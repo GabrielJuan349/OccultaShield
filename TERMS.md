@@ -48,6 +48,7 @@ If you become aware of any misuse of the Software or potential legal violations,
 
 ### 11. Updates to Terms
 These terms may be updated periodically to reflect changes in legal frameworks or Software functionality. Users are responsible for reviewing updates to ensure continued compliance.
+
 ---
 
 By using this Software, the user agrees to all terms described in these documents. Failure to comply with any of these terms may result in the immediate termination of the license and potential legal action.

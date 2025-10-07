@@ -21,10 +21,10 @@ __pycache__/
 *.so
 
 # Virtual environment
-venv/
-env/
-.venv/
-.env/
+**/venv/
+**/env/
+**/.venv/
+**/.env/
 
 # Distribution / packaging
 .Python
@@ -80,4 +80,7 @@ cover/
 .spyderworkspace
 
 # VS Code
-.vscode/
+**/.vscode/
+
+# UV dependencies
+uv.lock

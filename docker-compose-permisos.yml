@@ -1,0 +1,25 @@
+# Docker Compose CORREGIDO para SurrealDB - Solución de permisos
+# Versión con directorio local y permisos corregidos
+
+version: '3.8'
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    container_name: surrealdb
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./surrealdb-data:/data:rw
+    environment:
+      - RUST_LOG=info
+    command: >
+      start 
+      --log info
+      --user root
+      --pass Occultashield_db
+      --auth
+      rocksdb:/data/database.db
+    restart: unless-stopped
+    # Solución para el error de permisos:
+    user: "0:0"  # Ejecutar como root dentro del contenedor

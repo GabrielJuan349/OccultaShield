@@ -1,0 +1,39 @@
+# Configuración de Docker Compose para SurrealDB con autenticación
+# Compatible con Surrealist para conectar via GUI
+
+version: '3.8'
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    container_name: surrealdb
+    ports:
+      - "${SURREALDB_PORT:-8000}:8000"
+    # volumes:
+    #   - surrealdb_data:/data
+    environment:
+      - RUST_LOG=${SURREALDB_LOG:-info}
+    env_file:
+      - .env
+    command: >
+      start 
+      --log ${SURREALDB_LOG:-info}
+      --user ${SURREALDB_USER}
+      --pass ${SURREALDB_PASS}
+      rocksdb:/data/database.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - backend
+    volumes:
+      - ./surrealdb-data:/data:rw
+    user: "0:0" 
+
+networks:
+  backend:
+    driver: bridge

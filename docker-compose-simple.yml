@@ -1,0 +1,34 @@
+# Docker Compose alternativo más simple para SurrealDB
+
+version: '3.8'
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    container_name: surrealdb-simple
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./surrealdb-data:/data
+    environment:
+      - SURREAL_USER=root
+      - SURREAL_PASS=mi-password-segura
+      - SURREAL_LOG=info
+    command: >
+      start 
+      --log info
+      --user root
+      --pass mi-password-segura
+      --auth
+      rocksdb:/data/database.db
+    restart: unless-stopped
+
+# Instrucciones de uso:
+# 1. Cambiar "mi-password-segura" por tu contraseña deseada
+# 2. Ejecutar: docker-compose up -d
+# 3. Conectar desde Surrealist:
+#    - URL: http://localhost:8000
+#    - Usuario: root
+#    - Contraseña: mi-password-segura
+#    - Namespace: test (o crear uno nuevo)
+#    - Database: test (o crear una nueva)

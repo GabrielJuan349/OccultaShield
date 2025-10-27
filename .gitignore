@@ -25,6 +25,7 @@ __pycache__/
 **/env/
 **/.venv/
 **/.env/
+**/.env
 
 # Distribution / packaging
 .Python
@@ -84,3 +85,6 @@ cover/
 
 # UV dependencies
 uv.lock
+
+# SurrealDB
+**/surrealdb-data/

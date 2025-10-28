@@ -1,0 +1,87 @@
+<nav class="navbar">
+  <div class="container">
+    <a href="#" class="navbar-brand">🛡️ OccultaShield</a>
+
+    <!-- Botón hamburguesa para móvil -->
+    <button class="hamburger-menu" (click)="toggleMobileMenu()" [class.active]="mobileMenuOpen()">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <ul class="nav-links" [class.mobile-menu-open]="mobileMenuOpen()">
+      <li><a href="#features" (click)="closeMobileMenu()">Cómo Funciona</a></li>
+      <li><a href="#compliance" (click)="closeMobileMenu()">IA Act & GDPR</a></li>
+      <li><a href="/login" class="cta-login-button-nav" (click)="closeMobileMenu()">Iniciar Sesión</a></li>
+      <li><a href="#contact" class="cta-button-nav" (click)="closeMobileMenu()">Solicitar Demo</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <h1>Vuela tu Dron. Nosotros nos encargamos de la Privacidad.</h1>
+    <h2 class="subtitle">
+      OccultaShield: El sistema de IA listo para producción que automatiza el cumplimiento del GDPR en vídeos de drones.
+    </h2>
+    <p class="hero-subtext">
+      Transforma la burocracia legal en un proceso eficiente.
+      Anonimiza rostros y matrículas con supervisión humana.
+    </p>
+    <a href="#features" class="cta-button">Ver Cómo Funciona</a>
+  </div>
+</header>
+
+<section id="features" class="features-section">
+  <div class="container">
+    <h2>De la Captura al Cumplimiento en 3 Pasos</h2>
+    <div class="features-grid">
+      @for (feature of features; track feature.title) {
+        <div class="feature-card">
+          <div class="feature-icon">{{ feature.icon }}</div>
+          <h3>{{ feature.title }}</h3>
+          <p>{{ feature.description }}</p>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<section id="compliance" class="compliance-section">
+  <div class="container">
+    <div class="compliance-content">
+      <h2>Diseñado para la AI Act: Riesgo Bajo por Defecto</h2>
+      <p>
+        Otros sistemas automatizados son "cajas negras" que pueden clasificarse como de Alto Riesgo.
+        OccultaShield se diseñó desde cero para ser un sistema de <strong>Riesgo Bajo</strong>.
+      </p>
+      <p>
+        Al integrar la <strong>Supervisión Humana</strong> en el bucle de validación, la IA actúa como un asistente,
+        no como un decisor autónomo. Tú tienes el control final, garantizando la máxima seguridad jurídica.
+      </p>
+    </div>
+    <div class="compliance-image">
+      <img [src]="complianceImage" alt="Diagrama de IA con Supervisión Humana">
+    </div>
+  </div>
+</section>
+
+<section id="contact" class="contact-section">
+  <div class="container">
+    <h2>Prepara tus Operaciones para el Futuro</h2>
+    <p>
+      OccultaShield es un proyecto de Tesis de Grado en desarrollo.
+      <br>Si eres un piloto profesional o una empresa interesada en una demo, contáctanos.
+    </p>
+    <form class="contact-form">
+      <input type="email" placeholder="tu-email@empresa.com" required>
+      <button type="submit" class="cta-button">Notificarme</button>
+    </form>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <p>&copy; {{ (today | date:'yyyy') }} OccultaShield. Un Proyecto de Tesis de Grado.</p>
+  </div>
+</footer>

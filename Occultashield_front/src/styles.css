@@ -9,6 +9,17 @@
   --light-text: #f7fafc;
   --section-bg: #f9f9f9;
   --border-color: #e2e8f0;
+  --primary-color: #007bff;
+  --primary-hover: #0056b3;
+  --primary-dark: #004085; /* Nuevo: un azul más oscuro */
+  --primary-light: #66b5ff; /* Nuevo: un azul más claro para disabled */
+
+  --background-light: #f0f2f5; /* Nuevo: fondo para la página de auth */
+  --text-dark: #333333; /* Nuevo: texto oscuro */
+  --text-medium: #6c757d; /* Nuevo: texto medio */
+  --border-light: #ced4da; /* Nuevo: borde claro */
+  --error-red: #dc3545; /* Nuevo: color para mensajes de error */
+  --error-bg: #f8d7da; /* Nuevo: fondo para mensajes de error */
 }
 
 * {

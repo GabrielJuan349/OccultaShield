@@ -1,8 +1,10 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import os
 import uvicorn
 from contextlib import asynccontextmanager
 from surreal_conn import SurrealConn
+from auth import AuthMiddleware, AuthService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -10,8 +12,6 @@ async def lifespan(app: FastAPI):
     global surreal_conn
     surreal_conn = SurrealConn()
     await surreal_conn.connect()
-    await surreal_conn.getting_db("knowledge_graph")
-    print("Database connected successfully")
     
     yield  # Aquí la aplicación está corriendo
     
@@ -21,12 +21,34 @@ async def lifespan(app: FastAPI):
 
     
 app = FastAPI(lifespan=lifespan)
+
+# Configurar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:4200"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],  # Permite todos los headers
+    options_success_status=204,
+)
+
+# Configurar middleware de autenticación
+app.add_middleware(AuthMiddleware, surreal_conn=surreal_conn)
+# Inicializar el servicio de autenticación
+auth_service = AuthService(surreal_conn)
+
 # print("Using database:", db)
 
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
 
+@app.post("/auth/login")
+def login():
+    return {"status": "User logged in"}
+@app.post("/auth/register")
+def register():
+    return {"status": "User registered"}
 @app.post("/osd/in")
 def enter_video():
     return {"status": "Video entered"}

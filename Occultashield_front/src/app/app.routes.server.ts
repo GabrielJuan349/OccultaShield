@@ -4,5 +4,22 @@ export const serverRoutes: ServerRoute[] = [
   {
     path: '**',
     renderMode: RenderMode.Server
+  },
+  {
+    path: 'login',
+    renderMode: RenderMode.Client
+  },
+  {
+    path: 'upload',
+    renderMode: RenderMode.Prerender
+  },
+  {
+    path: 'download',
+    renderMode: RenderMode.Prerender
+  },
+  {
+    path:'quiz',
+    renderMode: RenderMode.Prerender
   }
+
 ];

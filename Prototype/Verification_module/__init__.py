@@ -1,15 +1,11 @@
-import json
-from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Any
+from .graph_rag import GDPRVerificationGraph
 
-
-@dataclass
-class Vulneration_info:
-    Article: str
-    Description: str
-    fine: float
-
-def execute_module(vulnerations: Dict[str, List[str]]) -> Dict[str, Vulneration_info]:
-    result: Dict[str, Vulneration_info] = {}
-    # result["message"] = "Module executed successfully"
+def verify_video_content(image_path: str, detected_objects: List[str]) -> Dict[str, Any]:
+    """
+    Main entry point for the Verification Module.
+    Uses GraphRAG to verify GDPR compliance of a video frame.
+    """
+    verifier = GDPRVerificationGraph()
+    result = verifier.run(image_path, detected_objects)
     return result

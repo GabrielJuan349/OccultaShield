@@ -1,0 +1,102 @@
+<div class="flex min-h-screen bg-[#080b1a] text-gray-200">
+  <!-- Left Column: Form -->
+  <div class="flex w-full flex-col justify-center px-8 py-12 lg:w-1/2 lg:px-16 xl:px-20">
+    <div class="w-full max-w-[320px]">
+      <div>
+        <div class="flex items-center gap-3 mb-6">
+          <img
+            alt="OccultaShield falcon logo"
+            class="h-8 w-auto"
+            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVblWw18X9kgJMLam2CCGufW8Rvn2u_DTXC12QI9vwSLt-WwHo-FjSySSwEgKvY8sVep9yVm1A8AF4jrh6gknt2nW_OavMY7FBqDu2O_0GJXuZaYzXpVkrcUWw3jrRpwvkCvp3aQOgX8LNSzCaFtO_bz1ZFBJZvSPjkieb9yIYUlbuyTBm0k6JWrUjVn4ELsW4nlh1YXV_mPz_sJywAlXPr50JK7IXohtxNhtKkoA_fBgLJaOlqLge9ylL49xDGtFTevgJBz7MHX0"
+          />
+          <span class="text-xl font-bold text-white">OccultaShield</span>
+        </div>
+        <h2 class="text-lg font-semibold text-white">Secure Access Portal</h2>
+        <p class="mt-1.5 text-sm text-gray-400">
+          Enter your credentials to access your secure dashboard.
+        </p>
+      </div>
+
+      <div class="mt-8">
+        <form (submit)="handleSignIn(); $event.preventDefault()" class="space-y-4">
+          <div>
+            <label for="email" class="block text-xs font-medium text-gray-400 mb-1.5">
+              Email address
+            </label>
+            <input
+              id="email"
+              type="email"
+              [field]="loginForm.email"
+              autocomplete="email"
+              class="block w-full rounded-md border border-[#2a3555] bg-[#0d1224] py-2.5 px-3 text-white placeholder:text-gray-500 focus:border-[#4364F7] focus:outline-none focus:ring-1 focus:ring-[#4364F7] text-sm"
+            />
+          </div>
+
+          <div>
+            <label for="password" class="block text-xs font-medium text-gray-400 mb-1.5">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              [field]="loginForm.password"
+              autocomplete="current-password"
+              class="block w-full rounded-md border border-[#2a3555] bg-[#0d1224] py-2.5 px-3 text-white placeholder:text-gray-500 focus:border-[#4364F7] focus:outline-none focus:ring-1 focus:ring-[#4364F7] text-sm"
+            />
+          </div>
+
+          <div class="flex items-center justify-between py-1">
+            <div class="flex items-center gap-2">
+              <input
+                id="remember-me"
+                type="checkbox"
+                [field]="loginForm.rememberMe"
+                class="h-3.5 w-3.5 rounded border-gray-500 bg-transparent text-[#4364F7] focus:ring-[#4364F7] focus:ring-offset-0"
+              />
+              <label for="remember-me" class="text-xs text-gray-400">
+                Remember me
+              </label>
+            </div>
+
+            <a href="#" class="text-xs font-medium text-[#4364F7] hover:text-[#6FB1FC]">
+              Forgot password?
+            </a>
+          </div>
+
+          <div class="flex items-center gap-3 pt-1">
+            <button
+              type="button"
+              class="flex w-full justify-center rounded-md border border-[#4364F7] bg-transparent px-4 py-2.5 text-sm font-medium text-white hover:bg-[#4364F7]/10 transition-colors duration-200"
+            >
+              Register
+            </button>
+            <button
+              type="submit"
+              class="flex w-full justify-center rounded-md bg-linear-to-r from-[#0052D4] via-[#4364F7] to-[#6FB1FC] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 transition-opacity duration-200"
+            >
+              Sign in
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Graphic -->
+  <div class="relative hidden lg:block lg:w-1/2">
+    <div class="absolute inset-0 bg-linear-to-br from-[#0a47a0] via-[#2563eb] to-[#4f8bff]"></div>
+    <img
+      alt="Falcon head outline"
+      class="absolute inset-0 h-full w-full object-cover object-center opacity-40 mix-blend-soft-light"
+      src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2dNRmY1pY6_TSy-uS3rRIwKq50N_LCb09lwsGMvwLDHC3aqyVz-OcDwLicl6SfXzsDnnMfLgTdJFwvxjDw1WG6ue-BoF28Q669yL7dLMooo2Zt7afsE_xKUw0N5rMW6M_U_XJGZXHZUxWZjGmtHTjGrj3Y7B5aFre_GVywaH3iR7MtlwciO3d386T_CGA3xMs3HWhySSM4_VjyOpBaikf9ZbYz3XShmeVai87Ztp_bIHDXJNN4ynHsBQ5FGPqsI5igGRoubSem3M"
+    />
+    <div class="absolute inset-0 flex flex-col items-center justify-center px-8 text-center text-white">
+      <div class="max-w-sm">
+        <h2 class="text-3xl font-bold italic leading-tight mb-3">Your Digital Guardian</h2>
+        <p class="text-sm leading-relaxed opacity-90">
+          Advanced video privacy and GDPR compliance, powered by state-of-the-art technology. OccultaShield stands watch, so you don't have to.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

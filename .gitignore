@@ -88,3 +88,6 @@ uv.lock
 
 # SurrealDB
 **/surrealdb-data/
+**/neo4j/
+**/data/
+**/neo4j-data

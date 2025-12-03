@@ -1,3 +1,7 @@
+/* You can add global styles to this file, and also import other style files */
+
+@import "tailwindcss";
+
 /* src/styles.css */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
 
@@ -83,3 +87,4 @@ p {
   background-color: var(--primary-hover);
   cursor: pointer;
 }
+

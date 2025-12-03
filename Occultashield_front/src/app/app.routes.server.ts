@@ -9,7 +9,7 @@ export const serverRoutes: ServerRoute[] = [
     path: 'login',
     renderMode: RenderMode.Client
   },
-  {
+    {
     path: 'upload',
     renderMode: RenderMode.Prerender
   },
@@ -18,8 +18,11 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Prerender
   },
   {
-    path:'quiz',
+    path:'review',
+    renderMode: RenderMode.Prerender
+  },
+  {
+    path: 'processing',
     renderMode: RenderMode.Prerender
   }
-
 ];

@@ -1,14 +1,15 @@
 import { Routes } from '@angular/router';
-import { LoginRegister } from './pages/LoginRegister/LoginRegister';
 import { LandingPage } from './pages/LandingPage/LandingPage';
+import { LoginRegister } from './pages/LoginRegister/LoginRegister';
 import { UploadPage } from './pages/UploadPage/UploadPage';
+import { ReviewPage } from './pages/ReviewPage/ReviewPage';
 import { DownloadPage } from './pages/DownloadPage/DownloadPage';
-import { authGuard } from './guards/auth.guard';
+import { ProcessingPage } from './pages/ProcessingPage/ProcessingPage';
 
 export const routes: Routes = [
   {
     path: '',
-    component: LandingPage,
+    component: LandingPage
   },
   {
     path: 'login',
@@ -17,16 +18,20 @@ export const routes: Routes = [
   {
     path: 'upload',
     component: UploadPage,
-    canActivate: [authGuard]
+    // canActivate: [authGuard]
   },
   {
     path: 'download',
     component: DownloadPage,
-    canActivate: [authGuard]
+    // canActivate: [authGuard]
   },
   {
-    path: 'quiz',
-    component: LandingPage,
+    path: 'review',
+    component: ReviewPage,
+  },
+  {
+    path: 'processing',
+    component: ProcessingPage,
   },
   {
     path: '**',

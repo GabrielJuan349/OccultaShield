@@ -1,9 +1,22 @@
-# Configuración de Docker Compose para SurrealDB con autenticación
-# Compatible con Surrealist para conectar via GUI
-
-version: '3.8'
-
 services:
+  neo4j:
+    image: neo4j:latest
+    container_name: neo4j
+    restart: unless-stopped
+    ports:
+      - 7474:7474
+      - 7687:7687
+    volumes:
+      - ./neo4j/logs:/logs
+      - ./neo4j/config:/config
+      - ./neo4j/data:/data
+      - ./neo4j/plugins:/plugins
+    environment: 
+      # Credentials
+      - NEO4J_AUTH=neo4j/Occultashield_neo4j
+      # - NEO4J_AUTH=${NEO4J_USER}/${NEO4J_PASS}
+    networks:
+      - backend
   surrealdb:
     image: surrealdb/surrealdb:latest
     container_name: surrealdb

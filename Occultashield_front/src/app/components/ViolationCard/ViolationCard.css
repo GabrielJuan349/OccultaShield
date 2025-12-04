@@ -1,0 +1,314 @@
+:host {
+  display: block; /* Importante para custom elements */
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr; /* Móvil: 1 columna */
+  background: var(--bg-card);
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-light);
+  transition: box-shadow 0.3s ease;
+}
+
+.card-grid:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+/* Desktop Grid: 3 columnas más grandes */
+@media (min-width: 1024px) {
+  .card-grid {
+    grid-template-columns: 360px 1fr 480px;
+    min-height: 400px;
+  }
+}
+
+/* --- COLUMNA 1: OPCIONES --- */
+.col-options {
+  padding: 1.5rem;
+  border-right: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.option-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: #F8FAFC;
+  border: 2px solid transparent;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.option-btn .icon { font-size: 1.25rem; }
+
+.option-btn:hover { background-color: #E2E8F0; }
+
+/* Estado Activo */
+.option-btn.active {
+  background-color: #ECFEFF; /* Cyan 50 muy claro */
+  color: #0891B2; /* Cyan 600 */
+  border-color: var(--primary-cyan);
+  font-weight: 600;
+}
+
+/* --- COLUMNA 2: INFO --- */
+.col-info {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.article-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.article-subtitle {
+  color: var(--primary-cyan);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  margin: 0.25rem 0 1rem 0;
+}
+
+.description {
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  flex-grow: 1; /* Empuja el fine-box hacia abajo */
+}
+
+.fine-box {
+  background-color: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+
+.fine-label {
+  color: #991B1B; /* Red 800 */
+  font-weight: 700;
+  margin: 0 0 0.25rem 0;
+}
+
+.fine-value {
+  color: var(--danger-text);
+  font-weight: 900;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+/* --- COLUMNA 3: IMAGEN --- */
+.col-image {
+  position: relative;
+  min-height: 300px;
+  background-color: #eee;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.preview-img {
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.group:hover .preview-img {
+  transform: scale(1.05);
+}
+
+/* Overlay para indicar que es clickeable */
+.image-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: white;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.image-overlay .material-symbols-outlined {
+  font-size: 3rem;
+}
+
+.col-image:hover .image-overlay,
+.col-image:focus .image-overlay {
+  opacity: 1;
+}
+
+/* --- MODAL DE PREVISUALIZACIÓN --- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  animation: scaleIn 0.3s ease-out;
+}
+
+.modal-close {
+  position: absolute;
+  top: -3rem;
+  right: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.modal-close .material-symbols-outlined {
+  font-size: 1.5rem;
+}
+
+.modal-image {
+  max-width: 100%;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.modal-hint {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+/* --- PROTECCIÓN CONTRA CAPTURAS DE PANTALLA --- */
+.protected-content {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.protected-image-container {
+  position: relative;
+  display: inline-block;
+  transition: opacity 0.1s ease;
+}
+
+/* Ocultar imagen durante captura de pantalla */
+.protected-image-container.hidden-for-capture {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.protected-image-container .modal-image {
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Marca de agua diagonal sobre la imagen */
+.watermark-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.08;
+}
+
+.watermark-overlay span {
+  font-size: 2rem;
+  font-weight: 900;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 1rem;
+  transform: rotate(-25deg);
+  white-space: nowrap;
+}
+
+/* Mensaje de captura bloqueada */
+.capture-blocked-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem 2rem;
+  color: rgba(255, 255, 255, 0.8);
+  animation: fadeIn 0.2s ease;
+}
+
+.capture-blocked-message .material-symbols-outlined {
+  font-size: 4rem;
+  color: #ef4444;
+}
+
+.capture-blocked-message p {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

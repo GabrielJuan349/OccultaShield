@@ -1,3 +1,235 @@
+/* processing.component.css */
+
+/* 1. TOKENS DE DISEÑO */
 :host {
+  /* Paleta Oscura "Cyberpunk/Tech" */
+  --bg-dark: #02042B;       /* Fondo azul muy profundo */
+  --brand-cyan: #00C7FF;    /* Cyan neón */
+  --brand-blue: #0052D4;    /* Azul eléctrico */
+  --text-white: #FFFFFF;
+  --text-muted: #94A3B8;    /* Slate 400 */
+
+  --font-main: 'Inter', sans-serif;
+
+  /* Gradientes */
+  --grad-bar: linear-gradient(90deg, var(--brand-blue), var(--brand-cyan));
+  --grad-text: linear-gradient(to right, var(--brand-cyan), #FFFFFF);
+}
+
+/* 2. LAYOUT PÁGINA */
+.page-container {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--bg-dark);
+  color: var(--text-white);
+  font-family: var(--font-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden; /* Para que los glows no generen scroll */
+}
+
+/* 3. AMBIENTE (Luces de fondo) */
+.ambient-glow {
+  position: absolute;
+  width: 50vw;
+  height: 50vw;
+  border-radius: 50%;
+  filter: blur(80px); /* Desenfoque extremo */
+  opacity: 0.3;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.glow-top {
+  top: -20%;
+  left: -10%;
+  background-color: var(--brand-blue);
+}
+
+.glow-bottom {
+  bottom: -20%;
+  right: -10%;
+  background-color: var(--brand-cyan);
+}
+
+/* 4. CONTENIDO PRINCIPAL */
+.content-wrapper {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 500px;
+  padding: 2rem;
+}
+
+/* 5. SISTEMA DE SPINNER (Anillos) */
+.spinner-container {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2.5rem;
+}
+
+/* Anillos Generales */
+.ring {
+  position: absolute;
+  border-radius: 50%;
+  border-style: solid;
+}
+
+/* Anillo Exterior (Cyan) */
+.ring-outer {
+  inset: 0;
+  border-width: 3px;
+  border-color: rgba(0, 199, 255, 0.15);
+  border-top-color: var(--brand-cyan);
+  border-left-color: var(--brand-cyan);
+  -webkit-animation: spin 3s linear infinite;
+  animation: spin 3s linear infinite;
+  filter: drop-shadow(0 0 8px rgba(0, 199, 255, 0.6));
+}
+
+/* Anillo Interior (Azul) */
+.ring-inner {
+  inset: 20px;
+  border-width: 3px;
+  border-color: rgba(0, 82, 212, 0.15);
+  border-bottom-color: var(--brand-blue);
+  border-right-color: var(--brand-blue);
+  -webkit-animation: spin 2s linear infinite reverse;
+  animation: spin 2s linear infinite reverse;
+  filter: drop-shadow(0 0 8px rgba(0, 82, 212, 0.6));
+}
+
+/* Núcleo Central */
+.core-glow {
+  position: relative;
+  z-index: 1;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background-color: rgba(2, 4, 43, 0.9);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-animation: pulse-glow 2.5s ease-in-out infinite;
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
+.logo-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-wrapper img {
+  object-fit: contain;
+  filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
+}
+
+/* 6. TIPOGRAFÍA */
+.headline {
+  font-size: 2.5rem; /* ~text-4xl */
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-align: center;
+  margin: 0 0 2rem 0;
+  line-height: 1.1;
+}
+
+.gradient-text {
+  background: var(--grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   display: block;
+}
+
+.block-text {
+  display: block;
+  color: white;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+/* 7. BARRA DE PROGRESO */
+.progress-section {
+  width: 100%;
+}
+
+.progress-track {
+  width: 100%;
+  height: 0.75rem; /* h-3 */
+  background-color: rgba(51, 65, 85, 0.5); /* Slate 700 con transparencia */
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--grad-bar);
+  border-radius: 9999px;
+  /* Transición suave para que no salte al actualizarse */
+  transition: width 0.2s linear;
+  box-shadow: 0 0 10px rgba(0, 199, 255, 0.5); /* Glow en la barra */
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.percent {
+  color: white;
+  font-weight: 700;
+}
+
+/* 8. ANIMACIONES (Keyframes) */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@-webkit-keyframes spin {
+  from {
+    -webkit-transform: rotate(0deg);
+    transform: rotate(0deg);
+  }
+  to {
+    -webkit-transform: rotate(360deg);
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px 5px rgba(0, 199, 255, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 50px 15px rgba(0, 199, 255, 0.5);
+    transform: scale(1.02);
+  }
+}
+
+/* Media Queries para pantallas grandes */
+@media (min-width: 640px) {
+  .headline { font-size: 3.5rem; }
 }

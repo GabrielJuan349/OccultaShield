@@ -1,0 +1,22 @@
+<div class="admin-container">
+  <aside class="admin-sidebar">
+    <div class="admin-header">
+      <h2>Admin Panel</h2>
+    </div>
+    <nav>
+      <a routerLink="/admin/dashboard" routerLinkActive="active">Dashboard</a>
+      <a routerLink="/admin/users" routerLinkActive="active">Usuarios</a>
+
+      <div class="spacer" style="flex: 1;"></div>
+
+      <button class="nav-item logout" (click)="logout()">
+        Cerrar Sesión
+      </button>
+
+      <a routerLink="/" class="back-link">Volver a la App</a>
+    </nav>
+  </aside>
+  <main class="admin-content">
+    <router-outlet></router-outlet>
+  </main>
+</div>

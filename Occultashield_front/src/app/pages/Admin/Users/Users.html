@@ -1,0 +1,45 @@
+<div class="users-page">
+  <h1>Gestión de Usuarios</h1>
+
+  @if (loading()) {
+    <div class="loading">Cargando usuarios...</div>
+  } @else {
+    <div class="users-table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Email</th>
+            <th>Rol</th>
+            <th>Registrado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (user of users(); track user.id) {
+            <tr>
+              <td>
+                <div class="user-info">
+                  @if (user.image) {
+                    <img [src]="user.image" alt="Avatar" class="avatar">
+                  }
+                  <span>{{ user.name }}</span>
+                </div>
+              </td>
+              <td>{{ user.email }}</td>
+              <td>
+                <span class="role-badge" [class]="user.role">{{ user.role }}</span>
+              </td>
+              <td>{{ user.createdAt | date:'mediumDate' }}</td>
+              <td>
+                <button (click)="toggleAdmin(user)" class="action-btn">
+                  {{ user.role === 'admin' ? 'Quitar Admin' : 'Hacer Admin' }}
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

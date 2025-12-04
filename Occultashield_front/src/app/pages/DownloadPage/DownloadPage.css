@@ -1,3 +1,409 @@
+/* download.component.css */
+
+/* 1. VARIABLES DE DISEÑO (Tokens) */
 :host {
-  display: block;
+  /* Colores */
+  --bg-page: #F0F4F8;       /* Slate 50 */
+  --bg-card: #FFFFFF;
+  --text-main: #0F172A;     /* Slate 900 */
+  --text-muted: #64748B;    /* Slate 500 */
+  --border-light: #E2E8F0;
+
+  --cyan-primary: #06b6d4;  /* Cyan 500 */
+  --blue-primary: #3b82f6;  /* Blue 500 */
+
+  /* Gradientes */
+  --grad-main: linear-gradient(135deg, var(--cyan-primary), var(--blue-primary));
+
+  /* Sombras y Efectos */
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 20px rgba(6, 182, 212, 0.3); /* Glow Cyan */
+
+  --radius-card: 1rem;
+  --font-family: 'Roboto', sans-serif;
 }
+
+/* Header Styles */
+.header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.brand-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-icon {
+  width: 40px;
+  height: auto;
+}
+
+.brand-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.user-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.user-email {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.btn-logout {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: white;
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.btn-logout:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #ef4444;
+}
+
+.btn-logout .material-icons-outlined {
+  font-size: 1.1rem;
+}
+
+@media (max-width: 768px) {
+  .header-top {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .user-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .user-email {
+    display: none;
+  }
+}
+
+/* 2. REPRODUCTOR DE VIDEO NATIVO */
+.video-player {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: block;
+  background: #000;
+  border-radius: var(--radius-card);
+
+  /* Personalización de controles nativos (limitada pero funcional) */
+  &::-webkit-media-controls-panel {
+    background: linear-gradient(transparent 50%, rgba(0, 0, 0, 0.7));
+  }
+
+  &::-webkit-media-controls-play-button,
+  &::-webkit-media-controls-mute-button,
+  &::-webkit-media-controls-fullscreen-button {
+    filter: brightness(1.2);
+  }
+
+  &:focus {
+    outline: 2px solid var(--cyan-primary);
+    outline-offset: 2px;
+  }
+}
+
+/* Placeholder mientras carga el video */
+.video-placeholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border-radius: var(--radius-card);
+  color: var(--text-muted);
+
+  & .material-symbols-outlined {
+    font-size: 4rem;
+    opacity: 0.5;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  & .loading-spinner {
+    animation: spin 1s linear infinite;
+    opacity: 0.8;
+  }
+
+  &.error {
+    background: linear-gradient(135deg, #2e1a1a, #3e1616);
+
+    & .material-symbols-outlined {
+      color: #ef4444;
+      animation: none;
+      opacity: 0.8;
+    }
+  }
+
+  & p {
+    font-size: 1rem;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 3. LAYOUT */
+.page-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+  background-color: var(--bg-page);
+  font-family: var(--font-family);
+  color: var(--text-main);
+}
+
+.content-wrapper {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+/* 4. HEADER */
+.header {
+  text-align: center;
+}
+
+.title {
+  font-size: 3rem;
+  font-weight: 900;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.gradient-text {
+  background: var(--grad-main);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.subtitle {
+  font-size: 1.125rem;
+  color: var(--text-muted);
+  margin-top: 1rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* 5. VIDEO CARD */
+.video-card {
+  background-color: #000; /* Fondo negro para el video */
+  border-radius: var(--radius-card);
+  overflow: hidden; /* IMPORTANTE: Recorta las esquinas del video */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-light);
+  /* Forzamos relación de aspecto para evitar saltos de layout */
+  aspect-ratio: 16 / 9;
+}
+
+/* 6. GRID DE ACCIONES */
+.actions-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+/* Responsive: Desktop (Card grande + 2 pequeñas) */
+@media (min-width: 1024px) {
+  .actions-grid {
+    grid-template-columns: 2fr 1fr 1fr;
+  }
+}
+
+/* 7. TARJETAS GENÉRICAS */
+.card {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-light);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* TARJETA DE DESCARGA (Estilo Destacado) */
+.card-download {
+  border-color: rgba(6, 182, 212, 0.3);
+  box-shadow: var(--shadow-glow); /* Efecto resplandor */
+  text-align: center;
+  align-items: center;
+}
+
+.card-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+}
+
+.card-desc {
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.btn-download {
+  background: var(--grad-main);
+  color: white;
+  border: none;
+  padding: 1rem 2.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(6, 182, 212, 0.4);
+}
+
+.btn-download:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(6, 182, 212, 0.5);
+}
+
+.btn-download:disabled {
+  opacity: 0.8;
+  cursor: wait;
+}
+
+/* TARJETAS PEQUEÑAS (Share & Actions) */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.icon-circle {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.icon-share { background: linear-gradient(135deg, #06b6d4, #3b82f6); }
+.icon-settings { background: linear-gradient(135deg, #3b82f6, #6366f1); }
+
+.header-text h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.header-text span {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Input Group (Share) */
+.input-group {
+  display: flex;
+  position: relative;
+  width: 100%;
+}
+
+.share-input {
+  width: 100%;
+  padding: 0.75rem 3rem 0.75rem 1rem;
+  background-color: #F8FAFC;
+  border: 1px solid var(--border-light);
+  border-radius: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.btn-copy {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.btn-copy:hover { color: var(--blue-primary); }
+
+/* Lista de Links (Actions) */
+.action-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.link-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: #475569;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: color 0.2s;
+}
+
+.link-item:hover {
+  color: var(--blue-primary);
+}
+
+/* SPINNER */
+.spinner {
+  width: 1em;
+  height: 1em;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }

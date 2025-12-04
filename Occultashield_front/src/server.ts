@@ -1,3 +1,11 @@
+/**
+ * OccultaShield Server - Bun.serve() con Better-Auth y Angular SSR
+ *
+ * Este servidor maneja:
+ * 1. Autenticación via Better-Auth (/api/auth/*)
+ * 2. Archivos estáticos desde /browser
+ * 3. SSR de Angular para el resto de rutas
+ */
 import {
   AngularNodeAppEngine,
   createNodeRequestHandler,
@@ -6,63 +14,247 @@ import {
 } from '@angular/ssr/node';
 import express from 'express';
 import { join } from 'node:path';
+import { auth } from '../server/lib/auth';
+import { getDb } from '../server/lib/db';
 
+// Rutas de archivos
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
-const app = express();
+// Motor de Angular SSR
 const angularApp = new AngularNodeAppEngine();
 
-/**
- * Example Express Rest API endpoints can be defined here.
- * Uncomment and define endpoints as necessary.
- *
- * Example:
- * ```ts
- * app.get('/api/{*splat}', (req, res) => {
- *   // Handle API request
- * });
- * ```
- */
+// Aplicación Express (usada también por Angular CLI)
+const app = express();
 
-/**
- * Serve static files from /browser
- */
+// =========================================================================
+// MIDDLEWARE: Parsear JSON para rutas de API
+// =========================================================================
+app.use(express.json());
+
+// =========================================================================
+// RUTAS DE AUTENTICACIÓN (/api/auth/*)
+// Better-Auth usa Web Standard Request/Response
+// =========================================================================
+app.all('/api/auth/*splat', async (req, res) => {
+  try {
+    // Convertir Express Request a Web Standard Request
+    const protocol = req.protocol;
+    const host = req.get('host') ?? 'localhost';
+    const url = `${protocol}://${host}${req.originalUrl}`;
+
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (value) {
+        headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+      }
+    }
+
+    const webRequest = new Request(url, {
+      method: req.method,
+      headers,
+      body: ['GET', 'HEAD'].includes(req.method)
+        ? undefined
+        : JSON.stringify(req.body),
+    });
+
+    // Better-Auth maneja la petición
+    const response = await auth.handler(webRequest);
+
+    // Convertir Web Response a Express Response
+    res.status(response.status);
+
+    response.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+
+    const body = await response.text();
+    res.send(body);
+  } catch (error) {
+    console.error('Auth Error:', error);
+    res.status(500).json({ error: 'Authentication error' });
+  }
+});
+
+// =========================================================================
+// RUTAS DE ADMINISTRACIÓN (/api/admin/*)
+// =========================================================================
+const adminRouter = express.Router();
+
+// Middleware de verificación de Admin
+adminRouter.use(async (req, res, next) => {
+  try {
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+    }
+
+    const session = await auth.api.getSession({ headers });
+
+    if (!session || session.user.role !== 'admin') {
+      res.status(403).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    (req as any).user = session.user;
+    next();
+  } catch (error) {
+    console.error('Admin Auth Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /api/admin/stats
+adminRouter.get('/stats', async (req, res) => {
+  try {
+    const db = await getDb();
+
+    // Consultas paralelas para estadísticas
+    const [usersResult] = await db.query<[{ count: number }][]>('SELECT count() FROM user GROUP ALL');
+    const [sessionsResult] = await db.query<[{ count: number }][]>('SELECT count() FROM session GROUP ALL');
+    const [logsResult] = await db.query<[{ count: number }][]>('SELECT count() FROM processing_log GROUP ALL');
+
+    // Actividad reciente (últimos 10 logs)
+    const [recentActivity] = await db.query('SELECT * FROM processing_log ORDER BY createdAt DESC LIMIT 10');
+
+    const totalUsers = usersResult && usersResult[0] ? usersResult[0].count : 0;
+    const activeSessions = sessionsResult && sessionsResult[0] ? sessionsResult[0].count : 0;
+    const totalProcessed = logsResult && logsResult[0] ? logsResult[0].count : 0;
+
+    res.json({
+      totalUsers,
+      activeSessions,
+      totalProcessed,
+      recentActivity: recentActivity || []
+    });
+  } catch (error) {
+    console.error('Stats Error:', error);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+// GET /api/admin/users
+adminRouter.get('/users', async (req, res) => {
+  try {
+    const db = await getDb();
+    const [users] = await db.query('SELECT * FROM user ORDER BY createdAt DESC');
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// PATCH /api/admin/users/:id/role
+adminRouter.patch('/users/:id/role', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!['user', 'admin'].includes(role)) {
+      res.status(400).json({ error: 'Invalid role' });
+      return;
+    }
+
+    const db = await getDb();
+    // Asegurarse de que el ID tenga el formato correcto (user:xyz)
+    const userId = id.includes(':') ? id : `user:${id}`;
+
+    await db.merge(userId, { role });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update role' });
+  }
+});
+
+app.use('/api/admin', adminRouter);
+
+// =========================================================================
+// RUTAS DE API GENERAL
+// =========================================================================
+
+// POST /api/upload/log - Registrar actividad de subida
+app.post('/api/upload/log', async (req, res) => {
+  try {
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+    }
+
+    const session = await auth.api.getSession({ headers });
+    if (!session) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { fileName, fileSize, action, status } = req.body;
+    const db = await getDb();
+
+    await db.create('processing_log', {
+      userId: session.user.id,
+      action: action || 'upload',
+      fileName,
+      fileSize,
+      status: status || 'success',
+      metadata: {},
+      createdAt: new Date()
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Log Error:', error);
+    res.status(500).json({ error: 'Failed to log activity' });
+  }
+});
+
+// =========================================================================
+// ARCHIVOS ESTÁTICOS
+// =========================================================================
 app.use(
   express.static(browserDistFolder, {
     maxAge: '1y',
     index: false,
     redirect: false,
-  }),
+  })
 );
 
-/**
- * Handle all other requests by rendering the Angular application.
- */
+// =========================================================================
+// ANGULAR SSR (Todas las demás rutas)
+// =========================================================================
 app.use((req, res, next) => {
   angularApp
     .handle(req)
     .then((response) =>
-      response ? writeResponseToNodeResponse(response, res) : next(),
+      response ? writeResponseToNodeResponse(response, res) : next()
     )
     .catch(next);
 });
 
-/**
- * Start the server if this module is the main entry point, or it is ran via PM2.
- * The server listens on the port defined by the `PORT` environment variable, or defaults to 4000.
- */
+// ============================================================================
+// INICIALIZACIÓN DEL SERVIDOR
+// ============================================================================
 if (isMainModule(import.meta.url) || process.env['pm_id']) {
-  const port = process.env['PORT'] || 4000;
-  app.listen(port, (error) => {
-    if (error) {
-      throw error;
-    }
+  const PORT = Number(process.env['PORT'] ?? 4000);
 
-    console.log(`Node Express server listening on http://localhost:${port}`);
-  });
+  // Inicializar conexión a SurrealDB
+  getDb()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`✅ OccultaShield Server running at http://localhost:${PORT}`);
+        console.log(`   Auth endpoints: http://localhost:${PORT}/api/auth/*`);
+        console.log(`   Angular SSR: Enabled`);
+      });
+    })
+    .catch((error) => {
+      console.error('❌ Failed to connect to database:', error);
+      // Iniciar servidor sin DB para desarrollo
+      app.listen(PORT, () => {
+        console.log(`⚠️  Server running without database at http://localhost:${PORT}`);
+        console.log(`   Start SurrealDB and restart the server for full functionality`);
+      });
+    });
 }
 
 /**
- * Request handler used by the Angular CLI (for dev-server and during build) or Firebase Cloud Functions.
+ * Request handler usado por Angular CLI (dev-server y build)
  */
 export const reqHandler = createNodeRequestHandler(app);
+

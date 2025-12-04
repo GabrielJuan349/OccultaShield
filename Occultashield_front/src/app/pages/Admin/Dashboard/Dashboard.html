@@ -1,0 +1,52 @@
+<div class="dashboard">
+  <h1>Dashboard</h1>
+
+  @if (loading()) {
+    <div class="loading">Cargando estadísticas...</div>
+  } @else if (stats()) {
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>Usuarios Totales</h3>
+        <div class="value">{{ stats()?.totalUsers }}</div>
+      </div>
+      <div class="stat-card">
+        <h3>Sesiones Activas</h3>
+        <div class="value">{{ stats()?.activeSessions }}</div>
+      </div>
+      <div class="stat-card">
+        <h3>Archivos Procesados</h3>
+        <div class="value">{{ stats()?.totalProcessed }}</div>
+      </div>
+    </div>
+
+    <div class="recent-activity">
+      <h2>Actividad Reciente</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Acción</th>
+            <th>Archivo</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (log of stats()?.recentActivity; track log.id) {
+            <tr>
+              <td>{{ log.createdAt | date:'short' }}</td>
+              <td>{{ log.action }}</td>
+              <td>{{ log.fileName }}</td>
+              <td>
+                <span class="status-badge" [class]="log.status">{{ log.status }}</span>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="4">No hay actividad reciente.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

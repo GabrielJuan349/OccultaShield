@@ -1,0 +1,46 @@
+<div class="page-container">
+
+  <div class="ambient-glow glow-top"></div>
+  <div class="ambient-glow glow-bottom"></div>
+
+  <main class="content-wrapper">
+
+    <div class="spinner-container">
+      <div class="ring ring-outer"></div>
+
+      <div class="ring ring-inner"></div>
+
+      <div class="core-glow">
+        <div class="logo-wrapper">
+          <img
+            ngSrc="logo_1_escudo_sin.png"
+            width="96"
+            height="72"
+            alt="OccultaShield Logo"
+            priority
+          >
+        </div>
+      </div>
+    </div>
+
+    <h1 class="headline">
+      <span class="gradient-text">ENHANCING</span>
+      <span class="block-text">PRIVACY</span>
+    </h1>
+
+    <div class="progress-section">
+      <div class="progress-track">
+        <div
+          class="progress-fill"
+          [style.width.%]="progress()"
+        ></div>
+      </div>
+
+      <div class="progress-info">
+        <span class="percent">{{ progress() | number:'1.0-0' }}%</span>
+        <span class="time">Est. time remaining: {{ timeRemaining() }}</span>
+      </div>
+    </div>
+
+  </main>
+</div>

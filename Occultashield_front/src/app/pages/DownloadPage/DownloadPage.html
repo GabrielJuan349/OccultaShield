@@ -1,0 +1,132 @@
+<div class="page-container">
+  <main class="content-wrapper">
+
+    <header class="header">
+      <div class="header-top">
+        <div class="brand-wrapper">
+          <img class="brand-icon" src="logo_1_escudo_sin.png" alt="OccultaShield Logo" />
+          <span class="brand-name">OccultaShield</span>
+        </div>
+
+        <div class="user-actions">
+          <span class="user-email">{{ authService.user()?.email }}</span>
+          <button class="btn-logout" (click)="logout()">
+            <span class="material-icons-outlined">logout</span>
+            Logout
+          </button>
+        </div>
+      </div>
+
+      <h1 class="title">
+        Your Video is <span class="gradient-text">Ready</span>
+      </h1>
+      <p class="subtitle">
+        Your video has been successfully processed with the selected privacy modifications.
+        Preview the final result below before downloading.
+      </p>
+    </header>
+
+    <section class="video-card">
+      @defer (on idle) {
+        <video
+          class="video-player"
+          [src]="videoUrl()"
+          controls
+          playsinline
+          preload="metadata"
+        >
+          Tu navegador no soporta el elemento de video.
+        </video>
+      } @placeholder {
+        <div class="video-placeholder">
+          <span class="material-symbols-outlined">play_circle</span>
+          <p>Video Preview</p>
+        </div>
+      } @loading (minimum 300ms) {
+        <div class="video-placeholder">
+          <span class="material-symbols-outlined loading-spinner">sync</span>
+          <p>Cargando video...</p>
+        </div>
+      } @error {
+        <div class="video-placeholder error">
+          <span class="material-symbols-outlined">error</span>
+          <p>Error al cargar el video</p>
+        </div>
+      }
+    </section>
+
+    <section class="actions-grid">
+
+      <div class="card card-download">
+        <div class="card-content">
+          <h2 class="card-title">Download Your Video</h2>
+          <p class="card-desc">Get the final, privacy-enhanced version of your video file.</p>
+
+          <button
+            class="btn-download"
+            (click)="startDownload()"
+            [class.loading]="isDownloading()"
+            [disabled]="isDownloading()"
+          >
+            @if (isDownloading()) {
+              <div class="spinner"></div> Processing...
+            } @else {
+              <span class="material-symbols-outlined">download</span>
+              Download Video
+            }
+          </button>
+        </div>
+      </div>
+
+      <div class="card card-small">
+        <div class="card-header">
+          <div class="icon-circle icon-share">
+            <span class="material-symbols-outlined">share</span>
+          </div>
+          <div class="header-text">
+            <h3>Share Video</h3>
+            <span>Get a shareable link</span>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <input type="text" [value]="shareUrl()" readonly class="share-input">
+          <button
+            class="btn-copy"
+            (click)="copyLink()"
+            [attr.aria-label]="isCopied() ? 'Copied' : 'Copy'"
+          >
+            <span class="material-symbols-outlined">
+              {{ isCopied() ? 'check' : 'content_copy' }}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div class="card card-small">
+        <div class="card-header">
+          <div class="icon-circle icon-settings">
+            <span class="material-symbols-outlined">settings</span>
+          </div>
+          <div class="header-text">
+            <h3>Further Actions</h3>
+            <span>Need more options?</span>
+          </div>
+        </div>
+
+        <div class="action-links">
+          <a routerLink="/review" class="link-item">
+            <span class="material-symbols-outlined">edit</span>
+            Re-edit Modifications
+          </a>
+          <a routerLink="/upload" class="link-item">
+            <span class="material-symbols-outlined">upload_file</span>
+            Process Another Video
+          </a>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+</div>

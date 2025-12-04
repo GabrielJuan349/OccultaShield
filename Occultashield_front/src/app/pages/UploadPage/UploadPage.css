@@ -1,3 +1,384 @@
+/* upload.component.css */
+
+/* 1. TOKENS DE DISEÑO */
 :host {
-  display: block;
+  --primary: #00A9E0;       /* Cyan brillante */
+  --primary-dark: #007BA7;
+  --secondary: #08203E;     /* Azul oscuro (Textos principales) */
+  --bg-page: #F3F6F9;       /* Fondo exacto de la imagen objetivo */
+  --bg-card: #FFFFFF;
+  --bg-drop: #F8FAFC;       /* Fondo zona drop (Slate 50) */
+  --text-gray: #64748B;     /* Texto secundario */
+  --border-dashed: #CBD5E1;
+  --success: #16A34A;
+
+  --radius-card: 1rem;
+  --radius-btn: 9999px;
+  --font-family: 'Inter', system-ui, sans-serif;
+  --transition: all 0.2s ease-in-out;
+  --shadow-card: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+}
+
+/* 2. LAYOUT DE PÁGINA */
+.page-container {
+  display: flex;
+  flex-direction: column; /* Apilar header y main verticalmente */
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+  font-family: var(--font-family);
+  background-color: var(--bg-page); /* Color de fondo corregido */
+}
+
+/* === NUEVOS ESTILOS DEL ENCABEZADO === */
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1200px;
+  margin-bottom: 3rem;
+  padding: 0 2rem;
+}
+
+.brand-container {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-logo {
+  width: 60px;
+  height: auto;
+}
+
+.brand-name {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.brand-subtitle {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.user-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.user-email {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.btn-logout {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.btn-logout:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.btn-logout .material-icons-outlined {
+  font-size: 1.1rem;
+}
+
+@media (max-width: 768px) {
+  .main-header {
+    flex-direction: column;
+    gap: 1.5rem;
+    text-align: center;
+  }
+
+  .brand-container {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .user-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .user-email {
+    display: none;
+  }
+}
+
+/* ===================================== */
+
+
+/* 3. ESTRUCTURA PRINCIPAL */
+.main-content {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.upload-card {
+  width: 100%;
+  max-width: 850px; /* Ancho más amplio */
+  background-color: var(--bg-card);
+  padding: 3.5rem; /* Padding interno de la tarjeta */
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  /* Quitamos el borde sólido para coincidir con la imagen final */
+  /* border: 1px solid #E2E8F0; */
+}
+
+/* 4. ZONA DE DROP */
+.drop-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem 3rem;
+  background-color: var(--bg-drop);
+  border: 2px dashed var(--border-dashed);
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative; /* Necesario para el icono absoluto */
+}
+
+.drop-area:hover,
+.drop-area.drag-over {
+  border-color: var(--primary);
+  background-color: #F0F9FF;
+}
+
+/* Estado cuando hay un drag activo en cualquier parte del viewport */
+.drop-area.drag-active-global {
+  border-color: var(--primary);
+  border-width: 3px;
+  background-color: #E0F7FF;
+  transform: scale(1.02);
+  box-shadow: 0 0 0 4px rgba(0, 169, 224, 0.2), 0 8px 25px rgba(0, 169, 224, 0.15);
+  animation: pulse-border 1.5s ease-in-out infinite;
+}
+
+.drop-area.drag-active-global .title,
+.drop-area.drag-active-global .icon-floating {
+  animation: bounce-subtle 0.6s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(0, 169, 224, 0.2), 0 8px 25px rgba(0, 169, 224, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(0, 169, 224, 0.1), 0 12px 35px rgba(0, 169, 224, 0.25);
+  }
+}
+
+@keyframes bounce-subtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+/* --- ICONO FLOTANTE (Corregido) --- */
+.icon-floating {
+  background-color: var(--primary);
+  color: white;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.15);
+
+  /* Posicionamiento ABSOLUTO en la esquina */
+  position: absolute;
+  top: -2.25rem;
+  right: -2.25rem;
+}
+
+.icon-floating span {
+  font-size: 2.5rem;
+}
+
+/* Tipografía interna */
+.title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--secondary);
+  margin: 1.25rem 0 0.75rem 0;
+  text-align: center;
+}
+
+.subtitle {
+  font-size: 1.25rem;
+  color: var(--text-gray);
+  margin: 0;
+  text-align: center;
+}
+
+.legal-text {
+  font-size: 0.8rem;
+  color: #94A3B8;
+  margin-top: 1.5rem;
+}
+
+/* 5. SEPARADOR */
+.divider {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 260px;
+  margin: 2rem 0;
+}
+
+.divider .line {
+  flex: 1;
+  height: 1px;
+  background-color: var(--border-dashed);
+}
+
+.divider .text {
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  color: var(--text-gray);
+  font-weight: 500;
+}
+
+/* 6. BOTÓN */
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.875rem 3rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgba(0, 169, 224, 0.3);
+  transition: var(--transition);
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+.hidden { display: none; }
+
+/* 7. VISTA DE PROGRESO (Sin cambios) */
+.progress-area {
+  padding: 2rem 1rem;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.file-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+.percent { color: var(--primary); font-weight: 700; }
+
+.progress-track {
+  width: 100%;
+  height: 1rem;
+  background-color: #F1F5F9;
+  border-radius: var(--radius-btn);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+  border-radius: var(--radius-btn);
+  transition: width 0.3s ease-out;
+}
+
+.success-badge {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--success);
+  font-weight: 600;
+  font-size: 1.1rem;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* 8. BOTÓN CONTINUAR */
+.btn-continue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 1rem 2rem;
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-size: 1.125rem;
+  font-weight: 700;
+  font-family: var(--font-family);
+  cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgba(0, 169, 224, 0.3);
+  transition: var(--transition);
+  animation: slideUp 0.3s ease-out 0.2s both;
+}
+
+.btn-continue:hover {
+  background-color: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px -2px rgba(0, 169, 224, 0.4);
+}
+
+.btn-continue:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.btn-continue .material-icons-outlined {
+  font-size: 1.25rem;
+  transition: transform 0.2s ease;
+}
+
+.btn-continue:hover .material-icons-outlined {
+  transform: translateX(4px);
 }

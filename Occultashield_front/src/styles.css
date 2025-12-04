@@ -24,6 +24,19 @@
   --border-light: #ced4da; /* Nuevo: borde claro */
   --error-red: #dc3545; /* Nuevo: color para mensajes de error */
   --error-bg: #f8d7da; /* Nuevo: fondo para mensajes de error */
+
+  /* ReviewPage & ViolationCard variables */
+  --bg-page: #F0F4F8;
+  --bg-card: #FFFFFF;
+  --primary-cyan: #06b6d4;
+  --primary-blue: #2563EB;
+  --text-main: #0F172A;
+  --text-muted: #64748B;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  --danger-border: rgba(239, 68, 68, 0.3);
+  --danger-text: #DC2626;
+  --shadow-card: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-hover: 0 20px 25px -5px rgba(6, 182, 212, 0.15);
 }
 
 * {
@@ -86,5 +99,22 @@ p {
 .cta-button:hover {
   background-color: var(--primary-hover);
   cursor: pointer;
+}
+
+/* Animaciones globales para ProcessingPage */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px 5px rgba(0, 199, 255, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 50px 15px rgba(0, 199, 255, 0.5);
+    transform: scale(1.02);
+  }
 }
 

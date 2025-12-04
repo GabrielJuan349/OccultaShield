@@ -1,81 +1,117 @@
-<div class="auth-container">
-  <div class="auth-card">
-    <div class="auth-header">
-      <img [src]="logo" alt="OccultaShield Logo" class="auth-logo" width="120px" />
-      <h2>{{ isRegisterMode() ? 'Regístrate en OccultaShield' : 'Iniciar Sesión en OccultaShield' }}</h2>
-      <p>Bienvenido de nuevo. Accede a tu centro de control.</p>
-    </div>
+<div class="login-layout">
+  <main class="form-container">
+    <div class="form-wrapper">
 
-    <form [formGroup]="authForm" (ngSubmit)="onSubmit()">
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" formControlName="email" placeholder="tu@email.com" autocomplete="email" />
-        @if (email?.invalid && (email?.dirty || email?.touched)) {
-          <div class="error-message">
-            @if (email?.errors?.['required']) {
-              Email es requerido.
-            }
-            @if (email?.errors?.['email']) {
-              Formato de email inválido.
-            }
-          </div>
-        }
-      </div>
+      <header class="header">
+        <div class="logo-wrapper">
+          <img src="logo_1_escudo_sin.png" width="50" height="60" alt="Logo" priority>
+        </div>
+        <h1 class="brand-name">OccultaShield</h1>
+      </header>
 
-      <div class="form-group">
-        <label for="password">Contraseña</label>
-        <input type="password" id="password" formControlName="password" placeholder="Contraseña" autocomplete="current-password" />
-        @if (password?.invalid && (password?.dirty || password?.touched)) {
-          <div class="error-message">
-            @if (password?.errors?.['required']) {
-              Contraseña es requerida.
-            }
-            @if (password?.errors?.['minlength']) {
-              Contraseña debe tener al menos 6 caracteres.
-            }
-          </div>
-        }
-      </div>
+      <h2 class="headline">Secure Access Portal</h2>
+      <p class="subheadline">Enter your credentials to access your secure dashboard.</p>
 
-      @if (isRegisterMode()) {
-        <div class="form-group">
-          <label for="confirmPassword">Confirmar Contraseña</label>
-          <input type="password" id="confirmPassword" formControlName="confirmPassword" placeholder="Confirmar Contraseña" autocomplete="new-password" />
-          @if (confirmPassword?.invalid && (confirmPassword?.dirty || confirmPassword?.touched)) {
-            <div class="error-message">
-              @if (confirmPassword?.errors?.['required']) {
-                Confirmar contraseña es requerido.
+      <form (submit)="onSubmit($event)" class="login-form">
+
+        <div class="input-group">
+          <label for="email">Email address</label>
+
+          <input
+            id="email"
+            type="email"
+            [field]="loginForm.email"
+            placeholder="name@company.com"
+            autocomplete="email"
+          >
+
+          @if (loginForm.email().touched() && loginForm.email().invalid()) {
+            <ul class="error-list">
+              @for (error of loginForm.email().errors(); track error) {
+                <li class="error-text">{{ error.message }}</li>
               }
-              @if (confirmPassword?.errors?.['passwordMismatch']) {
-                Las contraseñas no coinciden.
-              }
-            </div>
+            </ul>
           }
         </div>
-      }
 
-      @if (errorMessage()) {
-        <div class="global-error-message">
-          {{ errorMessage() }}
+        <div class="input-group">
+          <label for="password">Password</label>
+          <div class="password-wrapper">
+            @if (showPassword()) {
+              <input
+                id="password"
+                type="text"
+                [field]="loginForm.password"
+                placeholder="••••••••"
+                autocomplete="current-password"
+              >
+            } @else {
+              <input
+                id="password"
+                type="password"
+                [field]="loginForm.password"
+                placeholder="••••••••"
+                autocomplete="current-password"
+              >
+            }
+            <button
+              type="button"
+              class="toggle-visibility"
+              (click)="togglePasswordVisibility()"
+              [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+            >
+              @if (!showPassword()) {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M1 1l22 22"></path></svg>
+              }
+            </button>
+          </div>
+
+          @if (loginForm.password().touched() && loginForm.password().invalid()) {
+            <ul class="error-list">
+              @for (error of loginForm.password().errors(); track error) {
+                <li class="error-text">{{ error.message }}</li>
+              }
+            </ul>
+          }
         </div>
-      }
 
-      <button type="submit" class="submit-button" [disabled]="authForm.invalid || loading()">
-        @if (loading()) {
-          <div class="spinner"></div>
-        } @else {
-          {{ isRegisterMode() ? 'Registrarme' : 'Iniciar Sesión' }}
-        }
-      </button>
-    </form>
+        <div class="actions-row">
+          <label class="custom-checkbox">
+            <input type="checkbox" [field]="loginForm.rememberMe">
+            <span class="checkmark"></span>
+            <span class="label-text">Remember me</span>
+          </label>
+          <a routerLink="/forgot-password" class="link-forgot">Forgot password?</a>
+        </div>
 
-    <div class="auth-footer">
-      @if (isRegisterMode()) {
-        <p>¿Ya tienes una cuenta? <a (click)="toggleMode()">Inicia Sesión</a></p>
-      } @else {
-        <p>¿No tienes una cuenta? <a (click)="toggleMode()">Regístrate aquí</a></p>
-        <a href="#" class="forgot-password">¿Olvidaste tu contraseña?</a>
-      }
+        <div class="buttons-grid">
+          <button type="button" class="btn btn-secondary">Register</button>
+
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="loginForm().invalid() || isLoading()"
+          >
+            @if (isLoading()) {
+              <span class="spinner"></span> Processing...
+            } @else {
+              Sign in
+            }
+          </button>
+        </div>
+
+      </form>
     </div>
-  </div>
+  </main>
+
+  <aside class="visual-panel">
+    <div class="visual-content">
+      <div class="text-content">
+        <h2>Your Digital Guardian</h2>
+        <p>Advanced video privacy and GDPR compliance, powered by state-of-the-art technology. OccultaShield stands watch, so you don't have to.</p>
+      </div>
+    </div>
+  </aside>
 </div>

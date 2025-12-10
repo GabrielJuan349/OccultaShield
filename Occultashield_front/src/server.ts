@@ -14,7 +14,7 @@ import {
 } from '@angular/ssr/node';
 import express from 'express';
 import { join } from 'node:path';
-import { auth } from '../server/lib/auth';
+import { authPromise } from '../server/lib/auth'; // ✅ Importar la promesa
 import { getDb, prepareDataForSurreal } from '../server/lib/db';
 import { ENV } from '../server/lib/env';
 
@@ -38,6 +38,9 @@ app.use(express.json());
 // =========================================================================
 app.all('/api/auth/*splat', async (req, res) => {
   try {
+    // ✅ Esperar a que auth esté listo
+    const auth = await authPromise;
+
     // Convertir Express Request a Web Standard Request
     const protocol = req.protocol;
     const host = req.get('host') ?? 'localhost';
@@ -84,6 +87,8 @@ const adminRouter = express.Router();
 // Middleware de verificación de Admin
 adminRouter.use(async (req, res, next) => {
   try {
+    const auth = await authPromise; // ✅ Esperar a que auth esté listo
+
     const headers = new Headers();
     for (const [key, value] of Object.entries(req.headers)) {
       if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
@@ -175,6 +180,8 @@ app.use('/api/admin', adminRouter);
 // POST /api/upload/log - Registrar actividad de subida
 app.post('/api/upload/log', async (req, res) => {
   try {
+    const auth = await authPromise; // ✅ Esperar a que auth esté listo
+
     const headers = new Headers();
     for (const [key, value] of Object.entries(req.headers)) {
       if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
@@ -237,8 +244,8 @@ app.use((req, res, next) => {
 if (isMainModule(import.meta.url) || ENV.RUN_UNDER_PROCESS_MANAGER) {
   const PORT = Number(ENV.PORT ?? 4000);
 
-  // Inicializar conexión a SurrealDB
-  getDb()
+  // Inicializar conexión a SurrealDB y Better-Auth
+  Promise.all([getDb(), authPromise])
     .then(() => {
       app.listen(PORT, () => {
         console.log(`✅ OccultaShield Server running at http://localhost:${PORT}`);
@@ -247,10 +254,10 @@ if (isMainModule(import.meta.url) || ENV.RUN_UNDER_PROCESS_MANAGER) {
       });
     })
     .catch((error) => {
-      console.error('❌ Failed to connect to database:', error);
+      console.error('❌ Failed to initialize server:', error);
       // Iniciar servidor sin DB para desarrollo
       app.listen(PORT, () => {
-        console.log(`⚠️  Server running without database at http://localhost:${PORT}`);
+        console.log(`⚠️  Server running with errors at http://localhost:${PORT}`);
         console.log(`   Start SurrealDB and restart the server for full functionality`);
       });
     });
@@ -260,4 +267,3 @@ if (isMainModule(import.meta.url) || ENV.RUN_UNDER_PROCESS_MANAGER) {
  * Request handler usado por Angular CLI (dev-server y build)
  */
 export const reqHandler = createNodeRequestHandler(app);
-

@@ -1,11 +1,10 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 
 
 @Component({
   selector: 'landing-page',
-  imports: [CommonModule, NgOptimizedImage],
+  imports: [CommonModule],
   templateUrl: './LandingPage.html',
   styleUrl: './LandingPage.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

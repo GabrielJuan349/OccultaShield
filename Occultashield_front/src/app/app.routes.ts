@@ -18,7 +18,7 @@ export const routes: Routes = [
   {
     path: 'admin',
     component: AdminLayoutComponent,
-    // canActivate: [roleGuard],
+    canActivate: [roleGuard],
     data: { role: 'admin' },
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
@@ -33,22 +33,22 @@ export const routes: Routes = [
   {
     path: 'upload',
     component: UploadPage,
-    // canActivate: [authGuard]
+    canActivate: [authGuard]
   },
   {
     path: 'download',
     component: DownloadPage,
-    // canActivate: [authGuard]
+    canActivate: [authGuard]
   },
   {
     path: 'review',
     component: ReviewPage,
-    // canActivate: [authGuard]
+    canActivate: [authGuard]
   },
   {
     path: 'processing',
     component: ProcessingPage,
-    // canActivate: [authGuard]
+    canActivate: [authGuard]
   },
   {
     path: '**',

@@ -2,11 +2,11 @@ import { Component, signal, effect, ChangeDetectionStrategy } from '@angular/cor
 import { NgOptimizedImage } from '@angular/common';
 import { RouterLink } from '@angular/router';
 // Importamos la API real de Signal Forms (Experimental/v21)
-import { form, Field, required, email, minLength, submit } from '@angular/forms/signals';
+import { form, Field, required, email, minLength, submit, validate } from '@angular/forms/signals';
 
 @Component({
   selector: 'app-login',
-  imports: [RouterLink, NgOptimizedImage, Field],
+  imports: [RouterLink, Field],
   templateUrl: './LoginRegister.html',
   styleUrls: ['./LoginRegister.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -15,22 +15,52 @@ export class LoginRegister {
 
   // 1. EL MODELO (Source of Truth)
   // En Signal Forms, los datos viven en un signal puro, independientes del formulario.
-  protected credentials = signal({
+  protected loginCredentials = signal({
     email: '',
     password: '',
     rememberMe: false
+  });
+  protected registerCredentials = signal({
+    nameSurname: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    privacyCheck: false,
   });
 
   // 2. EL FORMULARIO
   // La función form() toma el signal y crea un "FieldTree" (árbol de campos)
   // El segundo argumento es donde aplicamos las validaciones.
-  protected loginForm = form(this.credentials, (f) => {
+  protected loginForm = form(this.loginCredentials, (f) => {
     // f representa los campos del formulario
     required(f.email, { message: 'Email is required' });
     email(f.email, { message: 'Invalid email format' });
 
     required(f.password);
     minLength(f.password, 8, { message: 'Password must be at least 8 chars' });
+  });
+
+  protected registerForm = form(this.registerCredentials, (f) => {
+    required(f.nameSurname, { message: 'Name and surname are required' });
+    required(f.email, { message: 'Email is required' });
+    email(f.email, { message: 'Invalid email format' });
+
+    required(f.password);
+    minLength(f.password, 8, { message: 'Password must be at least 8 chars' });
+
+    required(f.confirmPassword);
+    validate(f.confirmPassword, ({ value, valueOf }) => {
+      const password = valueOf(f.password);
+      if (value() !== password) {
+        return {
+          kind: 'mismatch',
+          message: 'Passwords do not match'
+        };
+      }
+      return null;
+    });
+
+    required(f.privacyCheck, { message: 'You must accept the privacy policy' });
   });
 
   // Estado de UI local (no del formulario)
@@ -40,7 +70,7 @@ export class LoginRegister {
   constructor() {
     // Podemos reaccionar a cambios en el MODELO directamente
     effect(() => {
-      console.log('Model changed:', this.credentials());
+      console.log('Model changed:', this.loginCredentials());
     });
   }
 
@@ -56,7 +86,7 @@ export class LoginRegister {
       this.isLoading.set(true);
 
       // Leemos directamente nuestro signal 'credentials()', que ya está sincronizado.
-      const payload = this.credentials();
+      const payload = this.loginCredentials();
       console.log('Authenticating:', payload);
 
       await new Promise(r => setTimeout(r, 1500));

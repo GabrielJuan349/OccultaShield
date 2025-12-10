@@ -28,11 +28,12 @@ DEFINE INDEX user_email_idx ON user FIELDS email UNIQUE;
 -- ============================================================================
 -- TABLA: session
 -- Almacena las sesiones activas de los usuarios
+-- Relación: session -> user (many-to-one)
 -- ============================================================================
 DEFINE TABLE session SCHEMAFULL;
 
--- Campos principales
-DEFINE FIELD userId ON session TYPE string;
+-- Foreign Key: referencia al usuario (record link)
+DEFINE FIELD userId ON session TYPE record<user>;
 DEFINE FIELD token ON session TYPE string;
 DEFINE FIELD expiresAt ON session TYPE datetime;
 
@@ -51,11 +52,12 @@ DEFINE INDEX session_userId_idx ON session FIELDS userId;
 -- ============================================================================
 -- TABLA: account
 -- Almacena las cuentas vinculadas (providers como email, google, github, etc.)
+-- Relación: account -> user (many-to-one)
 -- ============================================================================
 DEFINE TABLE account SCHEMAFULL;
 
--- Campos principales
-DEFINE FIELD userId ON account TYPE string;
+-- Foreign Key: referencia al usuario (record link)
+DEFINE FIELD userId ON account TYPE record<user>;
 DEFINE FIELD accountId ON account TYPE string;
 DEFINE FIELD providerId ON account TYPE string;
 
@@ -98,29 +100,53 @@ DEFINE INDEX verification_identifier_idx ON verification FIELDS identifier;
 DEFINE INDEX verification_value_idx ON verification FIELDS value UNIQUE;
 
 -- ============================================================================
--- EVENTOS (Opcional - para limpieza automática)
--- ============================================================================
-
--- Evento para limpiar sesiones expiradas (ejecutar periódicamente)
--- DELETE session WHERE expiresAt < time::now();
-
--- Evento para limpiar verificaciones expiradas
--- DELETE verification WHERE expiresAt < time::now();
-
--- ============================================================================
 -- TABLA: processing_log
 -- Almacena el historial de archivos procesados para estadísticas
+-- Relación: processing_log -> user (many-to-one)
 -- ============================================================================
 DEFINE TABLE processing_log SCHEMAFULL;
 
-DEFINE FIELD userId ON processing_log TYPE string; -- ID del usuario (opcional si es anónimo)
+-- Foreign Key: referencia al usuario (record link)
+DEFINE FIELD userId ON processing_log TYPE record<user>;
 DEFINE FIELD action ON processing_log TYPE string; -- 'upload', 'clean', 'download'
 DEFINE FIELD fileName ON processing_log TYPE string;
 DEFINE FIELD fileSize ON processing_log TYPE number;
 DEFINE FIELD status ON processing_log TYPE string; -- 'success', 'error'
-DEFINE FIELD metadata ON processing_log TYPE object;
+DEFINE FIELD metadata ON processing_log TYPE option<object> DEFAULT {};
 DEFINE FIELD createdAt ON processing_log TYPE datetime DEFAULT time::now();
 
+-- Índices para búsquedas rápidas
 DEFINE INDEX log_userId_idx ON processing_log FIELDS userId;
 DEFINE INDEX log_action_idx ON processing_log FIELDS action;
+DEFINE INDEX log_createdAt_idx ON processing_log FIELDS createdAt;
+
+-- ============================================================================
+-- QUERIES DE EJEMPLO CON RECORD LINKS
+-- Las relaciones se navegan automáticamente
+-- ============================================================================
+
+-- Obtener sesiones con datos del usuario (el record link se resuelve automáticamente):
+-- SELECT *, userId.* AS user FROM session;
+
+-- Obtener cuentas con nombre del usuario:
+-- SELECT *, userId.name AS userName, userId.email AS userEmail FROM account;
+
+-- Obtener logs con información del usuario:
+-- SELECT *, userId.name AS userName FROM processing_log ORDER BY createdAt DESC;
+
+-- Estadísticas de procesamiento por usuario:
+-- SELECT userId, userId.name AS userName, count() as total, action FROM processing_log GROUP BY userId, action;
+
+-- Obtener todas las sesiones de un usuario específico:
+-- SELECT * FROM session WHERE userId = user:some_user_id;
+
+-- ============================================================================
+-- QUERIES DE LIMPIEZA (Ejecutar periódicamente via cron/tarea programada)
+-- ============================================================================
+
+-- Limpiar sesiones expiradas:
+-- DELETE session WHERE expiresAt < time::now();
+
+-- Limpiar verificaciones expiradas:
+-- DELETE verification WHERE expiresAt < time::now();
 

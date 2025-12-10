@@ -1,11 +1,11 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgOptimizedImage } from '@angular/common';
 
 @Component({
   selector: 'app-admin-users',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, NgOptimizedImage],
   templateUrl: './Users.html',
   styleUrl: './Users.css'
 })

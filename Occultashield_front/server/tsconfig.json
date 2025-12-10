@@ -12,7 +12,7 @@
     "outDir": "../dist/server",
     "rootDir": ".",
     "types": ["bun"],
-    "lib": ["ES2022"]
+    "lib": ["ES2024"]
   },
   "include": [
     "./**/*.ts"

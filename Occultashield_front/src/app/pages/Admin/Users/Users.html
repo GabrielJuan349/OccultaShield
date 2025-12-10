@@ -21,7 +21,7 @@
               <td>
                 <div class="user-info">
                   @if (user.image) {
-                    <img [src]="user.image" alt="Avatar" class="avatar">
+                    <img [ngSrc]="user.image" alt="Avatar" class="avatar">
                   }
                   <span>{{ user.name }}</span>
                 </div>

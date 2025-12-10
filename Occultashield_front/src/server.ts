@@ -15,7 +15,8 @@ import {
 import express from 'express';
 import { join } from 'node:path';
 import { auth } from '../server/lib/auth';
-import { getDb } from '../server/lib/db';
+import { getDb, prepareDataForSurreal } from '../server/lib/db';
+import { ENV } from '../server/lib/env';
 
 // Rutas de archivos
 const browserDistFolder = join(import.meta.dirname, '../browser');
@@ -188,15 +189,17 @@ app.post('/api/upload/log', async (req, res) => {
     const { fileName, fileSize, action, status } = req.body;
     const db = await getDb();
 
-    await db.create('processing_log', {
+    // prepareDataForSurreal convierte userId a record<user> automáticamente
+    const logData = prepareDataForSurreal({
       userId: session.user.id,
       action: action || 'upload',
-      fileName,
-      fileSize,
+      fileName: fileName || 'unknown',
+      fileSize: fileSize || 0,
       status: status || 'success',
-      metadata: {},
-      createdAt: new Date()
+      metadata: {}
     });
+
+    await db.create('processing_log', logData);
 
     res.json({ success: true });
   } catch (error) {
@@ -231,8 +234,8 @@ app.use((req, res, next) => {
 // ============================================================================
 // INICIALIZACIÓN DEL SERVIDOR
 // ============================================================================
-if (isMainModule(import.meta.url) || process.env['pm_id']) {
-  const PORT = Number(process.env['PORT'] ?? 4000);
+if (isMainModule(import.meta.url) || ENV.RUN_UNDER_PROCESS_MANAGER) {
+  const PORT = Number(ENV.PORT ?? 4000);
 
   // Inicializar conexión a SurrealDB
   getDb()

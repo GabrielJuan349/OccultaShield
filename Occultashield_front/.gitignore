@@ -44,3 +44,7 @@ Thumbs.db
 
 # bun docs
 bun.lock
+
+# server  files
+!lib/
+lib/**/!(*.ts)

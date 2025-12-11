@@ -3,7 +3,6 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 
 
 @Component({
-  selector: 'landing-page',
   imports: [CommonModule],
   templateUrl: './LandingPage.html',
   styleUrl: './LandingPage.css',

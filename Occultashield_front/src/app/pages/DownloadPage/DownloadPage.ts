@@ -4,7 +4,6 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
-  selector: 'app-download-page',
   imports: [RouterLink],
   templateUrl: './DownloadPage.html',
   styleUrl: './DownloadPage.css',

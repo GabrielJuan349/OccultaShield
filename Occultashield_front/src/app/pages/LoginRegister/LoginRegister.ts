@@ -1,17 +1,23 @@
-import { Component, signal, effect, ChangeDetectionStrategy } from '@angular/core';
+import { Component, signal, effect, ChangeDetectionStrategy, inject } from '@angular/core';
 import { NgOptimizedImage } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 // Importamos la API real de Signal Forms (Experimental/v21)
 import { form, Field, required, email, minLength, submit, validate } from '@angular/forms/signals';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
-  selector: 'app-login',
   imports: [RouterLink, Field],
   templateUrl: './LoginRegister.html',
   styleUrls: ['./LoginRegister.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LoginRegister {
+  private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+  // Estado de UI local (no del formulario)
+  protected showPassword = signal(false);
+  protected isLoading = signal(false);
+  protected currentView = signal<'login' | 'register'>('login');
 
   // 1. EL MODELO (Source of Truth)
   // En Signal Forms, los datos viven en un signal puro, independientes del formulario.
@@ -58,14 +64,10 @@ export class LoginRegister {
         };
       }
       return null;
-    });
-
+});
     required(f.privacyCheck, { message: 'You must accept the privacy policy' });
   });
 
-  // Estado de UI local (no del formulario)
-  protected showPassword = signal(false);
-  protected isLoading = signal(false);
 
   constructor() {
     // Podemos reaccionar a cambios en el MODELO directamente

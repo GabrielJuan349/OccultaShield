@@ -1,10 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { ViolationCard } from '../../components/ViolationCard/ViolationCard';
-import { ModificationType, Violation } from '../../../interface/violation-models';
+import { ModificationType, Violation } from '../../interface/violation-models';
 
 @Component({
-  selector: 'app-review',
   imports: [ViolationCard],
   templateUrl: './ReviewPage.html',
   styleUrl: './ReviewPage.css',

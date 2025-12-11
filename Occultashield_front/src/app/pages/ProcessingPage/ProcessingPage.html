@@ -1,45 +1,132 @@
+<!-- pages/ProcessingPage/ProcessingPage.html -->
 <div class="page-container">
-
   <div class="ambient-glow glow-top"></div>
   <div class="ambient-glow glow-bottom"></div>
 
   <main class="content-wrapper">
 
-    <div class="spinner-container">
+    <!-- Spinner con estado dinámico -->
+    <div class="spinner-container" [class.error]="sse.isError()" [class.complete]="sse.isComplete()">
       <div class="ring ring-outer"></div>
-
       <div class="ring ring-inner"></div>
 
       <div class="core-glow">
         <div class="logo-wrapper">
-          <img
-            ngSrc="logo_1_escudo_sin.png"
-            width="96"
-            height="72"
-            alt="OccultaShield Logo"
-            priority
-          >
+          @if (sse.isError()) {
+            <span class="material-symbols-outlined error-icon">error</span>
+          } @else if (sse.isComplete()) {
+            <span class="material-symbols-outlined success-icon">check_circle</span>
+          } @else {
+            <img ngSrc="logo_1_escudo_sin.png" width="96" height="72" alt="OccultaShield Logo" priority>
+          }
         </div>
       </div>
     </div>
 
+    <!-- Fase actual -->
+    <div class="phase-indicator">
+      <span class="material-symbols-outlined phase-icon">{{ sse.phaseIcon() }}</span>
+      <span class="phase-label">{{ sse.phaseLabel() }}</span>
+    </div>
+
+    <!-- Headline dinámico -->
     <h1 class="headline">
-      <span class="gradient-text">ENHANCING</span>
-      <span class="block-text">PRIVACY</span>
+      @switch (sse.phase()) {
+        @case ('detecting') {
+          <span class="gradient-text">SCANNING</span>
+          <span class="block-text">FRAMES</span>
+        }
+        @case ('tracking') {
+          <span class="gradient-text">TRACKING</span>
+          <span class="block-text">OBJECTS</span>
+        }
+        @case ('verifying') {
+          <span class="gradient-text">AI</span>
+          <span class="block-text">ANALYSIS</span>
+        }
+        @case ('completed') {
+          <span class="gradient-text">ANALYSIS</span>
+          <span class="block-text">COMPLETE</span>
+        }
+        @case ('error') {
+          <span class="gradient-text error">PROCESSING</span>
+          <span class="block-text">FAILED</span>
+        }
+        @default {
+          <span class="gradient-text">ENHANCING</span>
+          <span class="block-text">PRIVACY</span>
+        }
+      }
     </h1>
 
+    <!-- Mensaje actual -->
+    <p class="status-message">{{ sse.message() }}</p>
+
+    <!-- Barra de progreso -->
     <div class="progress-section">
       <div class="progress-track">
         <div
           class="progress-fill"
-          [style.width.%]="progress()"
+          [class.error]="sse.isError()"
+          [class.complete]="sse.isComplete()"
+          [style.width.%]="sse.progress()"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          [attr.aria-valuenow]="sse.progress()"
         ></div>
       </div>
 
       <div class="progress-info">
-        <span class="percent">{{ progress() | number:'1.0-0' }}%</span>
-        <span class="time">Est. time remaining: {{ timeRemaining() }}</span>
+        <span class="percent">{{ sse.progress() | number:'1.0-0' }}%</span>
+        <span class="time">
+          @if (sse.isComplete()) {
+            Completed in {{ sse.elapsedTimeFormatted() }}
+          } @else if (sse.isError()) {
+            Failed after {{ sse.elapsedTimeFormatted() }}
+          } @else {
+            Est. remaining: {{ sse.estimatedTimeRemaining() }}
+          }
+        </span>
       </div>
+    </div>
+
+    <!-- Detecciones encontradas -->
+    @if (sse.totalDetections() > 0) {
+      <div class="detections-section">
+        <h3 class="detections-title">Detections Found</h3>
+        <div class="detections-grid">
+          @for (detection of sse.detectionsList(); track detection.type) {
+            <div class="detection-badge">
+              <span class="material-symbols-outlined">{{ detection.icon }}</span>
+              <span class="detection-type">{{ detection.type }}</span>
+              <span class="detection-count">{{ detection.count }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Botones de acción -->
+    @if (sse.isError()) {
+      <div class="error-actions">
+        <button class="btn-retry" (click)="retry()">
+          <span class="material-symbols-outlined">refresh</span>
+          Retry Processing
+        </button>
+        <button class="btn-back" [routerLink]="comingFrom()">
+          <span class="material-symbols-outlined">arrow_back</span>
+          Back to {{ comingFrom() === 'upload' ? 'Upload' : 'Review' }}
+        </button>
+      </div>
+    }
+
+    <!-- Indicador de conexión -->
+    <div class="connection-indicator" [class.connected]="sse.isConnected()">
+      <span class="connection-dot"></span>
+      <span class="connection-text">
+        {{ sse.isConnected() ? 'Live updates' : 'Reconnecting...' }}
+      </span>
     </div>
 
   </main>

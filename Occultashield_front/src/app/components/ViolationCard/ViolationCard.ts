@@ -1,6 +1,6 @@
 import { NgOptimizedImage } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
-import { ModificationType, Violation } from '../../../interface/violation-models';
+import { ModificationType, Violation } from '../../interface/violation-models';
 
 @Component({
   selector: 'app-violation-card',

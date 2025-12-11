@@ -233,3 +233,222 @@
 @media (min-width: 640px) {
   .headline { font-size: 3.5rem; }
 }
+
+/* Phase Indicator */
+.phase-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  background: rgba(0, 199, 255, 0.1);
+  border: 1px solid rgba(0, 199, 255, 0.3);
+  border-radius: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.phase-icon {
+  font-size: 1.5rem;
+  color: var(--brand-cyan);
+}
+
+.phase-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--brand-cyan);
+}
+
+/* Status Message */
+.status-message {
+  color: var(--text-muted);
+  font-size: 1rem;
+  margin-bottom: 2rem;
+  min-height: 1.5rem;
+  text-align: center;
+}
+
+/* Detections Section */
+.detections-section {
+  margin-top: 2rem;
+  width: 100%;
+}
+
+.detections-title {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.detections-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.detection-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 2rem;
+  font-size: 0.85rem;
+}
+
+.detection-badge .material-symbols-outlined {
+  font-size: 1.25rem;
+  color: var(--brand-cyan);
+}
+
+.detection-type {
+  color: var(--text-white);
+  text-transform: capitalize;
+}
+
+.detection-count {
+  background: var(--brand-cyan);
+  color: var(--bg-dark);
+  font-weight: 700;
+  padding: 0.125rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+}
+
+/* Error State */
+.spinner-container.error .ring {
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.spinner-container.error .ring-outer {
+  border-top-color: #ef4444;
+  border-left-color: #ef4444;
+  animation: none;
+}
+
+.spinner-container.error .ring-inner {
+  border-bottom-color: #dc2626;
+  border-right-color: #dc2626;
+  animation: none;
+}
+
+.error-icon {
+  font-size: 3rem;
+  color: #ef4444;
+}
+
+.headline .error {
+  background: linear-gradient(to right, #ef4444, #dc2626);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.progress-fill.error {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
+}
+
+/* Complete State */
+.spinner-container.complete .ring {
+  animation: none;
+}
+
+.spinner-container.complete .ring-outer {
+  border-color: rgba(34, 197, 94, 0.3);
+  border-top-color: #22c55e;
+  border-left-color: #22c55e;
+}
+
+.spinner-container.complete .ring-inner {
+  border-color: rgba(34, 197, 94, 0.2);
+  border-bottom-color: #16a34a;
+  border-right-color: #16a34a;
+}
+
+.success-icon {
+  font-size: 3rem;
+  color: #22c55e;
+  animation: scaleIn 0.3s ease-out;
+}
+
+.progress-fill.complete {
+  background: linear-gradient(90deg, #16a34a, #22c55e);
+}
+
+/* Error Actions */
+.error-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.btn-retry, .btn-back {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-retry {
+  background: var(--brand-cyan);
+  color: var(--bg-dark);
+  border: none;
+}
+
+.btn-retry:hover {
+  background: #00d4ff;
+  transform: translateY(-2px);
+}
+
+.btn-back {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--text-muted);
+}
+
+.btn-back:hover {
+  border-color: var(--text-white);
+  color: var(--text-white);
+}
+
+/* Connection Indicator */
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 2rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse-dot 2s infinite;
+}
+
+.connection-indicator.connected .connection-dot {
+  background: #22c55e;
+  animation: none;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

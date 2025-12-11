@@ -8,7 +8,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "surrealdb",
-    "langchain>=1.0.0",
+    "langchain>=1.1.3",
     "langgraph>=1.0.4",
     "langchain-community>=0.4.1",
     "langchain-neo4j",
@@ -21,4 +21,7 @@ dependencies = [
     "pillow",
     "python-dotenv",
     "sentence-transformers",
+    "sse-starlette>=3.0.3",
+    "langchain-ollama>=1.0.0",
+    "ollama>=0.6.1",
 ]

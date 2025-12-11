@@ -4,7 +4,7 @@
 
       <header class="header">
         <div class="logo-wrapper">
-          <img src="logo_1_escudo_sin.png" width="50" height="60" alt="Logo" priority>
+          <img ngSrc="logo_1_escudo_sin.png" width="50" height="60" alt="Logo" priority>
         </div>
         <h1 class="brand-name">OccultaShield</h1>
       </header>
@@ -12,7 +12,7 @@
       <h2 class="headline">Secure Access Portal</h2>
       <p class="subheadline">Enter your credentials to access your secure dashboard.</p>
 
-        <form (submit)="onLoginSubmit($event)" class="login-form">
+      <form (submit)="onSubmit($event)" class="login-form">
 
         <div class="input-group">
           <label for="email">Email address</label>
@@ -86,10 +86,8 @@
           <a routerLink="/forgot-password" class="link-forgot">Forgot password?</a>
         </div>
 
-          <div class="buttons-grid">
-            <button type="button" class="btn btn-secondary" (click)="showRegister()">
-              Register
-            </button>
+        <div class="buttons-grid">
+          <button type="button" class="btn btn-secondary">Register</button>
 
           <button
             type="submit"
@@ -104,162 +102,7 @@
           </button>
         </div>
 
-        </form>
-      }
-
-      <!-- ==================== REGISTER VIEW ==================== -->
-      @if (currentView() === 'register') {
-        <h2 class="headline">Create Your Account</h2>
-        <p class="subheadline">Join us to protect your digital privacy.</p>
-
-        <form (submit)="onRegisterSubmit($event)" class="login-form">
-
-          <div class="input-group">
-            <label for="register-username">Username</label>
-            <input
-              id="register-username"
-              type="text"
-              [formControl]="registerForm.controls.username"
-              placeholder="johndoe"
-              autocomplete="username"
-              [class.input-error]="isFieldInvalid('register', 'username')"
-            >
-            @if (isFieldInvalid('register', 'username')) {
-              <span class="error-text">{{ getFieldError('register', 'username') }}</span>
-            }
-          </div>
-
-          <div class="input-group">
-            <label for="register-email">Email address</label>
-            <input
-              id="register-email"
-              type="email"
-              [formControl]="registerForm.controls.email"
-              placeholder="name@company.com"
-              autocomplete="email"
-              [class.input-error]="isFieldInvalid('register', 'email')"
-            >
-            @if (isFieldInvalid('register', 'email')) {
-              <span class="error-text">{{ getFieldError('register', 'email') }}</span>
-            }
-          </div>
-
-          <div class="input-group">
-            <label for="register-password">Password</label>
-            <div class="password-wrapper">
-              <input
-                id="register-password"
-                [type]="showPassword() ? 'text' : 'password'"
-                [formControl]="registerForm.controls.password"
-                placeholder="••••••••"
-                autocomplete="new-password"
-                [class.input-error]="isFieldInvalid('register', 'password')"
-              >
-              <button
-                type="button"
-                class="toggle-visibility"
-                (click)="togglePasswordVisibility()"
-                [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
-              >
-                @if (!showPassword()) {
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                } @else {
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M1 1l22 22"></path></svg>
-                }
-              </button>
-            </div>
-            @if (isFieldInvalid('register', 'password')) {
-              <span class="error-text">{{ getFieldError('register', 'password') }}</span>
-            }
-          </div>
-
-          <div class="input-group">
-            <label for="register-confirm-password">Confirm Password</label>
-            <div class="password-wrapper">
-              <input
-                id="register-confirm-password"
-                [type]="showConfirmPassword() ? 'text' : 'password'"
-                [formControl]="registerForm.controls.confirmPassword"
-                placeholder="••••••••"
-                autocomplete="new-password"
-                [class.input-error]="isFieldInvalid('register', 'confirmPassword') || (!passwordsMatch() && registerForm.controls.confirmPassword.touched)"
-              >
-              <button
-                type="button"
-                class="toggle-visibility"
-                (click)="toggleConfirmPasswordVisibility()"
-                [attr.aria-label]="showConfirmPassword() ? 'Hide password' : 'Show password'"
-              >
-                @if (!showConfirmPassword()) {
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                } @else {
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M1 1l22 22"></path></svg>
-                }
-              </button>
-            </div>
-            @if (isFieldInvalid('register', 'confirmPassword')) {
-              <span class="error-text">{{ getFieldError('register', 'confirmPassword') }}</span>
-            }
-            @if (!passwordsMatch() && registerForm.controls.confirmPassword.touched && !isFieldInvalid('register', 'confirmPassword')) {
-              <span class="error-text">Las contraseñas no coinciden</span>
-            }
-          </div>
-
-          <!-- Checkboxes -->
-          <div class="checkbox-group">
-            <label class="custom-checkbox">
-              <input type="checkbox" [formControl]="registerForm.controls.acceptTerms">
-              <span class="checkmark"></span>
-              <span class="label-text">
-                I agree to the
-                <a routerLink="/terms" class="link-inline">Terms</a>,
-                <a routerLink="/privacy" class="link-inline">Privacy Policy</a>, and
-                <a routerLink="/data-use" class="link-inline">Data Use Policy</a>.
-              </span>
-            </label>
-            @if (isFieldInvalid('register', 'acceptTerms')) {
-              <span class="error-text checkbox-error">Debes aceptar los términos</span>
-            }
-
-            <label class="custom-checkbox">
-              <input type="checkbox" [formControl]="registerForm.controls.receiveOffers">
-              <span class="checkmark"></span>
-              <span class="label-text">Receive personalized offers and updates.</span>
-            </label>
-          </div>
-
-          <div class="buttons-grid">
-            <button type="button" class="btn btn-secondary" (click)="showLogin()">
-              Back to Login
-            </button>
-
-            <button
-              type="submit"
-              class="btn btn-primary btn-gradient"
-              [disabled]="registerForm.invalid || !passwordsMatch() || isLoading()"
-            >
-              @if (isLoading()) {
-                <span class="spinner"></span> Processing...
-              } @else {
-                Register
-              }
-            </button>
-          </div>
-
-        </form>
-      }
-
-      <!-- Link alternativo -->
-      <p class="switch-view-text">
-        @if (currentView() === 'login') {
-          Don't have an account?
-          <button type="button" class="link-switch" (click)="showRegister()">Sign up</button>
-        } @else {
-          Already a member?
-          <button type="button" class="link-switch" (click)="showLogin()">Sign in</button>
-        }
-      </p>
-
+      </form>
     </div>
   </main>
 

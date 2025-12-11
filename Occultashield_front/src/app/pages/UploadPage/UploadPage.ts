@@ -5,7 +5,6 @@ import { UploadService } from '../../services/upload.service';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
-  selector: 'upload-page',
   imports: [FileDropDirective],
   templateUrl: './UploadPage.html',
   styleUrl: './UploadPage.css',

@@ -8,10 +8,16 @@ load_dotenv()
 class SurrealConn:
     def __init__(self):
         self.db = None
-        self.host = os.getenv('SURREALDB_HOST', 'localhost')
-        self.port = os.getenv('SURREALDB_PORT', '8000')
-        self.user = os.getenv("SURREALDB_USER")
-        self.password = os.getenv("SURREALDB_PASS")
+        self.host = os.environ.get('SURREALDB_HOST') # Use get but check later or enforce?
+        # User said "eliminalo". Strict env usually means fail storage.
+        if not os.getenv("SURREALDB_HOST"):
+             # Or rely on os.environ[] to raise KeyError
+             pass
+             
+        self.host = os.environ["SURREALDB_HOST"]
+        self.port = os.environ["SURREALDB_PORT"]
+        self.user = os.environ["SURREALDB_USER"]
+        self.password = os.environ["SURREALDB_PASS"]
     
     async def connect(self):
         """Conecta a la base de datos de forma asíncrona"""
@@ -31,8 +37,9 @@ class SurrealConn:
         """Selecciona el namespace y base de datos"""
         if not self.db:
             await self.connect()
-        namespace = os.getenv("SURREALDB_NAMESPACE", "test")
-        await self.db.use(namespace, database_name)
+        namespace = os.environ["SURREALDB_NAMESPACE"]
+        item = os.environ["SURREALDB_ITEM"] # DB Name
+        await self.db.use(namespace, database_name or item)
         return self.db
     
     async def close(self):

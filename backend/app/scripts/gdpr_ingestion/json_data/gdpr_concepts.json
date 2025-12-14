@@ -1,0 +1,123 @@
+{
+    "concepts": [
+        {
+            "id": "personal_data",
+            "name": "Personal Data",
+            "definition": "Any information relating to an identified or identifiable natural person ('data subject').",
+            "synonyms": [
+                "PII",
+                "user data",
+                "private information"
+            ],
+            "article_reference": "4(1)",
+            "related_articles": [
+                4,
+                5,
+                6,
+                9
+            ]
+        },
+        {
+            "id": "processing_principles",
+            "name": "Principles of Processing",
+            "definition": "Fundamental rules that must be followed when processing personal data.",
+            "related_articles": [
+                5
+            ]
+        },
+        {
+            "id": "explicit_consent",
+            "name": "Explicit Consent",
+            "definition": "Consent given by a clear affirmative act establishing a freely given, specific, informed and unambiguous indication of the data subject's agreement.",
+            "related_articles": [
+                6,
+                7,
+                9
+            ],
+            "parent_concept": "consent"
+        }
+    ],
+    "data_types": [
+        {
+            "id": "biometric_data",
+            "name": "Biometric Data",
+            "definition": "Personal data resulting from specific technical processing relating to the physical, physiological or behavioural characteristics of a natural person.",
+            "examples": [
+                "facial recognition",
+                "fingerprints",
+                "iris scan"
+            ],
+            "is_special_category": true,
+            "article_reference": "4(14)",
+            "detection_types": [
+                "face"
+            ]
+        },
+        {
+            "id": "license_plate",
+            "name": "License Plate",
+            "definition": "Vehicle registration plates which can be linked to a natural person.",
+            "is_special_category": false,
+            "examples": [
+                "car plate",
+                "motorcycle plate"
+            ],
+            "detection_types": [
+                "license_plate"
+            ]
+        }
+    ],
+    "rights": [
+        {
+            "id": "right_to_erasure",
+            "name": "Right to Erasure",
+            "description": "The right to have personal data erased (Right to be forgotten).",
+            "article": 17
+        },
+        {
+            "id": "right_to_object",
+            "name": "Right to Object",
+            "description": "The right to object to processing of personal data.",
+            "article": 21
+        }
+    ],
+    "fines": [
+        {
+            "tier": "standard",
+            "max_amount": "10M EUR or 2% global turnover",
+            "description": "Fines for violations of obligations of the controller and processor, certification body, monitoring body.",
+            "applies_to_articles": [
+                5,
+                6,
+                11,
+                25,
+                26,
+                27,
+                28,
+                29
+            ]
+        },
+        {
+            "tier": "higher",
+            "max_amount": "20M EUR or 4% global turnover",
+            "description": "Fines for violations of basic principles for processing, including conditions for consent, data subjects' rights.",
+            "applies_to_articles": [
+                5,
+                6,
+                7,
+                9,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22
+            ]
+        }
+    ]
+}

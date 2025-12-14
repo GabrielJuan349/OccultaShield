@@ -3,12 +3,14 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Callable
 import json
-from surreal_conn import SurrealConn
+from db.surreal_conn import SurrealConn
 
 class AuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, surreal_conn: SurrealConn):
         super().__init__(app)
-        self.surreal_conn = surreal_conn.getting_db("test")
+        self.conn_manager = surreal_conn
+        # database selection should be handled in lifespan or per-request
+        # self.surreal_conn = surreal_conn.getting_db("test")
         # Rutas que no requieren autenticación
         self.public_routes = ["/", "/auth/login", "/auth/register", "/docs", "/openapi.json"]
     
@@ -58,8 +60,28 @@ class AuthMiddleware(BaseHTTPMiddleware):
         """Verifica el token usando SurrealDB"""
         try:
             # Autenticar con el token JWT
-            result = await self.surreal_conn.db.authenticate(token)
-            return result is not None
+            if not self.conn_manager.db:
+                return False
+            
+            query = "SELECT * FROM session WHERE token = $token AND expiresAt > time::now();"
+            vars = {"token": token}
+            response = await self.conn_manager.db.query(query, vars)
+            
+            if not response: 
+                return False
+                
+            # Accessing result
+            # SDK response format: [{'result': [...], 'status': 'OK', 'time': ...}]
+            result_data = response[0]
+            if not result_data or 'result' not in result_data:
+                return False
+                
+            records = result_data['result']
+            return len(records) > 0
+                
+        except Exception as e:
+            print(f"Token verification failed: {e}")
+            return False
         except Exception as e:
             print(f"Token verification failed: {e}")
             return False

@@ -1,0 +1,82 @@
+{
+    "detection_mappings": [
+        {
+            "detection_type": "face",
+            "gdpr_implications": {
+                "sensitive": true,
+                "is_special_category": true,
+                "data_type": "biometric_data",
+                "primary_articles": [
+                    9,
+                    6
+                ],
+                "severity": "critical",
+                "requires_explicit_consent": true,
+                "reasoning_template": "Detected face constitutes biometric data capable of identifying a natural person. As per Article 9, processing of biometric data for unique identification is prohibited unless an exception applies (e.g., explicit consent).",
+                "recommended_actions": [
+                    "Blur face completely",
+                    "Obtain explicit consent"
+                ],
+                "fine_tier": "higher"
+            }
+        },
+        {
+            "detection_type": "license_plate",
+            "gdpr_implications": {
+                "sensitive": true,
+                "is_special_category": false,
+                "data_type": "personal_data",
+                "primary_articles": [
+                    6
+                ],
+                "severity": "high",
+                "requires_explicit_consent": false,
+                "reasoning_template": "License plate numbers are linked to vehicle owners and thus constitute personal data. Processing requires a valid legal basis under Article 6.",
+                "recommended_actions": [
+                    "Blur license plate",
+                    "Pixelate license plate"
+                ],
+                "fine_tier": "standard"
+            }
+        },
+        {
+            "detection_type": "person",
+            "gdpr_implications": {
+                "sensitive": true,
+                "is_special_category": false,
+                "data_type": "personal_data",
+                "primary_articles": [
+                    6
+                ],
+                "severity": "medium",
+                "requires_explicit_consent": false,
+                "reasoning_template": "Full body image of a person may allow identification through clothing, gait, or context. Constitutes personal data processing.",
+                "recommended_actions": [
+                    "Assess identifiability",
+                    "Blur if identifiable"
+                ],
+                "fine_tier": "standard"
+            }
+        },
+        {
+            "detection_type": "minor",
+            "gdpr_implications": {
+                "sensitive": true,
+                "is_special_category": true,
+                "data_type": "vulnerable_person_data",
+                "primary_articles": [
+                    8,
+                    9
+                ],
+                "severity": "critical",
+                "requires_explicit_consent": true,
+                "reasoning_template": "Data processing involving children requires specific protection (Article 8). Parental consent is mandatory for information society services.",
+                "recommended_actions": [
+                    "Strict anonymization",
+                    "Verify parental consent"
+                ],
+                "fine_tier": "higher"
+            }
+        }
+    ]
+}

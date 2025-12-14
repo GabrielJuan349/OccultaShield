@@ -1,0 +1,57 @@
+# Sección: detector
+detector:
+  model_path: "${YOLO_MODEL_PATH:ml_models/yolo/yolov10s.pt}"
+  face_model_path: "${FACE_MODEL_PATH:}"
+  confidence_threshold: 0.5
+  iou_threshold: 0.45
+  device: "auto"
+  image_size: 640
+  target_classes: [0]
+  class_mapping:
+    0: "person"
+
+# Sección: tracking
+tracking:
+  iou_threshold: 0.3
+  max_age: 30
+  min_hits: 3
+  min_duration: 0.5
+
+# Sección: processing
+processing:
+  detection_interval: 3
+  capture_interval: 1.5
+  max_captures: 8
+  stability_threshold: 0.5
+  stability_frames: 3
+  max_processing_time: 3600
+
+# Sección: storage
+storage:
+  base_path: "${STORAGE_PATH:./storage}"
+  image_quality: 95
+  crop_margin: 20
+  create_thumbnails: true
+  thumbnail_size: [128, 128]
+  retention_days: 30
+
+# Sección: edition
+edition:
+  blur:
+    kernel_size: 99
+  pixelate:
+    pixel_size: 10
+  mask:
+    color: [0, 0, 0]
+  preserve_audio: true
+  output_codec: "mp4v"
+  interpolate_bboxes: true
+
+# Sección: verification
+verification:
+  enabled: true
+  llm_model: "gemma-3-4b"
+  timeout: 30
+  max_retries: 2
+  parallel_workers: 2
+  use_best_capture: true

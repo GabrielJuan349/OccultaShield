@@ -1,0 +1,273 @@
+{
+    "version": "2016/679",
+    "last_updated": "2024-01-01",
+    "chapters": [
+        {
+            "number": 1,
+            "title": "General provisions",
+            "articles": [
+                {
+                    "number": 1,
+                    "title": "Subject-matter and objectives",
+                    "paragraphs": [
+                        {
+                            "number": 1,
+                            "text": "This Regulation lays down rules relating to the protection of natural persons with regard to the processing of personal data and rules relating to the free movement of personal data."
+                        },
+                        {
+                            "number": 2,
+                            "text": "This Regulation protects fundamental rights and freedoms of natural persons and in particular their right to the protection of personal data."
+                        }
+                    ],
+                    "related_recitals": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13
+                    ],
+                    "keywords": [
+                        "protection",
+                        "personal data",
+                        "fundamental rights",
+                        "free movement"
+                    ],
+                    "fine_tier": null,
+                    "references": []
+                },
+                {
+                    "number": 5,
+                    "title": "Principles relating to processing of personal data",
+                    "paragraphs": [
+                        {
+                            "number": 1,
+                            "text": "Personal data shall be:",
+                            "points": [
+                                {
+                                    "letter": "a",
+                                    "text": "processed lawfully, fairly and in a transparent manner in relation to the data subject ('lawfulness, fairness and transparency');"
+                                },
+                                {
+                                    "letter": "b",
+                                    "text": "collected for specified, explicit and legitimate purposes and not further processed in a manner that is incompatible with those purposes ('purpose limitation');"
+                                },
+                                {
+                                    "letter": "c",
+                                    "text": "adequate, relevant and limited to what is necessary in relation to the purposes for which they are processed ('data minimisation');"
+                                },
+                                {
+                                    "letter": "d",
+                                    "text": "accurate and, where necessary, kept up to date ('accuracy');"
+                                },
+                                {
+                                    "letter": "e",
+                                    "text": "kept in a form which permits identification of data subjects for no longer than is necessary ('storage limitation');"
+                                },
+                                {
+                                    "letter": "f",
+                                    "text": "processed in a manner that ensures appropriate security ('integrity and confidentiality')."
+                                }
+                            ]
+                        },
+                        {
+                            "number": 2,
+                            "text": "The controller shall be responsible for, and be able to demonstrate compliance with, paragraph 1 ('accountability')."
+                        }
+                    ],
+                    "related_recitals": [
+                        39
+                    ],
+                    "keywords": [
+                        "lawfulness",
+                        "fairness",
+                        "transparency",
+                        "purpose limitation",
+                        "data minimisation",
+                        "accuracy",
+                        "storage limitation",
+                        "integrity",
+                        "confidentiality",
+                        "accountability"
+                    ],
+                    "fine_tier": "standard",
+                    "concepts": [
+                        "processing principles",
+                        "controller responsibility"
+                    ]
+                },
+                {
+                    "number": 6,
+                    "title": "Lawfulness of processing",
+                    "paragraphs": [
+                        {
+                            "number": 1,
+                            "text": "Processing shall be lawful only if and to the extent that at least one of the following applies:",
+                            "points": [
+                                {
+                                    "letter": "a",
+                                    "text": "the data subject has given consent to the processing of his or her personal data for one or more specific purposes;"
+                                },
+                                {
+                                    "letter": "b",
+                                    "text": "processing is necessary for the performance of a contract to which the data subject is party;"
+                                },
+                                {
+                                    "letter": "c",
+                                    "text": "processing is necessary for compliance with a legal obligation to which the controller is subject;"
+                                },
+                                {
+                                    "letter": "d",
+                                    "text": "processing is necessary in order to protect the vital interests of the data subject or of another natural person;"
+                                },
+                                {
+                                    "letter": "e",
+                                    "text": "processing is necessary for the performance of a task carried out in the public interest;"
+                                },
+                                {
+                                    "letter": "f",
+                                    "text": "processing is necessary for the purposes of the legitimate interests pursued by the controller or by a third party."
+                                }
+                            ]
+                        }
+                    ],
+                    "related_recitals": [
+                        40,
+                        41,
+                        42,
+                        43,
+                        44,
+                        45,
+                        46,
+                        47,
+                        48,
+                        49,
+                        50
+                    ],
+                    "keywords": [
+                        "consent",
+                        "contract",
+                        "legal obligation",
+                        "vital interests",
+                        "public interest",
+                        "legitimate interests",
+                        "lawful basis"
+                    ],
+                    "fine_tier": "higher",
+                    "concepts": [
+                        "legal basis",
+                        "consent",
+                        "legitimate interests"
+                    ]
+                },
+                {
+                    "number": 9,
+                    "title": "Processing of special categories of personal data",
+                    "paragraphs": [
+                        {
+                            "number": 1,
+                            "text": "Processing of personal data revealing racial or ethnic origin, political opinions, religious or philosophical beliefs, or trade union membership, and the processing of genetic data, biometric data for the purpose of uniquely identifying a natural person, data concerning health or data concerning a natural person's sex life or sexual orientation shall be prohibited."
+                        },
+                        {
+                            "number": 2,
+                            "text": "Paragraph 1 shall not apply if one of the following applies:",
+                            "points": [
+                                {
+                                    "letter": "a",
+                                    "text": "the data subject has given explicit consent to the processing of those personal data for one or more specified purposes;"
+                                },
+                                {
+                                    "letter": "b",
+                                    "text": "processing is necessary for the purposes of carrying out the obligations and exercising specific rights of the controller or of the data subject in the field of employment and social security and social protection law;"
+                                }
+                            ]
+                        }
+                    ],
+                    "related_recitals": [
+                        51,
+                        52,
+                        53,
+                        54,
+                        55,
+                        56
+                    ],
+                    "keywords": [
+                        "special categories",
+                        "biometric data",
+                        "genetic data",
+                        "health data",
+                        "racial origin",
+                        "political opinions",
+                        "religious beliefs",
+                        "explicit consent"
+                    ],
+                    "fine_tier": "higher",
+                    "data_types": [
+                        "biometric",
+                        "genetic",
+                        "health",
+                        "racial_ethnic",
+                        "political",
+                        "religious",
+                        "sexual_orientation"
+                    ],
+                    "concepts": [
+                        "special categories",
+                        "explicit consent",
+                        "prohibition"
+                    ]
+                }
+            ]
+        },
+        {
+            "number": 3,
+            "title": "Rights of the data subject",
+            "articles": [
+                {
+                    "number": 17,
+                    "title": "Right to erasure ('right to be forgotten')",
+                    "paragraphs": [
+                        {
+                            "number": 1,
+                            "text": "The data subject shall have the right to obtain from the controller the erasure of personal data concerning him or her without undue delay and the controller shall have the obligation to erase personal data without undue delay where one of the following grounds applies:",
+                            "points": [
+                                {
+                                    "letter": "a",
+                                    "text": "the personal data are no longer necessary in relation to the purposes for which they were collected or otherwise processed;"
+                                },
+                                {
+                                    "letter": "b",
+                                    "text": "the data subject withdraws consent on which the processing is based and where there is no other legal ground for the processing;"
+                                }
+                            ]
+                        }
+                    ],
+                    "related_recitals": [
+                        65,
+                        66
+                    ],
+                    "keywords": [
+                        "erasure",
+                        "right to be forgotten",
+                        "withdrawal of consent"
+                    ],
+                    "fine_tier": "higher",
+                    "rights": [
+                        "right to erasure"
+                    ],
+                    "concepts": [
+                        "erasure",
+                        "data deletion"
+                    ]
+                }
+            ]
+        }
+    ]
+}

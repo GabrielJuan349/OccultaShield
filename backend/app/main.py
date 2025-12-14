@@ -3,24 +3,33 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import uvicorn
 from contextlib import asynccontextmanager
-from surreal_conn import SurrealConn
-from auth import AuthMiddleware, AuthService
+from db.surreal_conn import SurrealConn
+from auth.auth_middleware import AuthMiddleware
+
+from api.v1.router import api_router
+
+# Global connection instance
+# Note: We rely on core.dependencies for injection, but middleware needs it too.
+# The middleware expects a SurrealConn instance.
+surreal_conn = SurrealConn()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Conectar a la base de datos
-    global surreal_conn
-    surreal_conn = SurrealConn()
+    # Startup
     await surreal_conn.connect()
     
-    yield  # Aquí la aplicación está corriendo
+    yield
     
-    # Shutdown: Cerrar la conexión
+    # Shutdown
     await surreal_conn.close()
     print("Database connection closed")
 
     
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="OccultaShield API",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 # Configurar CORS
 app.add_middleware(
@@ -28,51 +37,25 @@ app.add_middleware(
     allow_origins=["http://localhost:4200"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],  # Permite todos los headers
+    allow_headers=["*"],
     options_success_status=204,
 )
 
 # Configurar middleware de autenticación
 app.add_middleware(AuthMiddleware, surreal_conn=surreal_conn)
-# Inicializar el servicio de autenticación
-auth_service = AuthService(surreal_conn)
 
-# print("Using database:", db)
+# Inicializar auth service (si se usa globalmente)
+# auth_service = AuthService(surreal_conn)  <-- Removed per user request
+
+# Include API Router
+app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return {"status": "ok", "service": "OccultaShield Backend"}
 
-@app.post("/auth/login")
-def login():
-    return {"status": "User logged in"}
-@app.post("/auth/register")
-def register():
-    return {"status": "User registered"}
-@app.post("/osd/in")
-def enter_video():
-    return {"status": "Video entered"}
-@app.post("/osd/processed")
-def processed():
-    try:
-        # Logic to mark quest as done
-        return {"status": "Quest marked as done"}
-    except Exception as e:
-        return {"error": str(e)}
-@app.post("/osd/quest_done")
-def quest_done():
-    try:
-        # Logic to mark quest as done
-        return {"status": "Quest marked as done"}
-    except Exception as e:
-        return {"error": str(e)}
-    
-@app.post("/osd/exit")
-def exit_video():
-    return {"status": "Video exited"}
-    
+
 if __name__ == "__main__":
-
     host = os.getenv("SERVER_HOST", "0.0.0.0")
     port = int(os.getenv("SERVER_PORT", 8900))
     uvicorn.run("main:app", host=host, port=port, reload=True)

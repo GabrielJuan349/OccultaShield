@@ -4,24 +4,50 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
+
 dependencies = [
-    "fastapi",
-    "uvicorn",
-    "surrealdb",
-    "langchain>=1.1.3",
-    "langgraph>=1.0.4",
-    "langchain-community>=0.4.1",
-    "langchain-neo4j",
-    "langchain-text-splitters",
-    "pypdf",
-    "torch",
-    "torchvision",
-    "transformers",
-    "accelerate",
-    "pillow",
-    "python-dotenv",
-    "sentence-transformers",
-    "sse-starlette>=3.0.3",
-    "langchain-ollama>=1.0.0",
-    "ollama>=0.6.1",
+    # Framework
+    "fastapi>=0.124.0",
+    "uvicorn[standard]>=0.38.0",
+    "pydantic>=2.12.0",
+    "starlette>=0.50.0",
+    
+    # Database
+    "surrealdb>=1.0.0",
+    "neo4j",
+    
+    # AI/ML
+    "torch>=2.6.0",
+    "torchvision>=0.24.0",
+    "ultralytics>=8.3.0",
+    "sentence-transformers>=5.1.0",
+    "transformers>=4.47.0",
+    
+    # LangChain ecosystem
+    "langchain>=0.3.0",
+    "langgraph>=0.4.0",
+    "langchain-neo4j>=0.6.0",
+    
+    # Computer Vision
+    "opencv-python>=4.12.0",
+    "numpy>=2.2.0",
+    
+    # Async & Web
+    "aiofiles>=24.1.0",
+    "python-multipart>=0.0.20",
+    "sse-starlette>=2.2.0",
+    "httpx>=0.28.0",
+    
+    # Config & Utils
+    "pyyaml>=6.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.14.0",
 ]

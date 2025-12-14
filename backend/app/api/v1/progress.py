@@ -6,7 +6,7 @@ from typing import AsyncGenerator
 
 from services.progress_manager import progress_manager, ProgressManager
 from core.events import ProcessingPhase
-from auth import get_current_user  # Tu sistema de auth
+from core.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/v1/process", tags=["Processing"])
 

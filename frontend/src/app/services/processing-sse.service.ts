@@ -2,6 +2,7 @@
 import { Injectable, signal, computed, inject, PLATFORM_ID, OnDestroy } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
+import { environment } from '#environments/environment';
 import {
   ProcessingPhase,
   ProcessingState,
@@ -13,7 +14,7 @@ import {
   VerificationEvent,
   CompleteEvent,
   ErrorEvent
-} from '../interface/processing-events';
+} from '#interface/processing-events';
 
 @Injectable({
   providedIn: 'root'
@@ -125,7 +126,7 @@ export class ProcessingSSEService implements OnDestroy {
     this.disconnect();
     this.reset();
 
-    const baseUrl = '/api/v1/process';  // Ajustar según tu config
+    const baseUrl = `${environment.apiUrl}/process`;
     const url = `${baseUrl}/${videoId}/progress`;
 
     this.startTime = Date.now();

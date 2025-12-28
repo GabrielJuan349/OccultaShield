@@ -102,20 +102,18 @@ async function createAuth() {
   });
 }
 
-// Exportar la promesa de auth
-export const authPromise = createAuth();
+// Singleton promise for auth instance
+// Singleton promise for auth instance
+let authInstancePromise: ReturnType<typeof createAuth> | null = null;
 
-// Exportar auth sincrónico (se resolverá cuando esté listo)
-export let auth: Awaited<ReturnType<typeof createAuth>>;
+export function getAuth() {
+  if (!authInstancePromise) {
+    authInstancePromise = createAuth().catch(err => {
+      console.error('❌ Failed to create Better-Auth instance:', err);
+      throw err;
+    }) as ReturnType<typeof createAuth>;
+  }
+  return authInstancePromise;
+}
 
-// Inicializar auth inmediatamente
-authPromise.then((a) => {
-  auth = a;
-  console.log('✅ Better-Auth initialized');
-}).catch((error) => {
-  console.error('❌ Failed to initialize Better-Auth:', error);
-  process.exit(1);
-});
-
-// Tipo exportado para el cliente
 export type Auth = Awaited<ReturnType<typeof createAuth>>;

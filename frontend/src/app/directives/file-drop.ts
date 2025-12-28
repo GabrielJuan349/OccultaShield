@@ -118,10 +118,14 @@ export class FileDropDirective implements OnInit, OnDestroy {
   }
 
   protected onDrop(evt: DragEvent): void {
-    // Este handler ya no es necesario para capturar el archivo
-    // porque onDocumentDrop lo hace, pero evita la propagación
     evt.preventDefault();
     evt.stopPropagation();
+    this.isDragOver.set(false);
+
+    const files = evt.dataTransfer?.files;
+    if (files && files.length > 0) {
+      this.fileDropped.emit(files[0]);
+    }
   }
 
   // ========== HELPERS ==========

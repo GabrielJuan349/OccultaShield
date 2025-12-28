@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
+    "global": "ng serve && bun run start:ssr",
     "start": "ng serve",
     "start:ssr": "bun run build && bun run serve:ssr",
     "build": "ng build",
@@ -25,6 +26,44 @@
     ]
   },
   "private": true,
+  "imports": {
+    "#components/*": [
+      "./src/app/components/*.ts",
+      "./src/app/components/*"
+    ],
+    "#pages/*": [
+      "./src/app/pages/*.ts",
+      "./src/app/pages/*"
+    ],
+    "#interface/*": [
+      "./src/app/interface/*.ts",
+      "./src/app/interface/*"
+    ],
+    "#services/*": [
+      "./src/app/services/*.ts",
+      "./src/app/services/*"
+    ],
+    "#environments/*": [
+      "./src/environments/*.ts",
+      "./src/environments/*"
+    ],
+    "#interceptors/*": [
+      "./src/app/interceptors/*.ts",
+      "./src/app/interceptors/*"
+    ],
+    "#lib/*": [
+      "./src/app/lib/*.ts",
+      "./src/app/lib/*"
+    ],
+    "#server/*": [
+      "./server/lib/*.ts",
+      "./server/lib/*"
+    ],
+    "#guards/*": [
+      "./src/app/guards/*.ts",
+      "./src/app/guards/*"
+    ]
+  },
   "packageManager": "bun@1.3.1",
   "dependencies": {
     "@angular/common": "^21.0.0",
@@ -36,6 +75,7 @@
     "@angular/router": "^21.0.0",
     "@angular/ssr": "^21.0.2",
     "better-auth": "^1.4.5",
+    "concurrently": "^9.2.1",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "rxjs": "~7.8.0",

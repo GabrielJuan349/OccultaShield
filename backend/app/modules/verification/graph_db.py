@@ -48,10 +48,7 @@ class GraphDB:
         
         # 2. Initialize embeddings model (local, no API key needed)
         try:
-            embedding_model = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2") # Config not secret, keeping default ok? User said "info in .env... remove".
-            # The user said "lo que sea informacion muy sensible metela dentro del .env".
-            # Embedding model name is config, not secret. But "info in .env in code".
-            # I will check if I can remove it too.
+
             embedding_model = os.getenv("EMBEDDING_MODEL")
             if not embedding_model:
                 raise ValueError("EMBEDDING_MODEL not set in .env")

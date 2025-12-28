@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
-import { Router } from '@angular/router';
-import { ViolationCard } from '../../components/ViolationCard/ViolationCard';
-import { ModificationType, Violation } from '../../interface/violation-models';
+import { Router, ActivatedRoute } from '@angular/router';
+import { ViolationCard } from '#components/ViolationCard/ViolationCard';
+import { ModificationType, Violation } from '#interface/violation-models';
+import { VideoService } from '#services/video.service';
 
 @Component({
   imports: [ViolationCard],
@@ -13,72 +14,41 @@ export class ReviewPage implements OnInit {
 
   private readonly router = inject(Router);
 
+  private readonly route = inject(ActivatedRoute);
+  private readonly videoService = inject(VideoService);
+
   // Signal que contiene el array de vulneraciones
   protected readonly violations = signal<Violation[]>([]);
+  protected videoId = signal<string | null>(null);
 
   ngOnInit() {
-    this.loadViolations();
+    this.videoId.set(this.route.snapshot.paramMap.get('id'));
+    if (this.videoId()) {
+      this.loadViolations(this.videoId()!);
+    }
   }
 
-  // Simulación de carga desde API/JSON
-  loadViolations() {
-    const mockData: Violation[] = [
-      {
-        id: 'v1',
-        articleTitle: 'GDPR Article 5',
-        articleSubtitle: 'Principles relating to processing of personal data',
-        description: 'A face has been detected and is considered personal data. Processing it without a lawful basis could violate the core principles of data minimization.',
-        fineText: 'Up to €20 million or 4% of annual global turnover.',
-        imageUrl: 'supervision_humana.png',
-        selectedOption: 'no-modify'
+  loadViolations(id: string) {
+    this.videoService.getViolations(id).subscribe({
+      next: (response) => {
+        // Map ValidatedResponse items (ViolationCard) to UI Violation model
+        // Interface ViolationCard: { id, timestamp, threat_level, description, detection_type ... }
+        // UI Violation: { id, articleTitle, articleSubtitle, description, fineText, imageUrl, selectedOption }
+        // We need to map backend data to UI.
+
+        const mapped: Violation[] = response.items.map(v => ({
+          id: v.id,
+          articleTitle: `Detected: ${v.detection_type}`,
+          articleSubtitle: v.threat_level + " Severity",
+          description: v.description,
+          fineText: "Potential GDPR Violation",
+          imageUrl: 'supervision_humana.png', // Placeholder or use capture URL if available
+          selectedOption: 'no-modify' // Default
+        }));
+        this.violations.set(mapped);
       },
-      {
-        id: 'v2',
-        articleTitle: 'GDPR Article 9',
-        articleSubtitle: 'Processing of special categories of personal data',
-        description: 'A license plate has been detected. This can be linked to an individual and reveal sensitive information, which is prohibited without explicit consent.',
-        fineText: 'Up to €20 million or 4% of annual global turnover.',
-        imageUrl: 'supervision_humana.png',
-        selectedOption: 'no-modify'
-      },
-      {
-        id: 'v3',
-        articleTitle: 'GDPR Article 6',
-        articleSubtitle: 'Lawfulness of processing',
-        description: 'An ID card or passport has been detected in the video frame. This document contains highly sensitive personal identifiers that require explicit consent for processing.',
-        fineText: 'Up to €20 million or 4% of annual global turnover.',
-        imageUrl: 'supervision_humana.png',
-        selectedOption: 'no-modify'
-      },
-      {
-        id: 'v4',
-        articleTitle: 'GDPR Article 17',
-        articleSubtitle: 'Right to erasure (right to be forgotten)',
-        description: 'A minor (child) has been detected in the footage. Special protections apply to children\'s data, requiring parental consent and heightened security measures.',
-        fineText: 'Up to €20 million or 4% of annual global turnover.',
-        imageUrl: 'supervision_humana.png',
-        selectedOption: 'no-modify'
-      },
-      {
-        id: 'v5',
-        articleTitle: 'GDPR Article 13',
-        articleSubtitle: 'Information to be provided where data is collected',
-        description: 'A credit card or bank card has been detected. Financial information is classified as sensitive data and must be protected to prevent identity theft and fraud.',
-        fineText: 'Up to €20 million or 4% of annual global turnover.',
-        imageUrl: 'supervision_humana.png',
-        selectedOption: 'no-modify'
-      },
-      {
-        id: 'v6',
-        articleTitle: 'GDPR Article 32',
-        articleSubtitle: 'Security of processing',
-        description: 'A computer screen displaying personal data has been captured. This indirect exposure of third-party information requires appropriate anonymization measures.',
-        fineText: 'Up to €10 million or 2% of annual global turnover.',
-        imageUrl: 'supervision_humana.png',
-        selectedOption: 'no-modify'
-      }
-    ];
-    this.violations.set(mockData);
+      error: (err) => console.error("Error loading violations", err)
+    });
   }
 
   // Actualiza el modelo cuando el hijo emite un cambio
@@ -89,8 +59,35 @@ export class ReviewPage implements OnInit {
   }
 
   applyAndContinue(): void {
-    console.log('Applying modifications:', this.violations());
-    // Navegar a processing indicando que viene de review (para que luego vaya a download)
-    this.router.navigate(['/processing'], { queryParams: { from: 'review' } });
+    const id = this.videoId();
+    if (!id) return;
+
+    // Map decisions
+    // Backend expects { decisions: { "violation_id": "anonymize" | "keep" } }
+    const decisions: Record<string, 'anonymize' | 'keep'> = {};
+
+    this.violations().forEach(v => {
+      // Map UI selection to backend expected values
+      // UI: 'blur' | 'pixelate' | 'black-box' | 'no-modify'
+      // Simplication for now: if 'no-modify', keep. Else anonymize.
+      if (v.selectedOption === 'no-modify') {
+        decisions[v.id] = 'keep';
+      } else {
+        decisions[v.id] = 'anonymize';
+      }
+    });
+
+    console.log('Applying modifications:', decisions);
+
+    this.videoService.submitDecisions(id, decisions).subscribe({
+      next: () => {
+        // Navigate to processing (applying edits) -> Download
+        // We reuse processing page for 'edition' phase or creating download
+        // Or direct to download if synchronous? But Backend is async.
+        // Usually go back to processing to await completion.
+        this.router.navigate(['/processing', id], { queryParams: { from: 'review' } });
+      },
+      error: (err) => console.error("Error submitting decisions", err)
+    });
   }
 }

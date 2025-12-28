@@ -14,9 +14,9 @@ import {
 } from '@angular/ssr/node';
 import express from 'express';
 import { join } from 'node:path';
-import { authPromise } from '../server/lib/auth'; // ✅ Importar la promesa
-import { getDb, prepareDataForSurreal } from '../server/lib/db';
-import { ENV } from '../server/lib/env';
+import { getAuth } from '#server/auth';
+import { getDb, prepareDataForSurreal } from '#server/db';
+import { ENV } from '#server/env';
 
 // Rutas de archivos
 const browserDistFolder = join(import.meta.dirname, '../browser');
@@ -39,7 +39,7 @@ app.use(express.json());
 app.all('/api/auth/*splat', async (req, res) => {
   try {
     // ✅ Esperar a que auth esté listo
-    const auth = await authPromise;
+    const auth = await getAuth();
 
     // Convertir Express Request a Web Standard Request
     const protocol = req.protocol;
@@ -87,7 +87,7 @@ const adminRouter = express.Router();
 // Middleware de verificación de Admin
 adminRouter.use(async (req, res, next) => {
   try {
-    const auth = await authPromise; // ✅ Esperar a que auth esté listo
+    const auth = await getAuth(); // ✅ Esperar a que auth esté listo
 
     const headers = new Headers();
     for (const [key, value] of Object.entries(req.headers)) {
@@ -180,7 +180,7 @@ app.use('/api/admin', adminRouter);
 // POST /api/upload/log - Registrar actividad de subida
 app.post('/api/upload/log', async (req, res) => {
   try {
-    const auth = await authPromise; // ✅ Esperar a que auth esté listo
+    const auth = await getAuth(); // ✅ Esperar a que auth esté listo
 
     const headers = new Headers();
     for (const [key, value] of Object.entries(req.headers)) {
@@ -243,9 +243,10 @@ app.use((req, res, next) => {
 // ============================================================================
 if (isMainModule(import.meta.url) || ENV.RUN_UNDER_PROCESS_MANAGER) {
   const PORT = Number(ENV.PORT ?? 4000);
+  console.log(`🚀 OccultaShield Server starting on port ${PORT}`);
 
   // Inicializar conexión a SurrealDB y Better-Auth
-  Promise.all([getDb(), authPromise])
+  Promise.all([getDb(), getAuth()])
     .then(() => {
       app.listen(PORT, () => {
         console.log(`✅ OccultaShield Server running at http://localhost:${PORT}`);

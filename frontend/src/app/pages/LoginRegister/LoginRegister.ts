@@ -3,7 +3,7 @@ import { NgOptimizedImage } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 // Importamos la API real de Signal Forms (Experimental/v21)
 import { form, Field, required, email, minLength, submit, validate } from '@angular/forms/signals';
-import { AuthService } from '../../services/auth.service';
+import { AuthService } from '#services/auth.service';
 
 @Component({
   imports: [RouterLink, Field],
@@ -12,7 +12,7 @@ import { AuthService } from '../../services/auth.service';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LoginRegister {
-  private readonly authService = inject(AuthService);
+  protected readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   // Estado de UI local (no del formulario)
   protected showPassword = signal(false);
@@ -64,7 +64,7 @@ export class LoginRegister {
         };
       }
       return null;
-});
+    });
     required(f.privacyCheck, { message: 'You must accept the privacy policy' });
   });
 
@@ -80,18 +80,45 @@ export class LoginRegister {
     this.showPassword.update(v => !v);
   }
 
-  onSubmit(event: Event) {
+  toggleAuthMode() {
+    this.currentView.update(v => v === 'login' ? 'register' : 'login');
+    this.clearForms();
+  }
+
+  private clearForms() {
+    // Optional: Reset forms logic if needed, signal forms generally reset on destruction or manually.
+    // this.loginCredentials.set({ ... });
+  }
+
+  onLoginSubmit(event: Event) {
     event.preventDefault();
-    // La función submit() valida automáticamente y marca campos como touched
-    // Solo ejecuta el callback si el formulario es válido
     submit(this.loginForm, async () => {
       this.isLoading.set(true);
+      const { email, password } = this.loginCredentials();
+      const success = await this.authService.login(email, password);
+      if (success) {
+        this.router.navigate(['/upload']);
+      } else {
+        console.error('Login failed:', this.authService.error());
+      }
+      this.isLoading.set(false);
+    });
+  }
 
-      // Leemos directamente nuestro signal 'credentials()', que ya está sincronizado.
-      const payload = this.loginCredentials();
-      console.log('Authenticating:', payload);
+  onRegisterSubmit(event: Event) {
+    event.preventDefault();
+    submit(this.registerForm, async () => {
+      this.isLoading.set(true);
+      const { nameSurname, email, password } = this.registerCredentials();
+      const success = await this.authService.register(email, password, nameSurname);
 
-      await new Promise(r => setTimeout(r, 1500));
+      if (success) {
+        // Auto login or distinct flow? AuthService.register usually signs in too.
+        // Check AuthService: it sets session. So user is logged in.
+        this.router.navigate(['/upload']);
+      } else {
+        console.error('Register failed:', this.authService.error());
+      }
       this.isLoading.set(false);
     });
   }

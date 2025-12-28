@@ -91,3 +91,7 @@ uv.lock
 **/neo4j/
 **/data/
 **/neo4j-data
+
+# AI models
+**/.codeviz/
+**/.claude/

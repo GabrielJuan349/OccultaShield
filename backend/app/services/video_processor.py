@@ -49,42 +49,87 @@ class VideoProcessor:
             )
             
             # Save Detections to DB
-            # We need to transform DetectionResult objects to DB records
-            # For each tracked object:
-            detections_data = []
+            saved_detections_map = {} # track_id -> db_record_id
+            
             for track in detection_result.detections:
                  d_record = {
                      "video_id": video_id,
                      "track_id": track.track_id,
                      "detection_type": track.detection_type,
+                     "first_frame": track.first_frame,
+                     "last_frame": track.last_frame,
+                     "avg_confidence": track.avg_confidence,
+                     # bbox_history and captures should be compatible lists
                      "bbox_history": [b.to_dict() for b in track.bbox_history],
                      "captures": [c.to_dict() for c in track.captures],
-                     # ... other fields
                  }
-                 # Insert detection
-                 # DB insert logic here...
+                 
+                 # Create detection record
+                 # Since video_id is a string, we ensure it's a record pointer or ID
+                 # In Surreal, link is usually record<video>. If video_id is "video:123", it works.
+                 # If user passed "123", we might need to format. Assuming video_id is proper ID or we use text.
+                 # Schema says: video_id ON TABLE detection TYPE record<video>
+                 # So we need "video:ID".
+                 if not video_id.startswith("video:"):
+                     d_record["video_id"] = f"video:{video_id}"
+                 else:
+                     d_record["video_id"] = video_id
+                     
                  created = await db_conn.create("detection", d_record)
-                 detections_data.append(created[0] if created else d_record)
+                 if created:
+                     saved_detections_map[track.track_id] = created[0]['id']
 
             await progress_manager.change_phase(video_id, ProcessingPhase.VERIFYING, "Verifying GDPR compliance...")
             
             # --- VERIFICATION PHASE ---
-            # Call verification module (mock integration for now or real if available)
-            # verify_video_content(video_id, detections...)
-            # We'll simulate verification delay or call real logic if Phase 1 code is ready
-            # Phase 1 code: modules.verification.__init__ exposes logic working with Neo4j
+            from modules.verification import verify_image_detections
             
-            # Assuming verify_video_content takes detection data and verifies it
-            # results = await verify_video_content(detections_data)
-            await asyncio.sleep(2) # Placeholder for actual verification call
+            total_violations = 0
             
-            # Create dummy violations for testing if verification not fully wired to DB result
-            await progress_manager.report_verification(video_id, "vuln_1", "violation", 1, 1)
+            # Verify each tracked object
+            # We select the best capture for each track to verify context
+            for track in detection_result.detections:
+                if not track.captures:
+                    continue
+                    
+                # Pick the capture with highest stability or just the last one
+                # For now, taking the last capture
+                best_capture = track.captures[-1]
+                
+                db_det_id = saved_detections_map.get(track.track_id)
+                if not db_det_id: continue
+                
+                det_payload = {
+                    "id": db_det_id, # Passes DB ID for result correlation
+                    "detection_type": track.detection_type,
+                    "bbox": best_capture.bbox.to_dict()
+                }
+                
+                # Perform verification
+                v_results = await verify_image_detections(best_capture.image_path, [det_payload])
+                
+                for res in v_results:
+                    # Save "gdpr_verification" record
+                    is_violation = res.get("is_violation", False)
+                    if is_violation: total_violations += 1
+                    
+                    v_record = {
+                        "detection_id": res.get("detection_id"), 
+                        "is_violation": is_violation,
+                        "severity": res.get("severity", "none"),
+                        "description": res.get("reasoning", ""),
+                        "violated_articles": res.get("violated_articles", []),
+                        "confidence": res.get("confidence", 0.0),
+                        "llm_raw_response": str(res)
+                    }
+                    await db_conn.create("gdpr_verification", v_record)
+            
+            await progress_manager.report_verification(video_id, "summary", "completed", len(detection_result.detections), total_violations)
             
             await progress_manager.complete(
                 video_id, 
                 total_vulnerabilities=len(detection_result.detections), 
-                total_violations=0 # Placeholder
+                total_violations=total_violations
             )
             
         except Exception as e:

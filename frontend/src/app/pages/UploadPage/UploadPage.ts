@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, ElementRef, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, inject, signal, viewChild, computed, effect } from '@angular/core';
+import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
+import { of, tap, switchMap, map, startWith, catchError } from 'rxjs';
 import { FileDropDirective } from '../../directives/file-drop';
-import { UploadService } from '../../services/upload.service';
-import { AuthService } from '../../services/auth.service';
+import { VideoService } from '#services/video.service';
+import { AuthService } from '#services/auth.service';
 
 @Component({
   imports: [FileDropDirective],
@@ -12,70 +14,124 @@ import { AuthService } from '../../services/auth.service';
 })
 export class UploadPage {
   private readonly router = inject(Router);
-  private readonly uploadService = inject(UploadService);
+  private readonly videoService = inject(VideoService);
   protected readonly authService = inject(AuthService);
   private readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInputRef');
 
-  // Estado reactivo
-  protected uploadStatus = signal<'idle' | 'uploading' | 'complete'>('idle');
-  protected uploadProgress = signal(0);
-  protected fileName = signal<string>('');
+  // Signal Trigger for Resource
+  protected readonly fileToUpload = signal<File | undefined>(undefined);
+
+  // Progress Signal
+  protected readonly uploadProgress = signal(0);
+
+  // RESOURCE API implementation
+  // Manual Resource Implementation using toSignal
+  private readonly uploadState = toSignal(
+    toObservable(this.fileToUpload).pipe(
+      switchMap(file => {
+        if (!file) return of({ status: 'idle' } as const);
+        this.uploadProgress.set(10);
+        return this.videoService.uploadVideo(file).pipe(
+          tap(() => this.uploadProgress.set(100)),
+          map(value => ({ status: 'success' as const, value })),
+          startWith({ status: 'loading' as const }),
+          catchError(error => {
+            this.uploadProgress.set(0);
+            return of({ status: 'error' as const, error });
+          })
+        );
+      })
+    ),
+    { initialValue: { status: 'idle' } as const }
+  );
+
+  protected readonly uploadResource = {
+    value: computed(() => {
+      const s = this.uploadState();
+      return s.status === 'success' ? (s as any).value : undefined;
+    }),
+    error: computed(() => {
+      const s = this.uploadState();
+      return s.status === 'error' ? (s as any).error : undefined;
+    }),
+    isLoading: computed(() => {
+      const s = this.uploadState();
+      return s.status === 'loading';
+    })
+  };
+
+  // Derived state from Resource
+  protected readonly uploadStatus = computed(() => {
+    if (this.uploadResource.isLoading()) return 'uploading';
+    if (this.uploadResource.error()) return 'error';
+    if (this.uploadResource.value()) return 'complete'; // Only complete if we have a value
+    return 'idle';
+  });
+
+  protected readonly fileName = computed(() => this.fileToUpload()?.name || '');
+  protected readonly errorMessage = computed(() => {
+    const err = this.uploadResource.error();
+    return err ? 'Error durante la subida. Verifica tu conexión.' : '';
+  });
+
+  constructor() {
+    // Effect removed or kept? The user code had an effect to navigate automatically.
+    // The template suggests a "Continue to Processing" button appears on completion.
+    // If I keep the effect, the button might be redundant or the user might want manual transition.
+    // I will comment out the auto-navigation effect for now to let the button work, 
+    // OR keep it if the template allows both. 
+    // Actually, the template shows: @if (uploadStatus() === 'complete') { button... }
+    // If the effect automatically navigates, the button will barely be seen.
+    // I will disable the auto-navigation effect to let the button logic take over.
+    /*
+    effect(() => {
+      const response = this.uploadResource.value() as any;
+      if (response && response.video_id) {
+        // this.router.navigate(['/processing', response.video_id]);
+      }
+    });
+    */
+  }
+
+  continueToProcessing() {
+    const response = this.uploadResource.value();
+    if (response && response.video_id) {
+      this.router.navigate(['/processing', response.video_id]);
+    }
+  }
 
   logout() {
     this.authService.logout();
   }
 
-  // Selección manual (Click)
   triggerFileSelect() {
     this.fileInput().nativeElement.click();
   }
 
-  // Manejador unificado (viene de la Directiva o del Input)
   handleFile(fileOrEvent: File | Event) {
+    console.log('📂 handleFile called with:', fileOrEvent);
     let file: File | null = null;
-
-    if (fileOrEvent instanceof File) {
-      file = fileOrEvent; // Viene del Drag & Drop (Directiva)
-    } else {
+    if (fileOrEvent instanceof File) file = fileOrEvent;
+    else {
       const target = fileOrEvent.target as HTMLInputElement;
-      file = target.files ? target.files[0] : null; // Viene del Input manual
+      file = target.files ? target.files[0] : null;
     }
 
-    if (file) this.validateAndUpload(file);
+    console.log('📄 Extracted file:', file);
+
+    if (file) this.validateAndTrigger(file);
+    else console.warn('⚠️ No file extracted');
   }
 
-  private validateAndUpload(file: File) {
+  private validateAndTrigger(file: File) {
+    console.log('🔍 Validating file type:', file.type);
     if (!file.type.startsWith('video/')) {
+      console.error('❌ Invalid file type');
       alert('Formato no válido. Solo se admiten videos.');
       return;
     }
-
-    this.fileName.set(file.name);
-    this.uploadStatus.set('uploading');
-    this.uploadProgress.set(0);
-
-    // Simulación de carga
-    const interval = setInterval(() => {
-      this.uploadProgress.update(v => Math.min(v + 10, 100));
-      if (this.uploadProgress() === 100) {
-        clearInterval(interval);
-
-        // Registrar actividad en el backend
-        this.uploadService.logActivity(file.name, file.size).subscribe({
-          next: () => console.log('Upload logged successfully'),
-          error: (err) => console.error('Failed to log upload', err)
-        });
-
-        setTimeout(() => {
-          this.uploadStatus.set('complete');
-          // Ya no navegamos automáticamente - el usuario usará el botón de confirmación
-        }, 500);
-      }
-    }, 200);
-  }
-
-  // Navegar a la pantalla de procesamiento
-  continueToProcessing(): void {
-    this.router.navigate(['/processing'], { queryParams: { from: 'upload' } });
+    // Set signal -> Triggers Resource
+    console.log('✅ File valid, setting signal');
+    this.fileToUpload.set(file);
   }
 }

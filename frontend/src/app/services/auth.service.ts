@@ -5,7 +5,7 @@
 import { Injectable, signal, computed, inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
-import { authClient, signIn, signUp, signOut, getSession } from '../lib/auth-client';
+import { authClient, signIn, signUp, signOut, getSession } from '#lib/auth-client';
 
 // Tipos
 export interface User {

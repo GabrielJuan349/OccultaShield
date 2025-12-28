@@ -1,6 +1,6 @@
 import { NgOptimizedImage } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
-import { ModificationType, Violation } from '../../interface/violation-models';
+import { ModificationType, Violation } from '#interface/violation-models';
 
 @Component({
   selector: 'app-violation-card',
@@ -119,7 +119,7 @@ export class ViolationCard {
   protected readonly isHiddenForCapture = signal(false);
 
   // Configuración de botones para el HTML
-  protected readonly options: readonly {label: string; value: ModificationType; icon: string}[] = [
+  protected readonly options: readonly { label: string; value: ModificationType; icon: string }[] = [
     { label: 'No Modify', value: 'no-modify', icon: 'radio_button_unchecked' },
     { label: 'Pixelate', value: 'pixelate', icon: 'grid_on' },
     { label: 'Mask', value: 'mask', icon: 'visibility_off' },

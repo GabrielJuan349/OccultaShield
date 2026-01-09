@@ -47,23 +47,37 @@ cd app
 uvicorn main:app --host 0.0.0.0 --port 8900 --reload
 ```
 
-### 3. Frontend Initialization
+### 3. Frontend & Admin Setup
 ```bash
 cd frontend
-# Install dependencies
+# Install dependencies (including nodemailer for admin)
 bun install
-# Start App
+# Setup .env for Admin & Email
+# SMTP_USER, SMTP_PASS, SMTP_FROM are required for user approval emails
 bun run dev
 ```
 
 ---
 
+## 🛡️ Admin & Closed Beta Management
+
+OccultaShield includes an Administrative Panel at `/admin` to control access:
+
+1.  **Closed Beta Mode**: When enabled, new registrations are set as `pending` and cannot access processing features.
+2.  **User Approval**: Admins review requests and approve/reject users from the dashboard.
+3.  **Automated Emails**: The system sends professional HTML emails for registration receipt, approval, and rejection.
+4.  **Audit Logging**: Every administrative action is recorded in the `audit_log` table for accountability.
+
+---
+
 ## 🧪 Testing the "Precision Mode" Pipeline
 
-1.  **Upload**: Go to `http://localhost:4200` and upload a video.
-2.  **Monitor**: Watch the "Processing" page. The backend will use **YOLOv11** for instance segmentation and **Kalman Filters** to stabilize tracking.
-3.  **Review**: In the "Review" page, you will see precise silhouettes. Choose your anonymization effect (Blur, Pixelate, or Mask).
-4.  **Download**: Once processing is complete, download the anonymized video. The system automatically handles **Dynamic Fading** for subjects that are too small to be identifiable (Ground Truth check).
+1.  **Register**: Create a new account. If **Closed Beta Mode** is on, you will see a "Pending Approval" notice.
+2.  **Admin Approval**: Use an admin account to go to `/admin/users` and approve the new user.
+3.  **Upload**: Once approved, go to `http://localhost:4200` and upload a video.
+4.  **Monitor**: Watch the "Processing" page. The backend will use **YOLOv11** for instance segmentation.
+5.  **Review**: In the "Review" page, you will see precise silhouettes. Choose your anonymization effect (Blur, Pixelate, or Mask).
+6.  **Download**: Once processing is complete, download the anonymized video. The system automatically handles **Dynamic Fading** for subjects that are too small to be identifiable (Ground Truth check).
 
 ---
 
@@ -72,11 +86,12 @@ bun run dev
 | Component | Technology | Role |
 | :--- | :--- | :--- |
 | **Frontend** | Angular v21 (Signals) | Modern UI with real-time SSE updates. |
+| **Admin API** | Node.js (SSR Express) | Secure management of users, settings, and emails. |
 | **Backend** | FastAPI / Python | Orchestration and AI pipeline. |
 | **Detection** | YOLOv11-seg | Silhouette-level instance segmentation. |
-| **Tracking** | Kalman Filter | Smooth object tracking for shaky/drone shots. |
 | **Verification** | Neo4j / LLM | Legal compliance analysis (GDPR). |
-| **Database** | SurrealDB | Tracking history and execution state. |
+| **Database** | SurrealDB | Application state, users, and audit history. |
+| **Mailing** | Nodemailer | Transactional emails for the approval system. |
 
 ---
 

@@ -47,151 +47,77 @@ Variables importantes:
 - `SURREAL_NAMESPACE`: Namespace de la DB (default: `occultashield`)
 - `SURREAL_DATABASE`: Nombre de la DB (default: `main`)
 - `AUTH_SECRET`: **IMPORTANTE** - Cambiar por un secreto seguro de 32+ caracteres
+- `SMTP_USER`: Email para notificaciones (ej. Gmail).
+- `SMTP_PASS`: Contraseña de aplicación de Google.
 
 ### 3. Iniciar SurrealDB
 
 ```bash
 # Iniciar SurrealDB en modo desarrollo
 surreal start --user root --pass root memory
-
-# O con persistencia en disco
-surreal start --user root --pass root file:./data/surreal.db
 ```
 
 ### 4. Importar Esquema de Base de Datos
 
 ```bash
+# El esquema incluye las nuevas tablas app_settings y audit_log
 surreal import --conn http://localhost:8000 \
   --user root --pass root \
   --ns occultashield --db main \
-  server/schema.surql
+  db_files/schema.surql
 ```
 
-### 5. Ejecutar la Aplicación
+### 5. Configurar el Primer Administrador
 
-```bash
-# Desarrollo (Angular CLI)
-bun run start
-
-# Producción con SSR
-bun run start:ssr
+El sistema de roles está integrado. Para convertir un usuario en admin manualmente:
+```sql
+UPDATE user:id SET role = 'admin', isApproved = true;
 ```
 
-## Endpoints de Autenticación
+---
 
-Better-Auth expone automáticamente estos endpoints en `/api/auth/*`:
+## 🛡️ Admin API & SSR
+
+A diferencia del resto de la app, la lógica de administración corre en el servidor **Node.js (SSR Express)** para mayor seguridad y acceso directo a SurrealDB.
+
+### Endpoints de Administración (`/api/admin/*`)
 
 | Endpoint | Método | Descripción |
 |----------|--------|-------------|
-| `/api/auth/sign-up/email` | POST | Registro con email/password |
-| `/api/auth/sign-in/email` | POST | Login con email/password |
-| `/api/auth/sign-out` | POST | Cerrar sesión |
-| `/api/auth/session` | GET | Obtener sesión actual |
+| `/api/admin/stats` | GET | Estadísticas del dashboard |
+| `/api/admin/users` | GET | Lista de todos los usuarios |
+| `/api/admin/users/:id/approve` | PATCH | Aprobar usuario + Envío de email |
+| `/api/admin/users/:id/reject` | PATCH | Rechazar usuario + Envío de email |
+| `/api/admin/settings` | GET/PUT | Configuración (Beta Cerrada) |
 
-### Ejemplo de Registro
+---
 
-```typescript
-// Usando el AuthService de Angular
-const authService = inject(AuthService);
+## 🚪 Flujo de Aprobación (Closed Beta)
 
-const success = await authService.register(
-  'user@example.com',
-  'password123',
-  'John Doe'
-);
-```
+1.  **Registro**: Al registrarse, el usuario recibe automáticamente un email de "Solicitud Recibida". Su estado inicial es `isApproved: false`.
+2.  **Middlewares**: 
+    *   `requireAdmin`: Protege las rutas `/admin`.
+    *   `checkUserApproval`: Bloquea las rutas de la app si el usuario no está aprobado y el `closedBetaMode` está activo.
+3.  **Emails**: Se utiliza **Nodemailer** para enviar plantillas HTML profesionales con el estado de la cuenta.
 
-### Ejemplo de Login
+---
 
-```typescript
-const success = await authService.login(
-  'user@example.com',
-  'password123'
-);
+## Esquema de Base de Datos (Extendido)
 
-if (success) {
-  console.log('Usuario:', authService.user());
-}
-```
+Tablas principales de autenticación y control:
 
-## Uso en Componentes Angular
+- **user**: Incluye `role`, `isApproved` (boolean) y `usageType`.
+- **session**: Sesiones activas.
+- **app_settings**: Configuración del sistema (ej: `closedBetaMode`).
+- **audit_log**: Registro histórico de acciones administrativas.
 
-```typescript
-import { Component, inject } from '@angular/core';
-import { AuthService } from './services/auth.service';
-
-@Component({
-  selector: 'app-profile',
-  template: `
-    @if (auth.isAuthenticated()) {
-      <p>Bienvenido, {{ auth.userName() }}</p>
-      <button (click)="auth.logout()">Cerrar Sesión</button>
-    } @else {
-      <p>No has iniciado sesión</p>
-    }
-  `
-})
-export class ProfileComponent {
-  readonly auth = inject(AuthService);
-}
-```
-
-## Proteger Rutas
-
-Usa el guard de autenticación existente:
-
-```typescript
-// app.routes.ts
-import { authGuard } from './guards/auth.guard';
-
-export const routes: Routes = [
-  {
-    path: 'dashboard',
-    loadComponent: () => import('./pages/Dashboard'),
-    canActivate: [authGuard]
-  }
-];
-```
-
-## Esquema de Base de Datos
-
-El esquema en `server/schema.surql` crea las siguientes tablas:
-
-- **user**: Usuarios registrados
-- **session**: Sesiones activas
-- **account**: Cuentas vinculadas (providers)
-- **verification**: Tokens de verificación
-
-## Adaptador SurrealDB
-
-El adaptador custom en `server/lib/auth.ts` maneja:
-
-- Conversión de RecordId de SurrealDB (`table:id`) a strings simples
-- Traducción de operadores WHERE de Better-Auth a SurrealQL
-- CRUD completo para todas las tablas de autenticación
-
-## Troubleshooting
-
-### Error: "Failed to connect to SurrealDB"
-- Verificar que SurrealDB esté corriendo
-- Verificar las variables de entorno `SURREAL_*`
-
-### Error: "Authentication error"
-- Verificar que `AUTH_SECRET` esté configurado
-- Verificar que el esquema esté importado en la DB
-
-### Error de CORS
-- Añadir el origen a `trustedOrigins` en `server/lib/auth.ts`
+---
 
 ## Señales Disponibles en AuthService
 
 | Señal | Tipo | Descripción |
 |-------|------|-------------|
 | `user` | `User \| null` | Usuario autenticado |
-| `session` | `Session \| null` | Sesión actual |
-| `isLoading` | `boolean` | Estado de carga |
-| `error` | `string \| null` | Último error |
 | `isAuthenticated` | `boolean` | Si hay sesión activa |
-| `userName` | `string \| null` | Nombre del usuario |
-| `userEmail` | `string \| null` | Email del usuario |
-| `userRole` | `string` | Rol del usuario |
+| `userRole` | `string` | Rol actual (`user` o `admin`) |
+| `isApproved` | `boolean` | Estado de aprobación del usuario |

@@ -95,6 +95,11 @@ Sigue este flujo para verificar que todo funciona con la nueva arquitectura de s
 ---
 
 ## 🔍 Verificación de Componentes
-*   **SurrealDB**: Revisa que existen registros en las tablas `video`, `detection` (ahora incluyen el campo `mask` con polígonos) y `gdpr_verification`.
+*   **SurrealDB**: Revisa que existen datos en las tablas:
+    *   `video`, `gdpr_verification`, `detection`: Pipeline de procesamiento.
+    *   `user`: Usuarios con campos `isApproved` y `role`.
+    *   `app_settings`: Configuración global (ej. `closedBetaMode`).
+    *   `audit_log`: Historial de acciones administrativas.
+    *   `session`: Sesiones de Better-Auth.
 *   **Neo4j**: Ejecuta `MATCH (n:GDPRArticle) RETURN n LIMIT 1` en el browser de Neo4j.
 *   **GPU**: Vigila con `nvidia-smi`. La segmentación YOLOv11 es más intensiva que YOLOv10 pero ofrece una protección de privacidad mucho más quirúrgica.

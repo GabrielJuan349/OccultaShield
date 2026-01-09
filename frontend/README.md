@@ -35,7 +35,12 @@
 
 ### 3. Review Quirúrgica (Human-in-the-Loop)
 - **Visualización Precision**: Gracias a YOLOv11, el frontend permite ver las siluetas segmentadas exactas detectadas por la IA.
-- **Gestión de Decisiones**: Un estado reactivo basado en `Map` y `Signals` permite gestionar cientos de infracciones sin degradar el rendimiento de la UI.
+- **Gestión de Decisiones**: Un estado reactivo basado en `Signals` permite gestionar infracciones sin degradar el rendimiento de la UI.
+
+### 4. Admin Control Center & Beta Approval
+- **Panel de Control**: Acceso administrativo en `/admin` para gestionar usuarios y roles.
+- **Flujo de Aprobación**: Sistema de registro con estado "pendiente" y aprobación manual por administrador.
+- **Emails Transaccionales**: Envío de correos profesionales (Nodemailer) para notificar el estado de la cuenta.
 
 ---
 
@@ -46,23 +51,22 @@ Se recomienda usar **Bun** para una instalación ultra rápida:
 ```bash
 cd frontend
 bun install
-# o
-npm install
 ```
 
 ### Configuración (`.env`)
 ```bash
-VITE_API_URL=http://localhost:8900/api/v1
-AUTH_URL=http://localhost:4000
+API_URL=http://localhost:8900/api/v1
+# Configuración Admin & Email
+SMTP_USER=tu-email@gmail.com
+SMTP_PASS=tu-app-password
+SMTP_FROM=OccultaShield <noreply@occultashield.com>
 ```
 
 ### Ejecución en Desarrollo
 ```bash
-bun dev
-# o
-ng serve
+bun run dev
 ```
-Disponible en `http://localhost:4200`.
+Disponible en `http://localhost:4200`. La Admin API se sirve automáticamente mediante el servidor SSR Express integrado.
 
 ### Ejecución en Producción (SSR)
 ```bash

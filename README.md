@@ -19,6 +19,9 @@
 - **🎯 Intelligent Tracking**: Implements **Kalman Filters** and camera motion compensation to ensure privacy masks stay locked on subjects, even in complex drone or handheld shots.
 - **🛡️ Dynamic Discernibility**: Automatically desvanece (fades) anonymization effects for subjects that are too small to be identifiable, maintaining cinematic quality while ensuring compliance.
 - **🤝 Human-in-the-Loop**: A streamlined review interface where human operators can validate or override AI decisions before final rendering.
+- **🛡️ Admin Control Center**: A dedicated panel for user management, role assignment, and system-wide settings.
+- **🚪 Closed Beta Approval**: Integrated registration workflow where new users require manual administrator approval, coupled with automated email notifications.
+- **📜 Audit Log**: Comprehensive tracking of all administrative actions (approvals, rejections, settings changes) for full accountability.
 
 ---
 
@@ -28,14 +31,15 @@ OccultaShield is built on a high-performance modern stack:
 
 ### Frontend
 - **Framework**: Angular v21 (Zoneless + Signals strategy).
-- **Communication**: Real-time progress updates via Server-Sent Events (SSE).
-- **UX**: Premium Dark Mode with Glassmorphism aesthetics.
+- **Admin API**: Centralized server-side logic within the Angular SSR (Express) server for user management and secure operations.
+- **UX**: Premium Dark Mode with Glassmorphism aesthetics and real-time Toast notifications.
 
 ### Backend
-- **Core**: FastAPI (Python) for asynchronous orchestration.
+- **Core**: FastAPI (Python) for asynchronous orchestration of AI tasks.
 - **AI/CV**: Ultralytics YOLOv11, Kornia (GPU-accelerated filters), and OpenCV.
 - **Knowledge Graph**: Neo4j (Vector Index + Cypher) for GDPR reasoning.
 - **Persistence**: SurrealDB for multi-model storage (Relations + JSON).
+- **Notifications**: Integrated Nodemailer for transactional system emails.
 
 ---
 

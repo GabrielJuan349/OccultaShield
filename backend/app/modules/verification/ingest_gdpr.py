@@ -1,11 +1,21 @@
 import os
-from typing import List
+import sys
+import shutil
+import tempfile
+from typing import List, Optional
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_neo4j import Neo4jVector, Neo4jGraph
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from dotenv import load_dotenv
+
+# Optional Kaggle import
+try:
+    import kaggle
+    KAGGLE_AVAILABLE = True
+except ImportError:
+    KAGGLE_AVAILABLE = False
 
 load_dotenv()
 
@@ -152,6 +162,66 @@ def ingest_gdpr_pdf(pdf_path: str, clear_existing: bool = False):
     return len(processed_docs)
 
 
+def download_from_kaggle(dataset_id: str, file_pattern: str = ".pdf") -> str:
+    """
+    Downloads a dataset from Kaggle and returns the path to the PDF file.
+    
+    Args:
+        dataset_id: Kaggle dataset ID (e.g., 'username/dataset-name')
+        file_pattern: Pattern to search for the PDF file in the dataset
+        
+    Returns:
+        Path to the downloaded PDF file
+    """
+    if not KAGGLE_AVAILABLE:
+        raise ImportError("The 'kaggle' package is not installed. Add it to your dependencies.")
+    
+    # Ensure credentials are set
+    if not os.getenv("KAGGLE_USERNAME") or not os.getenv("KAGGLE_KEY"):
+         # Check if config file exists
+         kaggle_config = os.path.expanduser("~/.kaggle/kaggle.json")
+         if not os.path.exists(kaggle_config):
+             print("\n⚠️  Kaggle credentials missing!")
+             print("Please set KAGGLE_USERNAME and KAGGLE_KEY environment variables")
+             print("or provide a ~/.kaggle/kaggle.json file.")
+             sys.exit(1)
+
+    print(f"\n📥 Step 0: Downloading dataset from Kaggle: {dataset_id}...")
+    
+    temp_dir = tempfile.mkdtemp(prefix="kaggle_gdpr_")
+    
+    try:
+        from kaggle.api.kaggle_api_extended import KaggleApi
+        api = KaggleApi()
+        api.authenticate()
+        
+        # Download files
+        api.dataset_download_files(dataset_id, path=temp_dir, unzip=True)
+        
+        # Find PDF file
+        pdf_files = []
+        for root, _, files in os.walk(temp_dir):
+            for file in files:
+                if file.lower().endswith(file_pattern.lower()):
+                    pdf_files.append(os.path.join(root, file))
+        
+        if not pdf_files:
+            shutil.rmtree(temp_dir)
+            raise FileNotFoundError(f"No PDF files found in Kaggle dataset '{dataset_id}'")
+            
+        # Use first PDF file found
+        target_path = pdf_files[0]
+        print(f"   ✅ Downloaded: {os.path.basename(target_path)}")
+        
+        return target_path
+        
+    except Exception as e:
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+        print(f"❌ Kaggle error: {e}")
+        sys.exit(1)
+
+
 def test_search(query: str = "biometric data processing"):
     """Test the vector search after ingestion."""
     print(f"\n🔎 Testing search with query: '{query}'")
@@ -189,19 +259,43 @@ def test_search(query: str = "biometric data processing"):
 if __name__ == "__main__":
     import sys
     
-    if len(sys.argv) > 1:
-        pdf_path = sys.argv[1]
+    # Handle environment variables for Kaggle if provided in args
+    # Usage: python ingest_gdpr.py local:path/to/pdf
+    #    or: python ingest_gdpr.py kaggle:username/dataset
+    
+    arg = sys.argv[1] if len(sys.argv) > 1 else "local:path/to/your/gdpr.pdf"
+    
+    temp_path = None
+    
+    if arg.startswith("kaggle:"):
+        dataset_id = arg.replace("kaggle:", "")
+        try:
+            pdf_path = download_from_kaggle(dataset_id)
+            temp_path = os.path.dirname(pdf_path) # Directory to cleanup
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            sys.exit(1)
+    elif arg.startswith("local:"):
+        pdf_path = arg.replace("local:", "")
     else:
-        # Default path - update this to your GDPR PDF location
-        pdf_path = r"path/to/your/gdpr.pdf"
+        # Fallback for simple path
+        pdf_path = arg
     
     if not os.path.exists(pdf_path):
         print(f"❌ Error: PDF file not found at {pdf_path}")
-        print("Usage: python ingest_gdpr.py <path_to_gdpr_pdf>")
+        print("\nUsage:")
+        print("  python ingest_gdpr.py local:path/to/gdpr.pdf")
+        print("  python ingest_gdpr.py kaggle:username/dataset-identifier")
         sys.exit(1)
     
-    # Run ingestion
-    ingest_gdpr_pdf(pdf_path, clear_existing=True)
-    
-    # Test search
-    test_search("facial recognition biometric data")
+    try:
+        # Run ingestion
+        ingest_gdpr_pdf(pdf_path, clear_existing=True)
+        
+        # Test search
+        test_search("facial recognition biometric data")
+    finally:
+        # Cleanup temp Kaggle files if any
+        if temp_path and os.path.exists(temp_path):
+            print(f"\n🧹 Cleaning up temporary files in {temp_path}...")
+            shutil.rmtree(temp_path)

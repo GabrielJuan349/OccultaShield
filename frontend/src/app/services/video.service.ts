@@ -16,12 +16,31 @@ export interface VideoUploadResponse {
 }
 
 export interface ViolationCard {
-    id: string;
-    timestamp: string;
-    threat_level: 'High' | 'Medium' | 'Low';
+    verification_id: string; // "id" in backend response
+    detection_id: string; // Link to detection
+    is_violation: boolean;
+    severity: 'none' | 'low' | 'medium' | 'high' | 'critical';
+    violated_articles: string[];
     description: string;
-    bbox?: number[];
+    recommended_action: string;
+    confidence: number;
+    capture_image_url: string; // URL to image
+    thumbnail_url?: string;
     detection_type: string;
+    timestamp?: string; // Optional if not provided or different format
+    track_id?: number | string;
+    frames_analyzed?: number;       // Temporal Consensus: number of frames analyzed
+    frames_with_violation?: number; // Temporal Consensus: frames with positive violation
+}
+
+export interface UserDecision {
+    verification_id: string;
+    action: 'blur' | 'pixelate' | 'mask' | 'no_modify';
+    confirmed_violation: boolean;
+}
+
+export interface UserDecisionBatch {
+    decisions: UserDecision[];
 }
 
 export interface PaginatedResponse<T> {
@@ -50,8 +69,9 @@ export class VideoService {
         return this.http.get<PaginatedResponse<ViolationCard>>(`${this.apiUrl}/${videoId}/violations?page=${page}`);
     }
 
-    submitDecisions(videoId: string, decisions: Record<string, 'anonymize' | 'keep'>): Observable<any> {
-        return this.http.post(`${this.apiUrl}/${videoId}/decisions`, { decisions });
+    submitDecisions(videoId: string, decisions: UserDecision[]): Observable<any> {
+        const payload: UserDecisionBatch = { decisions };
+        return this.http.post(`${this.apiUrl}/${videoId}/decisions`, payload);
     }
 
     downloadVideo(videoId: string): Observable<Blob> {

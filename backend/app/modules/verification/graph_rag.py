@@ -45,7 +45,7 @@ class GDPRVerificationGraph:
         # --- Hugging Face Transformers Configuration ---
         # Model ID - change this to the exact model you want to use
         # Options: "google/gemma-3-4b-it", "meta-llama/Llama-3.2-11B-Vision-Instruct", etc.
-        self.model_id = os.getenv("MULTIMODAL_MODEL_ID", "google/gemma-3-4b-it")
+        self.model_id = os.getenv("MULTIMODAL_MODEL_ID", "google/gemma-3n-E4B-it")
         
         # Detect device (GPU strongly recommended for vision models)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"

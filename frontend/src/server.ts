@@ -81,95 +81,9 @@ app.all('/api/auth/*splat', async (req, res) => {
 
 // =========================================================================
 // RUTAS DE ADMINISTRACIÓN (/api/admin/*)
+// Importado desde admin.ts - incluye approval workflow, settings, audit log
 // =========================================================================
-const adminRouter = express.Router();
-
-// Middleware de verificación de Admin
-adminRouter.use(async (req, res, next) => {
-  try {
-    const auth = await getAuth(); // ✅ Esperar a que auth esté listo
-
-    const headers = new Headers();
-    for (const [key, value] of Object.entries(req.headers)) {
-      if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
-    }
-
-    const session = await auth.api.getSession({ headers });
-
-    if (!session || session.user.role !== 'admin') {
-      res.status(403).json({ error: 'Unauthorized' });
-      return;
-    }
-
-    (req as any).user = session.user;
-    next();
-  } catch (error) {
-    console.error('Admin Auth Error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-// GET /api/admin/stats
-adminRouter.get('/stats', async (req, res) => {
-  try {
-    const db = await getDb();
-
-    // Consultas paralelas para estadísticas
-    const [usersResult] = await db.query<[{ count: number }][]>('SELECT count() FROM user GROUP ALL');
-    const [sessionsResult] = await db.query<[{ count: number }][]>('SELECT count() FROM session GROUP ALL');
-    const [logsResult] = await db.query<[{ count: number }][]>('SELECT count() FROM processing_log GROUP ALL');
-
-    // Actividad reciente (últimos 10 logs)
-    const [recentActivity] = await db.query('SELECT * FROM processing_log ORDER BY createdAt DESC LIMIT 10');
-
-    const totalUsers = usersResult && usersResult[0] ? usersResult[0].count : 0;
-    const activeSessions = sessionsResult && sessionsResult[0] ? sessionsResult[0].count : 0;
-    const totalProcessed = logsResult && logsResult[0] ? logsResult[0].count : 0;
-
-    res.json({
-      totalUsers,
-      activeSessions,
-      totalProcessed,
-      recentActivity: recentActivity || []
-    });
-  } catch (error) {
-    console.error('Stats Error:', error);
-    res.status(500).json({ error: 'Failed to fetch stats' });
-  }
-});
-
-// GET /api/admin/users
-adminRouter.get('/users', async (req, res) => {
-  try {
-    const db = await getDb();
-    const [users] = await db.query('SELECT * FROM user ORDER BY createdAt DESC');
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch users' });
-  }
-});
-
-// PATCH /api/admin/users/:id/role
-adminRouter.patch('/users/:id/role', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { role } = req.body;
-
-    if (!['user', 'admin'].includes(role)) {
-      res.status(400).json({ error: 'Invalid role' });
-      return;
-    }
-
-    const db = await getDb();
-    // Asegurarse de que el ID tenga el formato correcto (user:xyz)
-    const userId = id.includes(':') ? id : `user:${id}`;
-
-    await db.merge(userId, { role });
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update role' });
-  }
-});
+import { adminRouter, checkUserApproval } from '#server/admin';
 
 app.use('/api/admin', adminRouter);
 

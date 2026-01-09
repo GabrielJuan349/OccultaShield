@@ -10,6 +10,8 @@ class ProcessingPhase(str, Enum):
     TRACKING = "tracking"
     VERIFYING = "verifying"
     SAVING = "saving"
+    WAITING_FOR_REVIEW = "waiting_for_review" # New phase
+    ANONYMIZING = "anonymizing" # New phase
     COMPLETED = "completed"
     ERROR = "error"
 
@@ -34,7 +36,6 @@ class ProgressEvent(BaseModel):
     timestamp: datetime = datetime.now()
     
     def to_sse(self) -> str:
-        """Convierte a formato SSE."""
         import json
         data = self.model_dump(mode='json')
         return f"event: {self.event_type.value}\ndata: {json.dumps(data)}\n\n"

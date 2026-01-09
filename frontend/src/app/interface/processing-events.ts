@@ -6,6 +6,8 @@ export type ProcessingPhase =
   | 'tracking'
   | 'verifying'
   | 'saving'
+  | 'waiting_for_review' // New
+  | 'anonymizing' // New
   | 'completed'
   | 'error';
 

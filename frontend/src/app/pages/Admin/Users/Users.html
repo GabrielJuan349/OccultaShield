@@ -1,45 +1,100 @@
 <div class="users-page">
   <h1>Gestión de Usuarios</h1>
 
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab" [class.active]="activeTab() === 'all'" (click)="setTab('all')">
+      Todos ({{ users().length }})
+    </button>
+    <button class="tab" [class.active]="activeTab() === 'pending'" (click)="setTab('pending')">
+      Pendientes ({{ pendingUsers().length }})
+    </button>
+    <button class="tab" [class.active]="activeTab() === 'approved'" (click)="setTab('approved')">
+      Aprobados ({{ approvedUsers().length }})
+    </button>
+  </div>
+
+  <!-- Beta Mode Toggle -->
+  <div class="settings-card">
+    <label class="toggle-label">
+      <span>Modo Beta Cerrada</span>
+      <input type="checkbox" [checked]="closedBetaMode()" (change)="toggleBetaMode($event)">
+      <span class="toggle-slider"></span>
+    </label>
+    <p class="setting-hint">
+      @if (closedBetaMode()) {
+      Los nuevos usuarios necesitan aprobación manual.
+      } @else {
+      Los nuevos usuarios tienen acceso inmediato.
+      }
+    </p>
+  </div>
+
   @if (loading()) {
-    <div class="loading">Cargando usuarios...</div>
+  <div class="loading">Cargando usuarios...</div>
   } @else {
-    <div class="users-table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Usuario</th>
-            <th>Email</th>
-            <th>Rol</th>
-            <th>Registrado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (user of users(); track user.id) {
-            <tr>
-              <td>
-                <div class="user-info">
-                  @if (user.image) {
-                    <img [ngSrc]="user.image" alt="Avatar" class="avatar">
-                  }
-                  <span>{{ user.name }}</span>
-                </div>
-              </td>
-              <td>{{ user.email }}</td>
-              <td>
-                <span class="role-badge" [class]="user.role">{{ user.role }}</span>
-              </td>
-              <td>{{ user.createdAt | date:'mediumDate' }}</td>
-              <td>
-                <button (click)="toggleAdmin(user)" class="action-btn">
-                  {{ user.role === 'admin' ? 'Quitar Admin' : 'Hacer Admin' }}
-                </button>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+  <div class="users-table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Usuario</th>
+          <th>Email</th>
+          <th>Tipo</th>
+          <th>Estado</th>
+          <th>Rol</th>
+          <th>Registrado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (user of displayedUsers(); track user.id) {
+        <tr>
+          <td>
+            <div class="user-info">
+              @if (user.image) {
+              <img [ngSrc]="user.image" alt="Avatar" width="32" height="32" class="avatar">
+              } @else {
+              <div class="avatar-placeholder">{{ user.name.charAt(0) }}</div>
+              }
+              <span>{{ user.name }}</span>
+            </div>
+          </td>
+          <td>{{ user.email }}</td>
+          <td>
+            <span class="usage-badge">{{ user.usageType }}</span>
+          </td>
+          <td>
+            @if (user.isApproved) {
+            <span class="status-badge approved">Aprobado</span>
+            } @else {
+            <span class="status-badge pending">Pendiente</span>
+            }
+          </td>
+          <td>
+            <span class="role-badge" [class]="user.role">{{ user.role }}</span>
+          </td>
+          <td>{{ user.createdAt | date:'mediumDate' }}</td>
+          <td class="actions-cell">
+            @if (!user.isApproved) {
+            <button (click)="approveUser(user)" class="btn-approve" title="Aprobar">
+              ✓
+            </button>
+            <button (click)="rejectUser(user)" class="btn-reject" title="Rechazar">
+              ✕
+            </button>
+            }
+            <button (click)="toggleAdmin(user)" class="btn-role" title="Cambiar rol">
+              {{ user.role === 'admin' ? '👤' : '⚡' }}
+            </button>
+          </td>
+        </tr>
+        } @empty {
+        <tr>
+          <td colspan="7" class="empty-state">No hay usuarios en esta categoría</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
   }
 </div>

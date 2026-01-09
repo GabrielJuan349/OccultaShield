@@ -1,4 +1,4 @@
-export type ModificationType = 'no-modify' | 'pixelate' | 'mask' | 'blur';
+export type ModificationType = 'no_modify' | 'pixelate' | 'mask' | 'blur';
 
 export interface Violation {
   id: string;
@@ -8,4 +8,6 @@ export interface Violation {
   fineText: string;
   imageUrl: string;
   selectedOption: ModificationType; // Estado mutable
+  framesAnalyzed?: number;  // Temporal Consensus: number of frames analyzed
+  confidence?: number;      // Consensus confidence score (0-1)
 }

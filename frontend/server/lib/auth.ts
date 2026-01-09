@@ -19,6 +19,7 @@ import { surrealdbAdapter } from 'surreal-better-auth';
 
 import { getDb } from './db';
 import { ENV } from './env';
+import { sendPendingNotification } from './email';
 
 // ============================================================================
 // BETTER-AUTH CONFIGURATION
@@ -83,6 +84,25 @@ async function createAuth() {
           type: 'string',
           required: false,
           defaultValue: 'user',
+        },
+      },
+    },
+
+    // Database hooks - enviar email al registrarse
+    databaseHooks: {
+      user: {
+        create: {
+          after: async (user) => {
+            // Enviar email de notificación de registro pendiente
+            if (user.email && user.name) {
+              try {
+                await sendPendingNotification(user.email, user.name);
+                console.log(`📧 Pending notification sent to ${user.email}`);
+              } catch (error) {
+                console.error('Failed to send pending notification:', error);
+              }
+            }
+          },
         },
       },
     },

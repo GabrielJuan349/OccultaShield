@@ -110,7 +110,7 @@ export class ViolationCard {
   readonly selectionChange = output<ModificationType>();
 
   // Estado local sincronizado inicialmente con la data
-  protected readonly currentSelection = signal<ModificationType>('no-modify');
+  protected readonly currentSelection = signal<ModificationType>('no_modify');
 
   // Estado para el modal de previsualización
   protected readonly isPreviewOpen = signal(false);
@@ -120,7 +120,7 @@ export class ViolationCard {
 
   // Configuración de botones para el HTML
   protected readonly options: readonly { label: string; value: ModificationType; icon: string }[] = [
-    { label: 'No Modify', value: 'no-modify', icon: 'radio_button_unchecked' },
+    { label: 'No Modify', value: 'no_modify', icon: 'radio_button_unchecked' },
     { label: 'Pixelate', value: 'pixelate', icon: 'grid_on' },
     { label: 'Mask', value: 'mask', icon: 'visibility_off' },
     { label: 'Blur', value: 'blur', icon: 'blur_on' }

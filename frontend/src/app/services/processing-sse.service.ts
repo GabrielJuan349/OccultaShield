@@ -98,6 +98,8 @@ export class ProcessingSSEService implements OnDestroy {
       'tracking': 'Tracking Objects',
       'verifying': 'AI Verification',
       'saving': 'Saving Results',
+      'waiting_for_review': 'Waiting for Review',
+      'anonymizing': 'Anonymizing Video',
       'completed': 'Complete!',
       'error': 'Error'
     };
@@ -112,6 +114,8 @@ export class ProcessingSSEService implements OnDestroy {
       'tracking': 'timeline',
       'verifying': 'psychology',
       'saving': 'save',
+      'waiting_for_review': 'rate_review',
+      'anonymizing': 'edit',
       'completed': 'check_circle',
       'error': 'error'
     };
@@ -190,8 +194,8 @@ export class ProcessingSSEService implements OnDestroy {
     this.eventSource.addEventListener('initial_state', (event: MessageEvent) => {
       const data = JSON.parse(event.data);
       this._phase.set(data.phase);
-      this._progress.set(data.progress);
-      this._message.set(data.message);
+      this._progress.set(data.progress || 0);
+      this._message.set(data.message || '');
       this._currentItem.set(data.current || 0);
       this._totalItems.set(data.total || 0);
     });
@@ -206,6 +210,11 @@ export class ProcessingSSEService implements OnDestroy {
       if (data.estimated_time_seconds) {
         this._estimatedTime.set(data.estimated_time_seconds);
       }
+
+      // Auto-redirect to review if waiting
+      // Note: Components can also react to this, but this is a global rule
+      // However, we can't easily get videoId here from event data if it's not present.
+      // But we passed videoId to connect(), so we could store it.
     });
 
     // Progreso
@@ -261,7 +270,9 @@ export class ProcessingSSEService implements OnDestroy {
 
       // Auto-redirect después de 2 segundos
       setTimeout(() => {
-        this.router.navigateByUrl(data.redirect_url);
+        if (data.redirect_url) {
+          this.router.navigateByUrl(data.redirect_url);
+        }
       }, 2000);
     });
 
@@ -280,7 +291,6 @@ export class ProcessingSSEService implements OnDestroy {
 
     // Heartbeat
     this.eventSource.addEventListener('heartbeat', () => {
-      // Keep connection alive indicator
       console.debug('SSE Heartbeat received');
     });
   }

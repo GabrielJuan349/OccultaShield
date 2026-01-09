@@ -9,6 +9,8 @@ import { authGuard, roleGuard } from '#guards/auth.guard';
 import { AdminLayoutComponent } from '#pages/Admin/AdminLayout/AdminLayout';
 import { DashboardComponent } from '#pages/Admin/Dashboard/Dashboard';
 import { UsersComponent } from '#pages/Admin/Users/Users';
+import { SettingsComponent } from '#pages/Admin/Settings/Settings';
+import { AuditLogComponent } from '#pages/Admin/AuditLog/AuditLog';
 
 export const routes: Routes = [
   {
@@ -23,7 +25,9 @@ export const routes: Routes = [
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard', component: DashboardComponent },
-      { path: 'users', component: UsersComponent }
+      { path: 'users', component: UsersComponent },
+      { path: 'settings', component: SettingsComponent },
+      { path: 'audit-log', component: AuditLogComponent }
     ]
   },
   {

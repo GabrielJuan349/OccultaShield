@@ -1,0 +1,145 @@
+.audit-log-page {
+    padding: 24px;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.page-header h1 {
+    color: var(--text-primary);
+    font-size: 1.75rem;
+    margin: 0;
+}
+
+.filter-controls select {
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-elevated);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    cursor: pointer;
+    min-width: 200px;
+}
+
+.filter-controls select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.log-table-wrapper {
+    background: var(--surface-elevated);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.log-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.log-table th,
+.log-table td {
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.log-table th {
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.log-table td {
+    color: var(--text-primary);
+}
+
+.log-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.log-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.date {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.action-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.action-badge[data-action="user_approved"] {
+    background: rgba(76, 175, 80, 0.15);
+    color: #4CAF50;
+}
+
+.action-badge[data-action="user_rejected"] {
+    background: rgba(244, 67, 54, 0.15);
+    color: #f44336;
+}
+
+.action-badge[data-action="role_changed"] {
+    background: rgba(33, 150, 243, 0.15);
+    color: #2196F3;
+}
+
+.action-badge[data-action="settings_changed"] {
+    background: rgba(255, 152, 0, 0.15);
+    color: #ff9800;
+}
+
+.target {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.admin {
+    color: var(--text-secondary);
+}
+
+.empty {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 40px !important;
+}
+
+.loading {
+    text-align: center;
+    padding: 60px;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .filter-controls select {
+        width: 100%;
+    }
+
+    .log-table-wrapper {
+        overflow-x: auto;
+    }
+}

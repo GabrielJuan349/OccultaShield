@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@ang
 import { Router, ActivatedRoute } from '@angular/router';
 import { ViolationCard } from '#components/ViolationCard/ViolationCard';
 import { ModificationType, Violation } from '#interface/violation-models';
-import { VideoService } from '#services/video.service';
+import { VideoService, UserDecision } from '#services/video.service';
+import { environment } from '#environments/environment';
 
 @Component({
   imports: [ViolationCard],
@@ -31,20 +32,40 @@ export class ReviewPage implements OnInit {
   loadViolations(id: string) {
     this.videoService.getViolations(id).subscribe({
       next: (response) => {
-        // Map ValidatedResponse items (ViolationCard) to UI Violation model
-        // Interface ViolationCard: { id, timestamp, threat_level, description, detection_type ... }
-        // UI Violation: { id, articleTitle, articleSubtitle, description, fineText, imageUrl, selectedOption }
-        // We need to map backend data to UI.
+        // Map Backend ViolationCard to UI Violation model
+        const mapped: Violation[] = response.items.map(v => {
+          // Need to handle image URL. 
+          // If backend sends relative path or full URL. Usually relative in 'capture_image_url' like '/api/v1/...'
 
-        const mapped: Violation[] = response.items.map(v => ({
-          id: v.id,
-          articleTitle: `Detected: ${v.detection_type}`,
-          articleSubtitle: v.threat_level + " Severity",
-          description: v.description,
-          fineText: "Potential GDPR Violation",
-          imageUrl: 'supervision_humana.png', // Placeholder or use capture URL if available
-          selectedOption: 'no-modify' // Default
-        }));
+          let imgUrl = v.capture_image_url;
+          if (imgUrl && !imgUrl.startsWith('http')) {
+            // Prepend API base if needed, or assume it's a static file served by backend
+            // If it is an endpoint like /api/v1/video/{id}/capture/..., we might need origin.
+            // Assuming backend sends a usable URL or proxy path.
+            imgUrl = `${environment.apiUrl}${imgUrl}`;
+          }
+
+          // Map backend 'recommended_action' to default selection
+          let defaultOption: ModificationType = 'no_modify';
+          if (v.recommended_action === 'blur') defaultOption = 'blur';
+          if (v.recommended_action === 'pixelate') defaultOption = 'pixelate';
+          if (v.recommended_action === 'mask') defaultOption = 'mask';
+
+          // If specific logic needed: defaults to blur if violation
+          if (v.is_violation && defaultOption === 'no_modify') defaultOption = 'blur';
+
+          return {
+            id: v.verification_id, // Important: Use verification_id for decisions
+            articleTitle: `Detected: ${v.detection_type}`,
+            articleSubtitle: `${v.severity} Severity`,
+            description: v.description,
+            fineText: v.violated_articles.join(', ') || "Potential GDPR Violation",
+            imageUrl: imgUrl || 'assets/images/placeholder.png',
+            selectedOption: defaultOption,
+            framesAnalyzed: v.frames_analyzed,  // Temporal Consensus
+            confidence: v.confidence
+          };
+        });
         this.violations.set(mapped);
       },
       error: (err) => console.error("Error loading violations", err)
@@ -62,19 +83,13 @@ export class ReviewPage implements OnInit {
     const id = this.videoId();
     if (!id) return;
 
-    // Map decisions
-    // Backend expects { decisions: { "violation_id": "anonymize" | "keep" } }
-    const decisions: Record<string, 'anonymize' | 'keep'> = {};
-
-    this.violations().forEach(v => {
-      // Map UI selection to backend expected values
-      // UI: 'blur' | 'pixelate' | 'black-box' | 'no-modify'
-      // Simplication for now: if 'no-modify', keep. Else anonymize.
-      if (v.selectedOption === 'no-modify') {
-        decisions[v.id] = 'keep';
-      } else {
-        decisions[v.id] = 'anonymize';
-      }
+    // Convert UI state to UserDecision[]
+    const decisions: UserDecision[] = this.violations().map(v => {
+      return {
+        verification_id: v.id,
+        action: v.selectedOption,
+        confirmed_violation: v.selectedOption !== 'no_modify'
+      };
     });
 
     console.log('Applying modifications:', decisions);
@@ -82,9 +97,7 @@ export class ReviewPage implements OnInit {
     this.videoService.submitDecisions(id, decisions).subscribe({
       next: () => {
         // Navigate to processing (applying edits) -> Download
-        // We reuse processing page for 'edition' phase or creating download
-        // Or direct to download if synchronous? But Backend is async.
-        // Usually go back to processing to await completion.
+        // Set 'from' query param to 'review' so ProcessingPage knows next step is Download
         this.router.navigate(['/processing', id], { queryParams: { from: 'review' } });
       },
       error: (err) => console.error("Error submitting decisions", err)

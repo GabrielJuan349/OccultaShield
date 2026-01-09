@@ -1,7 +1,5 @@
-import { Component, signal, effect, ChangeDetectionStrategy, inject } from '@angular/core';
-import { NgOptimizedImage } from '@angular/common';
+import { Component, signal, computed, ChangeDetectionStrategy, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-// Importamos la API real de Signal Forms (Experimental/v21)
 import { form, Field, required, email, minLength, submit, validate } from '@angular/forms/signals';
 import { AuthService } from '#services/auth.service';
 
@@ -14,38 +12,64 @@ import { AuthService } from '#services/auth.service';
 export class LoginRegister {
   protected readonly authService = inject(AuthService);
   private readonly router = inject(Router);
-  // Estado de UI local (no del formulario)
+
+  // UI State
   protected showPassword = signal(false);
   protected isLoading = signal(false);
   protected currentView = signal<'login' | 'register'>('login');
+  protected registrationPending = signal(false);
 
-  // 1. EL MODELO (Source of Truth)
-  // En Signal Forms, los datos viven en un signal puro, independientes del formulario.
+  // Login Model
   protected loginCredentials = signal({
     email: '',
     password: '',
     rememberMe: false
   });
+
+  // Register Model (with usageType)
   protected registerCredentials = signal({
     nameSurname: '',
     email: '',
     password: '',
     confirmPassword: '',
+    usageType: 'individual' as 'individual' | 'researcher' | 'agency',
     privacyCheck: false,
   });
 
-  // 2. EL FORMULARIO
-  // La función form() toma el signal y crea un "FieldTree" (árbol de campos)
-  // El segundo argumento es donde aplicamos las validaciones.
+  // Password Strength Meter (computed signal)
+  protected passwordStrength = computed(() => {
+    const password = this.registerCredentials().password;
+    if (!password) return { score: 0, label: '', color: '' };
+
+    let score = 0;
+
+    // Length checks
+    if (password.length >= 8) score += 1;
+    if (password.length >= 12) score += 1;
+    if (password.length >= 16) score += 1;
+
+    // Character variety
+    if (/[a-z]/.test(password)) score += 1;
+    if (/[A-Z]/.test(password)) score += 1;
+    if (/[0-9]/.test(password)) score += 1;
+    if (/[^a-zA-Z0-9]/.test(password)) score += 1;
+
+    // Map score to label
+    if (score <= 2) return { score: 1, label: 'Débil', color: '#ef4444' };
+    if (score <= 4) return { score: 2, label: 'Media', color: '#f59e0b' };
+    if (score <= 5) return { score: 3, label: 'Buena', color: '#22c55e' };
+    return { score: 4, label: 'Excelente', color: '#10b981' };
+  });
+
+  // Login Form
   protected loginForm = form(this.loginCredentials, (f) => {
-    // f representa los campos del formulario
     required(f.email, { message: 'Email is required' });
     email(f.email, { message: 'Invalid email format' });
-
     required(f.password);
     minLength(f.password, 8, { message: 'Password must be at least 8 chars' });
   });
 
+  // Register Form
   protected registerForm = form(this.registerCredentials, (f) => {
     required(f.nameSurname, { message: 'Name and surname are required' });
     required(f.email, { message: 'Email is required' });
@@ -58,23 +82,12 @@ export class LoginRegister {
     validate(f.confirmPassword, ({ value, valueOf }) => {
       const password = valueOf(f.password);
       if (value() !== password) {
-        return {
-          kind: 'mismatch',
-          message: 'Passwords do not match'
-        };
+        return { kind: 'mismatch', message: 'Passwords do not match' };
       }
       return null;
     });
     required(f.privacyCheck, { message: 'You must accept the privacy policy' });
   });
-
-
-  constructor() {
-    // Podemos reaccionar a cambios en el MODELO directamente
-    effect(() => {
-      console.log('Model changed:', this.loginCredentials());
-    });
-  }
 
   togglePasswordVisibility() {
     this.showPassword.update(v => !v);
@@ -82,12 +95,11 @@ export class LoginRegister {
 
   toggleAuthMode() {
     this.currentView.update(v => v === 'login' ? 'register' : 'login');
-    this.clearForms();
+    this.registrationPending.set(false);
   }
 
-  private clearForms() {
-    // Optional: Reset forms logic if needed, signal forms generally reset on destruction or manually.
-    // this.loginCredentials.set({ ... });
+  setUsageType(type: 'individual' | 'researcher' | 'agency') {
+    this.registerCredentials.update(c => ({ ...c, usageType: type }));
   }
 
   onLoginSubmit(event: Event) {
@@ -113,9 +125,9 @@ export class LoginRegister {
       const success = await this.authService.register(email, password, nameSurname);
 
       if (success) {
-        // Auto login or distinct flow? AuthService.register usually signs in too.
-        // Check AuthService: it sets session. So user is logged in.
-        this.router.navigate(['/upload']);
+        // In closed beta mode, show pending approval message
+        // The backend will set isApproved = false by default
+        this.registrationPending.set(true);
       } else {
         console.error('Register failed:', this.authService.error());
       }

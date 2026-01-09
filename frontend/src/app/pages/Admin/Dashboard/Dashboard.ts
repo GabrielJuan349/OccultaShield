@@ -4,7 +4,6 @@ import { DatePipe } from '@angular/common';
 
 @Component({
   selector: 'app-admin-dashboard',
-  standalone: true,
   imports: [DatePipe],
   templateUrl: './Dashboard.html',
   styleUrl: './Dashboard.css'

@@ -1,0 +1,41 @@
+<div class="settings-page">
+    <h1>Configuración del Sistema</h1>
+
+    @if (loading()) {
+    <div class="loading">Cargando configuración...</div>
+    } @else {
+    <div class="settings-grid">
+        <div class="setting-card">
+            <div class="setting-header">
+                <h3>Modo Beta Cerrado</h3>
+                <label class="toggle-switch">
+                    <input type="checkbox" [checked]="settings()?.closedBetaMode" (change)="toggleClosedBeta()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <p class="setting-description">
+                Cuando está activado, los nuevos usuarios que se registren necesitarán ser aprobados
+                manualmente por un administrador antes de poder acceder a la plataforma.
+            </p>
+            <div class="setting-status" [class.active]="settings()?.closedBetaMode">
+                @if (settings()?.closedBetaMode) {
+                <span class="status-badge pending">🔒 Activo</span>
+                <span>Los nuevos registros requieren aprobación</span>
+                } @else {
+                <span class="status-badge approved">🔓 Desactivado</span>
+                <span>Acceso libre para nuevos usuarios</span>
+                }
+            </div>
+        </div>
+
+        <div class="setting-card info">
+            <h3>📊 Información del Sistema</h3>
+            <ul>
+                <li><strong>Versión:</strong> 1.0.0-beta</li>
+                <li><strong>Entorno:</strong> Desarrollo</li>
+                <li><strong>Base de datos:</strong> SurrealDB</li>
+            </ul>
+        </div>
+    </div>
+    }
+</div>

@@ -2,51 +2,61 @@
   <h1>Dashboard</h1>
 
   @if (loading()) {
-    <div class="loading">Cargando estadísticas...</div>
+  <div class="loading">Cargando estadísticas...</div>
   } @else if (stats()) {
-    <div class="stats-grid">
-      <div class="stat-card">
-        <h3>Usuarios Totales</h3>
-        <div class="value">{{ stats()?.totalUsers }}</div>
-      </div>
-      <div class="stat-card">
-        <h3>Sesiones Activas</h3>
-        <div class="value">{{ stats()?.activeSessions }}</div>
-      </div>
-      <div class="stat-card">
-        <h3>Archivos Procesados</h3>
-        <div class="value">{{ stats()?.totalProcessed }}</div>
-      </div>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <h3>Usuarios Totales</h3>
+      <div class="value">{{ stats()?.total_users }}</div>
     </div>
+    <div class="stat-card pending">
+      <h3>Pendientes</h3>
+      <div class="value">{{ stats()?.pending_users }}</div>
+    </div>
+    <div class="stat-card approved">
+      <h3>Aprobados</h3>
+      <div class="value">{{ stats()?.approved_users }}</div>
+    </div>
+    <div class="stat-card">
+      <h3>Sesiones Activas</h3>
+      <div class="value">{{ stats()?.active_sessions }}</div>
+    </div>
+    <div class="stat-card">
+      <h3>Videos Procesados</h3>
+      <div class="value">{{ stats()?.total_videos }}</div>
+    </div>
+    <div class="stat-card violations">
+      <h3>Violaciones GDPR</h3>
+      <div class="value">{{ stats()?.total_violations }}</div>
+    </div>
+  </div>
 
-    <div class="recent-activity">
-      <h2>Actividad Reciente</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Acción</th>
-            <th>Archivo</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (log of stats()?.recentActivity; track log.id) {
-            <tr>
-              <td>{{ log.createdAt | date:'short' }}</td>
-              <td>{{ log.action }}</td>
-              <td>{{ log.fileName }}</td>
-              <td>
-                <span class="status-badge" [class]="log.status">{{ log.status }}</span>
-              </td>
-            </tr>
-          } @empty {
-            <tr>
-              <td colspan="4">No hay actividad reciente.</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+  <div class="recent-activity">
+    <h2>Actividad Reciente</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Acción</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (log of stats()?.recentActivity; track log.id) {
+        <tr>
+          <td>{{ log.createdAt | date:'short' }}</td>
+          <td>{{ log.action }}</td>
+          <td>
+            <span class="status-badge" [class]="log.status">{{ log.status }}</span>
+          </td>
+        </tr>
+        } @empty {
+        <tr>
+          <td colspan="3">No hay actividad reciente.</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
   }
 </div>

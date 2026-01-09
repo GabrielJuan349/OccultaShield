@@ -35,6 +35,7 @@ dependencies = [
     # Config & Utils
     "pyyaml>=6.0.0",
     "python-dotenv>=1.0.0",
+    "kaggle>=1.6.0",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,48 @@
+<div class="audit-log-page">
+    <div class="page-header">
+        <h1>Historial de Auditoría</h1>
+        <div class="filter-controls">
+            <select [value]="selectedAction()" (change)="onFilterChange($any($event.target).value)">
+                @for (type of actionTypes; track type.value) {
+                <option [value]="type.value">{{ type.label }}</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (loading()) {
+    <div class="loading">Cargando historial...</div>
+    } @else {
+    <div class="log-table-wrapper">
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Acción</th>
+                    <th>Objetivo</th>
+                    <th>Administrador</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (entry of auditLog(); track entry.id) {
+                <tr>
+                    <td class="date">{{ entry.createdAt | date:'medium' }}</td>
+                    <td class="action">
+                        <span class="action-badge" [attr.data-action]="entry.action">
+                            {{ getActionLabel(entry.action) }}
+                        </span>
+                    </td>
+                    <td class="target">{{ entry.targetId }}</td>
+                    <td class="admin">{{ entry.metadata?.['changed_by'] || entry.metadata?.['approved_by'] ||
+                        entry.metadata?.['rejected_by'] || '-' }}</td>
+                </tr>
+                } @empty {
+                <tr>
+                    <td colspan="4" class="empty">No hay registros de auditoría.</td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+</div>

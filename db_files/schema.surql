@@ -1,294 +1,254 @@
 -- ============================================================================
--- OccultaShield - SurrealDB Schema Completo para surreal-better-auth
--- Incluye: Core tables + Extensiones futuras (2FA, Organizations, etc.)
--- Ejecutar: surreal import --conn http://localhost:8000 --ns occultashield --db main --user root --pass root schema.surql
+-- OccultaShield - Merged SurrealDB Schema (MASTER)
+-- Includes: Service Authentication (Better-Auth) & Application Domain (Videos/GDPR)
 -- ============================================================================
 
 -- ============================================================================
--- TABLAS CORE DE BETTER-AUTH (REQUERIDAS)
+-- 1. AUTHENTICATION & ORGANIZATION (Better-Auth)
 -- ============================================================================
 
--- ============================================================================
--- TABLA: user
--- Almacena información de los usuarios registrados
--- ============================================================================
+-- TABLE: user
 DEFINE TABLE user SCHEMAFULL;
-
--- Campos principales (requeridos por better-auth)
 DEFINE FIELD email ON user TYPE string ASSERT string::is::email($value);
 DEFINE FIELD emailVerified ON user TYPE bool DEFAULT false;
 DEFINE FIELD name ON user TYPE string;
 DEFINE FIELD image ON user TYPE option<string>;
-
--- Campo de rol personalizado (extensión de OccultaShield)
 DEFINE FIELD role ON user TYPE string DEFAULT 'user';
-
--- Timestamps (requeridos por better-auth)
+DEFINE FIELD isApproved ON user TYPE bool DEFAULT false;
+DEFINE FIELD usageType ON user TYPE string DEFAULT 'individual' 
+    ASSERT $value INSIDE ['individual', 'researcher', 'agency'];
 DEFINE FIELD createdAt ON user TYPE datetime DEFAULT time::now();
 DEFINE FIELD updatedAt ON user TYPE datetime DEFAULT time::now();
-
--- Índices
 DEFINE INDEX user_email_idx ON user FIELDS email UNIQUE;
+DEFINE INDEX user_approved_idx ON user FIELDS isApproved;
 
--- ============================================================================
--- TABLA: session
--- Almacena las sesiones activas de los usuarios
--- Relación: session -> user (many-to-one)
--- ============================================================================
+-- TABLE: session
 DEFINE TABLE session SCHEMAFULL;
-
--- Campos requeridos por better-auth
 DEFINE FIELD userId ON session TYPE record<user>;
 DEFINE FIELD token ON session TYPE string;
 DEFINE FIELD expiresAt ON session TYPE datetime;
-
--- Campos opcionales de better-auth
 DEFINE FIELD ipAddress ON session TYPE option<string>;
 DEFINE FIELD userAgent ON session TYPE option<string>;
-
--- Timestamps
 DEFINE FIELD createdAt ON session TYPE datetime DEFAULT time::now();
 DEFINE FIELD updatedAt ON session TYPE datetime DEFAULT time::now();
-
--- Índices
 DEFINE INDEX session_token_idx ON session FIELDS token UNIQUE;
 DEFINE INDEX session_userId_idx ON session FIELDS userId;
 
--- ============================================================================
--- TABLA: account
--- Almacena las cuentas vinculadas (providers como email, google, github, etc.)
--- Relación: account -> user (many-to-one)
--- ============================================================================
+-- TABLE: account
 DEFINE TABLE account SCHEMAFULL;
-
--- Campos requeridos por better-auth
 DEFINE FIELD userId ON account TYPE record<user>;
 DEFINE FIELD accountId ON account TYPE string;
 DEFINE FIELD providerId ON account TYPE string;
-
--- Credenciales (para email/password)
 DEFINE FIELD password ON account TYPE option<string>;
-
--- Tokens OAuth (para providers externos)
 DEFINE FIELD accessToken ON account TYPE option<string>;
 DEFINE FIELD refreshToken ON account TYPE option<string>;
 DEFINE FIELD accessTokenExpiresAt ON account TYPE option<datetime>;
 DEFINE FIELD refreshTokenExpiresAt ON account TYPE option<datetime>;
 DEFINE FIELD scope ON account TYPE option<string>;
 DEFINE FIELD idToken ON account TYPE option<string>;
-
--- Timestamps
 DEFINE FIELD createdAt ON account TYPE datetime DEFAULT time::now();
 DEFINE FIELD updatedAt ON account TYPE datetime DEFAULT time::now();
-
--- Índices
 DEFINE INDEX account_provider_idx ON account FIELDS providerId, accountId UNIQUE;
 DEFINE INDEX account_userId_idx ON account FIELDS userId;
 
--- ============================================================================
--- TABLA: verification
--- Almacena tokens de verificación (email, password reset, magic links, etc.)
--- ============================================================================
+-- TABLE: verification (Auth Tokens)
 DEFINE TABLE verification SCHEMAFULL;
-
--- Campos requeridos por better-auth
 DEFINE FIELD identifier ON verification TYPE string;
 DEFINE FIELD value ON verification TYPE string;
 DEFINE FIELD expiresAt ON verification TYPE datetime;
-
--- Timestamps
 DEFINE FIELD createdAt ON verification TYPE datetime DEFAULT time::now();
 DEFINE FIELD updatedAt ON verification TYPE datetime DEFAULT time::now();
-
--- Índices
 DEFINE INDEX verification_identifier_idx ON verification FIELDS identifier;
 DEFINE INDEX verification_value_idx ON verification FIELDS value UNIQUE;
 
--- ============================================================================
--- TABLAS PARA PLUGINS FUTUROS
--- ============================================================================
-
--- ============================================================================
--- TABLA: twoFactor (Plugin: twoFactor)
--- Almacena configuración de 2FA para usuarios
--- Relación: twoFactor -> user (one-to-one)
--- ============================================================================
+-- TABLE: twoFactor
 DEFINE TABLE twoFactor SCHEMAFULL;
-
--- Foreign Key: referencia al usuario
 DEFINE FIELD userId ON twoFactor TYPE record<user>;
-
--- Secreto TOTP (Time-based One-Time Password)
 DEFINE FIELD secret ON twoFactor TYPE string;
-
--- Códigos de respaldo (para recuperación)
 DEFINE FIELD backupCodes ON twoFactor TYPE option<array<string>>;
-
--- Estado de activación
 DEFINE FIELD enabled ON twoFactor TYPE bool DEFAULT false;
-
--- Timestamps
 DEFINE FIELD createdAt ON twoFactor TYPE datetime DEFAULT time::now();
 DEFINE FIELD updatedAt ON twoFactor TYPE datetime DEFAULT time::now();
-
--- Índices
 DEFINE INDEX twoFactor_userId_idx ON twoFactor FIELDS userId UNIQUE;
 
--- ============================================================================
--- TABLA: organization (Plugin: organization)
--- Almacena organizaciones/equipos
--- ============================================================================
+-- TABLE: organization
 DEFINE TABLE organization SCHEMAFULL;
-
--- Campos principales
 DEFINE FIELD name ON organization TYPE string;
 DEFINE FIELD slug ON organization TYPE string;
 DEFINE FIELD logo ON organization TYPE option<string>;
-
--- Metadatos adicionales (JSON flexible)
 DEFINE FIELD metadata ON organization TYPE option<object> DEFAULT {};
-
--- Timestamps
 DEFINE FIELD createdAt ON organization TYPE datetime DEFAULT time::now();
 DEFINE FIELD updatedAt ON organization TYPE datetime DEFAULT time::now();
-
--- Índices
 DEFINE INDEX organization_slug_idx ON organization FIELDS slug UNIQUE;
 
--- ============================================================================
--- TABLA: member (Plugin: organization)
--- Almacena miembros de organizaciones con sus roles
--- Relación: member -> user (many-to-one)
--- Relación: member -> organization (many-to-one)
--- ============================================================================
+-- TABLE: member
 DEFINE TABLE member SCHEMAFULL;
-
--- Foreign Keys
 DEFINE FIELD userId ON member TYPE record<user>;
 DEFINE FIELD organizationId ON member TYPE record<organization>;
-
--- Rol del miembro en la organización
-DEFINE FIELD role ON member TYPE string DEFAULT 'member'; -- 'owner', 'admin', 'member'
-
--- Timestamps
+DEFINE FIELD role ON member TYPE string DEFAULT 'member';
 DEFINE FIELD createdAt ON member TYPE datetime DEFAULT time::now();
 DEFINE FIELD updatedAt ON member TYPE datetime DEFAULT time::now();
-
--- Índices (un usuario puede estar en múltiples orgs, pero solo una vez por org)
 DEFINE INDEX member_user_org_idx ON member FIELDS userId, organizationId UNIQUE;
 DEFINE INDEX member_org_idx ON member FIELDS organizationId;
 
--- ============================================================================
--- TABLA: invitation (Plugin: organization)
--- Almacena invitaciones pendientes a organizaciones
--- Relación: invitation -> organization (many-to-one)
--- Relación: invitation -> user (many-to-one, quien invita)
--- ============================================================================
+-- TABLE: invitation
 DEFINE TABLE invitation SCHEMAFULL;
-
--- Email del invitado
 DEFINE FIELD email ON invitation TYPE string ASSERT string::is::email($value);
-
--- Foreign Keys
 DEFINE FIELD organizationId ON invitation TYPE record<organization>;
-DEFINE FIELD inviterId ON invitation TYPE record<user>; -- Quien envía la invitación
-
--- Rol que tendrá el invitado
+DEFINE FIELD inviterId ON invitation TYPE record<user>;
 DEFINE FIELD role ON invitation TYPE string DEFAULT 'member';
-
--- Token de invitación
 DEFINE FIELD token ON invitation TYPE string;
-
--- Expiración
 DEFINE FIELD expiresAt ON invitation TYPE datetime;
-
--- Estado
-DEFINE FIELD status ON invitation TYPE string DEFAULT 'pending'; -- 'pending', 'accepted', 'rejected', 'expired'
-
--- Timestamps
+DEFINE FIELD status ON invitation TYPE string DEFAULT 'pending';
 DEFINE FIELD createdAt ON invitation TYPE datetime DEFAULT time::now();
 DEFINE FIELD updatedAt ON invitation TYPE datetime DEFAULT time::now();
-
--- Índices
 DEFINE INDEX invitation_token_idx ON invitation FIELDS token UNIQUE;
 DEFINE INDEX invitation_org_idx ON invitation FIELDS organizationId;
 DEFINE INDEX invitation_email_idx ON invitation FIELDS email;
 
--- ============================================================================
--- TABLAS PERSONALIZADAS DE OCCULTASHIELD
--- ============================================================================
-
--- ============================================================================
--- TABLA: processing_log
--- Almacena el historial de archivos procesados para estadísticas
--- Relación: processing_log -> user (many-to-one)
--- ============================================================================
+-- TABLE: processing_log (Extension)
 DEFINE TABLE processing_log SCHEMAFULL;
-
--- Foreign Key: referencia al usuario (record link)
 DEFINE FIELD userId ON processing_log TYPE record<user>;
-DEFINE FIELD action ON processing_log TYPE string; -- 'upload', 'clean', 'download'
+DEFINE FIELD action ON processing_log TYPE string;
 DEFINE FIELD fileName ON processing_log TYPE string;
 DEFINE FIELD fileSize ON processing_log TYPE number;
-DEFINE FIELD status ON processing_log TYPE string; -- 'success', 'error'
+DEFINE FIELD status ON processing_log TYPE string;
 DEFINE FIELD metadata ON processing_log TYPE option<object> DEFAULT {};
 DEFINE FIELD createdAt ON processing_log TYPE datetime DEFAULT time::now();
-
--- Índices para búsquedas rápidas
 DEFINE INDEX log_userId_idx ON processing_log FIELDS userId;
 DEFINE INDEX log_action_idx ON processing_log FIELDS action;
 DEFINE INDEX log_createdAt_idx ON processing_log FIELDS createdAt;
 
--- ============================================================================
--- EVENTOS AUTOMÁTICOS (Limpieza automática de datos expirados)
--- ============================================================================
-
--- Evento para limpiar sesiones expiradas
+-- EVENTS: Cleanup
 DEFINE EVENT session_cleanup ON TABLE session WHEN $event = "CREATE" OR $event = "UPDATE" THEN {
     DELETE session WHERE expiresAt < time::now();
 };
-
--- Evento para limpiar verificaciones expiradas
 DEFINE EVENT verification_cleanup ON TABLE verification WHEN $event = "CREATE" OR $event = "UPDATE" THEN {
     DELETE verification WHERE expiresAt < time::now();
 };
-
--- Evento para limpiar invitaciones expiradas
 DEFINE EVENT invitation_cleanup ON TABLE invitation WHEN $event = "CREATE" OR $event = "UPDATE" THEN {
     DELETE invitation WHERE expiresAt < time::now() AND status = 'pending';
 };
 
--- PENDIENTE: Tabla de videos
-DEFINE TABLE video SCHEMAFULL;
-DEFINE FIELD user_id ON video TYPE record<user>;
-DEFINE FIELD filename ON video TYPE string;
-DEFINE FIELD original_path ON video TYPE string;
-DEFINE FIELD processed_path ON video TYPE option<string>;
-DEFINE FIELD status ON video TYPE string DEFAULT 'pending';
-DEFINE FIELD metadata ON video TYPE object;
-DEFINE FIELD created_at ON video TYPE datetime DEFAULT time::now();
+-- TABLE: audit_log (Admin actions tracking)
+DEFINE TABLE audit_log SCHEMAFULL;
+DEFINE FIELD userId ON audit_log TYPE record<user>;
+DEFINE FIELD action ON audit_log TYPE string 
+    ASSERT $value INSIDE ['user_approved', 'user_rejected', 'role_changed', 'settings_changed', 'video_processed'];
+DEFINE FIELD targetId ON audit_log TYPE option<string>;
+DEFINE FIELD metadata ON audit_log TYPE object DEFAULT {};
+DEFINE FIELD createdAt ON audit_log TYPE datetime DEFAULT time::now();
+DEFINE INDEX audit_log_user_idx ON audit_log FIELDS userId;
+DEFINE INDEX audit_log_action_idx ON audit_log FIELDS action;
+DEFINE INDEX audit_log_created_idx ON audit_log FIELDS createdAt;
 
--- PENDIENTE: Tabla de detecciones
-DEFINE TABLE detection SCHEMAFULL;
-DEFINE FIELD video_id ON detection TYPE record<video>;
-DEFINE FIELD track_id ON detection TYPE int;
-DEFINE FIELD detection_type ON detection TYPE string;
-DEFINE FIELD bbox_history ON detection TYPE array;
-DEFINE FIELD captures ON detection TYPE array;
+-- TABLE: app_settings (Global configuration)
+DEFINE TABLE app_settings SCHEMAFULL;
+DEFINE FIELD key ON app_settings TYPE string;
+DEFINE FIELD value ON app_settings TYPE any;
+DEFINE FIELD updatedAt ON app_settings TYPE datetime DEFAULT time::now();
+DEFINE INDEX app_settings_key_idx ON app_settings FIELDS key UNIQUE;
 
--- PENDIENTE: Tabla de verificaciones
-DEFINE TABLE verification SCHEMAFULL;
-DEFINE FIELD detection_id ON verification TYPE record<detection>;
-DEFINE FIELD is_violation ON verification TYPE bool;
-DEFINE FIELD severity ON verification TYPE string;
-DEFINE FIELD articles ON verification TYPE array;
-DEFINE FIELD reasoning ON verification TYPE string;
+-- Initial settings (run once)
+-- INSERT INTO app_settings { key: 'closedBetaMode', value: true };
 
--- PENDIENTE: Tabla de decisiones usuario
-DEFINE TABLE user_decision SCHEMAFULL;
-DEFINE FIELD verification_id ON user_decision TYPE record<verification>;
-DEFINE FIELD action ON user_decision TYPE string;
-DEFINE FIELD confirmed_violation ON user_decision TYPE bool;
+
+-- ============================================================================
+-- 2. APPLICATION DOMAIN (OccultaShield)
+-- ============================================================================
+
+-- TABLE: video
+DEFINE TABLE video SCHEMALESS;
+DEFINE FIELD user_id ON TABLE video TYPE record<user> ASSERT $value != NONE;
+DEFINE FIELD filename ON TABLE video TYPE string ASSERT string::len($value) >= 1;
+DEFINE FIELD original_path ON TABLE video TYPE string;
+DEFINE FIELD processed_path ON TABLE video TYPE string;
+DEFINE FIELD status ON TABLE video TYPE string 
+    ASSERT $value INSIDE ['pending', 'processing', 'detected', 'verified', 'editing', 'completed', 'error'] 
+    DEFAULT 'pending';
+DEFINE FIELD metadata ON TABLE video TYPE object DEFAULT {};
+DEFINE FIELD error_message ON TABLE video TYPE string;
+DEFINE FIELD processing_started_at ON TABLE video TYPE datetime;
+DEFINE FIELD processing_completed_at ON TABLE video TYPE datetime;
+DEFINE FIELD created_at ON TABLE video TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated_at ON TABLE video TYPE datetime DEFAULT time::now();
+DEFINE INDEX idx_video_user ON TABLE video COLUMNS user_id;
+DEFINE INDEX idx_video_status ON TABLE video COLUMNS status;
+DEFINE INDEX idx_video_created ON TABLE video COLUMNS created_at;
+
+-- TABLE: detection
+DEFINE TABLE detection SCHEMALESS;
+DEFINE FIELD video_id ON TABLE detection TYPE record<video> ASSERT $value != NONE;
+DEFINE FIELD track_id ON TABLE detection TYPE int ASSERT $value >= 0;
+DEFINE FIELD detection_type ON TABLE detection TYPE string 
+    ASSERT $value INSIDE ['face', 'license_plate', 'person', 'document', 'minor', 'nude_body', 'other'];
+DEFINE FIELD first_frame ON TABLE detection TYPE int ASSERT $value >= 0;
+DEFINE FIELD last_frame ON TABLE detection TYPE int ASSERT $value >= 0;
+DEFINE FIELD duration_seconds ON TABLE detection TYPE float ASSERT $value >= 0;
+DEFINE FIELD avg_confidence ON TABLE detection TYPE float DEFAULT 0.0;
+DEFINE FIELD max_confidence ON TABLE detection TYPE float DEFAULT 0.0;
+DEFINE FIELD bbox_history ON TABLE detection TYPE array DEFAULT [];
+DEFINE FIELD captures ON TABLE detection TYPE array DEFAULT [];
+DEFINE FIELD storage_path ON TABLE detection TYPE string;
+DEFINE FIELD created_at ON TABLE detection TYPE datetime DEFAULT time::now();
+DEFINE INDEX idx_detection_video ON TABLE detection COLUMNS video_id;
+DEFINE INDEX idx_detection_type ON TABLE detection COLUMNS detection_type;
+
+-- TABLE: gdpr_verification (RENAMED from verification to avoid conflict with auth)
+DEFINE TABLE gdpr_verification SCHEMALESS;
+DEFINE FIELD detection_id ON TABLE gdpr_verification TYPE record<detection> ASSERT $value != NONE;
+DEFINE FIELD capture_index ON TABLE gdpr_verification TYPE int DEFAULT 0;
+DEFINE FIELD is_violation ON TABLE gdpr_verification TYPE bool DEFAULT false;
+DEFINE FIELD severity ON TABLE gdpr_verification TYPE string 
+    ASSERT $value INSIDE ['none', 'low', 'medium', 'high', 'critical'] 
+    DEFAULT 'none';
+DEFINE FIELD violated_articles ON TABLE gdpr_verification TYPE array DEFAULT [];
+DEFINE FIELD detected_personal_data ON TABLE gdpr_verification TYPE array DEFAULT [];
+DEFINE FIELD description ON TABLE gdpr_verification TYPE string DEFAULT '';
+DEFINE FIELD legal_basis_required ON TABLE gdpr_verification TYPE string;
+DEFINE FIELD recommended_action ON TABLE gdpr_verification TYPE string DEFAULT '';
+DEFINE FIELD confidence ON TABLE gdpr_verification TYPE float DEFAULT 0.0;
+DEFINE FIELD processing_time_ms ON TABLE gdpr_verification TYPE int;
+DEFINE FIELD llm_model ON TABLE gdpr_verification TYPE string DEFAULT 'gemma-3-4b';
+DEFINE FIELD llm_raw_response ON TABLE gdpr_verification TYPE string;
+DEFINE FIELD created_at ON TABLE gdpr_verification TYPE datetime DEFAULT time::now();
+DEFINE INDEX idx_verification_detection ON TABLE gdpr_verification COLUMNS detection_id;
+DEFINE INDEX idx_verification_violation ON TABLE gdpr_verification COLUMNS is_violation;
+DEFINE INDEX idx_verification_severity ON TABLE gdpr_verification COLUMNS severity;
+
+-- TABLE: user_decision
+DEFINE TABLE user_decision SCHEMALESS;
+DEFINE FIELD verification_id ON TABLE user_decision TYPE record<gdpr_verification> ASSERT $value != NONE;
+DEFINE FIELD user_id ON TABLE user_decision TYPE record<user> ASSERT $value != NONE;
+DEFINE FIELD action ON TABLE user_decision TYPE string 
+    ASSERT $value INSIDE ['no_modify', 'blur', 'pixelate', 'mask'];
+DEFINE FIELD confirmed_violation ON TABLE user_decision TYPE bool DEFAULT true;
+DEFINE FIELD rejection_reason ON TABLE user_decision TYPE string;
+DEFINE FIELD notes ON TABLE user_decision TYPE string;
+DEFINE FIELD created_at ON TABLE user_decision TYPE datetime DEFAULT time::now();
+DEFINE INDEX idx_decision_verification ON TABLE user_decision COLUMNS verification_id;
+DEFINE INDEX idx_decision_user ON TABLE user_decision COLUMNS user_id;
+
+-- TABLE: processing_progress
+DEFINE TABLE processing_progress SCHEMALESS;
+DEFINE FIELD video_id ON TABLE processing_progress TYPE record<video>;
+DEFINE FIELD phase ON TABLE processing_progress TYPE string 
+    ASSERT $value INSIDE ['pending', 'detecting', 'tracking', 'verifying', 'saving', 'editing', 'completed', 'error'] 
+    DEFAULT 'pending';
+DEFINE FIELD current_frame ON TABLE processing_progress TYPE int DEFAULT 0;
+DEFINE FIELD total_frames ON TABLE processing_progress TYPE int DEFAULT 0;
+DEFINE FIELD percentage ON TABLE processing_progress TYPE int DEFAULT 0;
+DEFINE FIELD fps_processing ON TABLE processing_progress TYPE float DEFAULT 0.0;
+DEFINE FIELD active_detections ON TABLE processing_progress TYPE int DEFAULT 0;
+DEFINE FIELD total_detections ON TABLE processing_progress TYPE int DEFAULT 0;
+DEFINE FIELD total_violations ON TABLE processing_progress TYPE int DEFAULT 0;
+DEFINE FIELD message ON TABLE processing_progress TYPE string DEFAULT '';
+DEFINE FIELD error_code ON TABLE processing_progress TYPE string;
+DEFINE FIELD error_message ON TABLE processing_progress TYPE string;
+DEFINE FIELD started_at ON TABLE processing_progress TYPE datetime;
+DEFINE FIELD updated_at ON TABLE processing_progress TYPE datetime DEFAULT time::now();
+DEFINE INDEX idx_progress_video ON TABLE processing_progress COLUMNS video_id UNIQUE;
+
 -- ============================================================================
 -- QUERIES DE EJEMPLO CON RECORD LINKS
 -- ============================================================================
@@ -311,24 +271,8 @@ DEFINE FIELD confirmed_violation ON user_decision TYPE bool;
 -- Obtener miembros de una organización con datos de usuario:
 -- SELECT *, userId.* AS user FROM member WHERE organizationId = organization:some_org_id;
 
--- Obtener organizaciones de un usuario:
--- SELECT organizationId.* AS organization, role FROM member WHERE userId = user:some_user_id;
+-- Obtener herramientas disponibles
+-- INFO FOR DB;
 
--- Verificar si un usuario tiene 2FA habilitado:
--- SELECT * FROM twoFactor WHERE userId = user:some_user_id AND enabled = true;
-
--- ============================================================================
--- QUERIES DE LIMPIEZA MANUAL (Por si los eventos automáticos fallan)
--- ============================================================================
-
--- Limpiar sesiones expiradas:
--- DELETE session WHERE expiresAt < time::now();
-
--- Limpiar verificaciones expiradas:
--- DELETE verification WHERE expiresAt < time::now();
-
--- Limpiar invitaciones expiradas:
--- DELETE invitation WHERE expiresAt < time::now() AND status = 'pending';
-
--- Limpiar logs antiguos (ej: más de 90 días):
--- DELETE processing_log WHERE createdAt < time::now() - 90d;
+-- Obtener videos de un usuario
+-- SELECT * FROM video WHERE user_id = user:xyz;

@@ -10,17 +10,20 @@ class VideoStatus(str, Enum):
     PROCESSING = "processing"
     DETECTED = "detected"
     VERIFIED = "verified"
-    EDITING = "editing"
+    WAITING_FOR_REVIEW = "waiting_for_review" # New
+    ANONYMIZING = "anonymizing" # New
     COMPLETED = "completed"
     ERROR = "error"
 
 class ProcessingPhase(str, Enum):
-    PENDING = "pending"
+    IDLE = "idle"
+    UPLOADING = "uploading"
     DETECTING = "detecting"
     TRACKING = "tracking"
     VERIFYING = "verifying"
     SAVING = "saving"
-    EDITING = "editing"
+    WAITING_FOR_REVIEW = "waiting_for_review" # New
+    ANONYMIZING = "anonymizing" # New
     COMPLETED = "completed"
     ERROR = "error"
 

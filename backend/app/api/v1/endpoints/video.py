@@ -177,7 +177,8 @@ async def submit_decisions(
     # Logic to save decisions and trigger edition
     
     # Trigger Anonymization
-    background_tasks.add_task(video_processor.apply_anonymization, video_id, batch.decisions)
+    user_display_name = current_user.get("name") or current_user.get("id", "unknown")
+    background_tasks.add_task(video_processor.apply_anonymization, video_id, batch.decisions, user_display_name)
     
     return {
         "status": "editing",

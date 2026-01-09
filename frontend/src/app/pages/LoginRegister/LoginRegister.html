@@ -79,6 +79,23 @@
       <!-- REGISTER FORM -->
       @if (currentView() === 'register') {
       <div class="form-content fade-in">
+
+        <!-- PENDING APPROVAL NOTIFICATION -->
+        @if (registrationPending()) {
+        <div class="pending-card fade-in">
+          <div class="pending-icon">✓</div>
+          <h2>¡Registro Completado!</h2>
+          <p>Tu cuenta está <strong>pendiente de aprobación</strong>.</p>
+          <p class="pending-details">
+            Un administrador revisará tu solicitud en <strong>1-2 días</strong>.
+            Recibirás un email cuando tu cuenta esté activa.
+          </p>
+          <button type="button" class="btn btn-primary" (click)="toggleAuthMode()">
+            Volver al Login
+          </button>
+        </div>
+        } @else {
+
         <h2 class="headline">Create Account</h2>
         <p class="subheadline">Join OccultaShield for advanced privacy protection.</p>
 
@@ -114,11 +131,47 @@
             }
           </div>
 
-          <!-- Password -->
+          <!-- Usage Type Selector -->
+          <div class="input-group">
+            <label>How will you use OccultaShield?</label>
+            <div class="usage-selector">
+              <button type="button" class="usage-option"
+                [class.active]="registerCredentials().usageType === 'individual'" (click)="setUsageType('individual')">
+                <span class="usage-icon">👤</span>
+                <span>Individual</span>
+              </button>
+              <button type="button" class="usage-option"
+                [class.active]="registerCredentials().usageType === 'researcher'" (click)="setUsageType('researcher')">
+                <span class="usage-icon">🔬</span>
+                <span>Researcher</span>
+              </button>
+              <button type="button" class="usage-option" [class.active]="registerCredentials().usageType === 'agency'"
+                (click)="setUsageType('agency')">
+                <span class="usage-icon">🏢</span>
+                <span>Agency</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Password with Strength Meter -->
           <div class="input-group">
             <label for="reg-pass">Password</label>
             <input [type]="showPassword() ? 'text' : 'password'" id="reg-pass" [field]="registerForm.password"
               placeholder="••••••••" autocomplete="new-password">
+
+            <!-- Password Strength Meter -->
+            @if (registerCredentials().password) {
+            <div class="strength-meter">
+              <div class="strength-bar">
+                <div class="strength-fill" [style.width.%]="passwordStrength().score * 25"
+                  [style.background]="passwordStrength().color"></div>
+              </div>
+              <span class="strength-label" [style.color]="passwordStrength().color">
+                {{ passwordStrength().label }}
+              </span>
+            </div>
+            }
+
             @if (registerForm.password().touched() && registerForm.password().invalid()) {
             <ul class="error-list">@for (error of registerForm.password().errors(); track error) { <li
                 class="error-text">{{ error.message }}</li> }</ul>
@@ -152,6 +205,7 @@
             </button>
           </div>
         </form>
+        }
       </div>
       }
 

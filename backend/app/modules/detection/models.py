@@ -10,6 +10,7 @@ class BoundingBox:
     y2: float
     confidence: float
     frame: int
+    mask: Optional[List[float]] = None # Polygon points [x1, y1, x2, y2, ...] flattened
 
     @property
     def width(self) -> float:
@@ -74,6 +75,13 @@ class TrackedDetection:
         if not self.bbox_history: return 0.0
         return max(b.confidence for b in self.bbox_history)
         
+    @property
+    def best_capture(self) -> Optional[Capture]:
+        """Retorna la captura con mayor confianza"""
+        if not self.captures:
+            return None
+        return max(self.captures, key=lambda c: c.bbox.confidence)
+    
     def add_bbox(self, bbox: BoundingBox):
         self.bbox_history.append(bbox)
         
@@ -81,11 +89,11 @@ class TrackedDetection:
         return {
             "track_id": self.track_id,
             "detection_type": self.detection_type,
-            "first_frame": self.first_frame,
-            "last_frame": self.last_frame,
+            "bbox_history": [b.to_dict() for b in self.bbox_history],
+            "captures": [c.to_dict() for c in self.captures],
+            "is_confirmed": self.is_confirmed,
             "avg_confidence": self.avg_confidence,
-            "max_confidence": self.max_confidence,
-            "captures_count": len(self.captures)
+            "total_frames": len(self.bbox_history)
         }
 
 @dataclass

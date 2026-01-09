@@ -18,6 +18,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get_db)):
     """
     Dependency to get the current authenticated user.
+    Note: Approval check is handled by Angular SSR server.
     """
     try:
         # Check Better-Auth Session
@@ -44,17 +45,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
         user = session.get('userId')
         
         if not user or isinstance(user, str):
-            # If FETCH failed or wasn't used/supported like this, fallback
              raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User not found for session",
             )
-            
-        # Return user object directly (it's the dict from DB)
-        # Ensure it has an ID
-        if 'id' not in user:
-            # Maybe it's still a record string?
-            pass 
             
         return user
         

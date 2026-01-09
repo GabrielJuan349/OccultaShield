@@ -25,11 +25,16 @@ export const ENV = {
   SURREAL_DB: process.env['SURREALDB_DB'] ?? 'main',
   SURREAL_USER: process.env['SURREALDB_USER'] ?? 'root',
   SURREAL_PASS: process.env['SURREALDB_PASS'] ?? 'root',
+  // Email (SMTP)
+  SMTP_USER: process.env['SMTP_USER'] ?? '',
+  SMTP_PASS: process.env['SMTP_PASS'] ?? '',
+  SMTP_FROM: process.env['SMTP_FROM'] ?? '',
   PM_ID,
   RUN_UNDER_PROCESS_MANAGER:
     Boolean(PM_ID) ||
     Boolean(process.env['RUN_UNDER_PROCESS_MANAGER']) ||
     process.env['CI'] === 'true',
 } as const;
+
 
 export type Env = typeof ENV;

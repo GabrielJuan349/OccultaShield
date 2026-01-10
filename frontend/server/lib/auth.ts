@@ -85,6 +85,11 @@ async function createAuth() {
           required: false,
           defaultValue: 'user',
         },
+        usageType: {
+          type: 'string',
+          required: false,
+          defaultValue: 'individual',
+        },
       },
     },
 
@@ -111,14 +116,25 @@ async function createAuth() {
     advanced: {
       cookiePrefix: 'occultashield',
       useSecureCookies: ENV.NODE_ENV === 'production',
+      // Cookies deben funcionar en desarrollo con localhost/127.0.0.1
+      crossSubDomainCookies: {
+        enabled: false,
+      },
+      defaultCookieAttributes: {
+        sameSite: 'lax',
+        httpOnly: true,
+        path: '/',
+      },
     },
 
     // Trusted origins para CORS
     trustedOrigins: [
       'http://localhost:4000',
       'http://localhost:4200',
+      'http://127.0.0.1:4000',
+      'http://127.0.0.1:4200',
       ENV.BASE_URL,
-    ].filter(Boolean),
+    ].filter(Boolean) as string[],
   });
 }
 

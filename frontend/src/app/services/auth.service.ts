@@ -74,21 +74,29 @@ export class AuthService {
 
     this._isLoading.set(true);
     this._error.set(null);
+    console.log('🔄 AuthService: Checking session...');
 
     try {
-      const result = await getSession();
+      const result = await getSession({
+        fetchOptions: {
+          credentials: 'include',
+        },
+      });
+      console.log('🔄 AuthService: getSession result:', result);
 
       if (result.data?.session && result.data?.user) {
+        console.log('✅ AuthService: Session valid for user:', result.data.user.email);
         this._user.set(result.data.user as User);
         this._session.set(result.data.session as Session);
         return true;
       }
 
+      console.warn('⚠️ AuthService: No active session found');
       this._user.set(null);
       this._session.set(null);
       return false;
     } catch (error) {
-      console.error('Error checking session:', error);
+      console.error('❌ AuthService: Error checking session:', error);
       this._user.set(null);
       this._session.set(null);
       return false;
@@ -146,17 +154,25 @@ export class AuthService {
   /**
    * Registra un nuevo usuario
    */
-  async register(email: string, password: string, name: string): Promise<boolean> {
+  async register(
+    email: string,
+    password: string,
+    name: string,
+    usageType: 'individual' | 'researcher' | 'agency' = 'individual'
+  ): Promise<boolean> {
     if (!this.isBrowser) return false;
 
     this._isLoading.set(true);
     this._error.set(null);
 
     try {
+      // Note: usageType is passed as additional field; Better-Auth will save it
       const result = await signUp.email({
         email,
         password,
         name,
+        // @ts-expect-error - usageType is defined in server-side additionalFields
+        usageType,
       });
 
       if (result.error) {
@@ -196,17 +212,28 @@ export class AuthService {
   async logout(): Promise<void> {
     if (!this.isBrowser) return;
 
+    console.log('🚪 AuthService: Starting logout...');
     this._isLoading.set(true);
 
     try {
-      await signOut();
+      console.log('🚪 AuthService: Calling signOut()...');
+      // signOut necesita enviar la cookie para que el servidor sepa qué sesión borrar
+      const result = await signOut({
+        fetchOptions: {
+          credentials: 'include',
+        },
+      });
+      console.log('🚪 AuthService: signOut result:', result);
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('❌ AuthService: Logout error:', error);
     } finally {
+      console.log('🚪 AuthService: Clearing local state...');
       this._user.set(null);
       this._session.set(null);
       this._isLoading.set(false);
-      this.router.navigate(['/login']);
+
+      // Redirigir y forzar recarga completa para limpiar todo el estado
+      window.location.href = '/login';
     }
   }
 

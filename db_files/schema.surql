@@ -2,7 +2,8 @@
 -- OccultaShield - Merged SurrealDB Schema (MASTER)
 -- Includes: Service Authentication (Better-Auth) & Application Domain (Videos/GDPR)
 -- ============================================================================
-
+USE NS test;
+USE DB Occultashield_database;
 -- ============================================================================
 -- 1. AUTHENTICATION & ORGANIZATION (Better-Auth)
 -- ============================================================================
@@ -37,7 +38,7 @@ DEFINE INDEX session_userId_idx ON session FIELDS userId;
 -- TABLE: account
 DEFINE TABLE account SCHEMAFULL;
 DEFINE FIELD userId ON account TYPE record<user>;
-DEFINE FIELD accountId ON account TYPE string;
+DEFINE FIELD accountId ON account TYPE any;
 DEFINE FIELD providerId ON account TYPE string;
 DEFINE FIELD password ON account TYPE option<string>;
 DEFINE FIELD accessToken ON account TYPE option<string>;

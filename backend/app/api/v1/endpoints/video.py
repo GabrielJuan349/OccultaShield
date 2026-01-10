@@ -34,6 +34,7 @@ async def upload_video(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
+    print(f"DEBUG: upload_video called for file: {file.filename}")
     try:
         # 1. Validate file
         if not file.content_type.startswith("video/"):

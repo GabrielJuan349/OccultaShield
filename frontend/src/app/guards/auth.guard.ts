@@ -1,4 +1,5 @@
-import { inject } from '@angular/core';
+import { inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import type { CanActivateFn } from '@angular/router';
 import { Router } from '@angular/router';
 import { AuthService } from '#services/auth.service';
@@ -41,7 +42,14 @@ export const authGuard: CanActivateFn = async (route, state) => {
 export const roleGuard: CanActivateFn = async (route, state) => {
   const authService = inject(AuthService);
   const router = inject(Router);
+  const platformId = inject(PLATFORM_ID);
   const requiredRole = route.data['role'] as string;
+
+  // En SSR no tenemos acceso a cookies, permitir render y verificar en cliente
+  if (!isPlatformBrowser(platformId)) {
+    console.log('🔐 roleGuard: SSR detected, allowing render');
+    return true;
+  }
 
   if (!requiredRole) {
     console.error('❌ roleGuard: No se especificó el rol requerido en route.data');
@@ -59,30 +67,42 @@ export const roleGuard: CanActivateFn = async (route, state) => {
     }
   }
 
+  // Debug: ver qué usuario y rol tenemos
+  const user = authService.user();
+  console.log('🔐 roleGuard - User:', user);
+  console.log('🔐 roleGuard - Required role:', requiredRole, '| User role:', user?.role);
+
   // Verificar rol
   if (authService.hasRole(requiredRole)) {
     console.log(`✅ Usuario tiene rol ${requiredRole} - permitiendo acceso`);
     return true;
   }
 
-  console.log(`⚠️ Usuario no tiene rol ${requiredRole} - acceso denegado`);
-  router.navigate(['/']);
+  // Si no tiene el rol, redirigir a upload sin dejar rastro
+  console.log(`⚠️ Usuario no tiene rol ${requiredRole} - redirigiendo a upload`);
+  router.navigate(['/upload'], { replaceUrl: true });
   return false;
 };
 
 
 /**
  * Guard para rutas de solo invitados (login, register)
- * Redirige a home si el usuario ya está autenticado
+ * Redirige a upload si el usuario ya está autenticado
  */
 export const guestGuard: CanActivateFn = async (route, state) => {
   const authService = inject(AuthService);
   const router = inject(Router);
+  const platformId = inject(PLATFORM_ID);
 
-  // Si ya está autenticado, redirigir a home
+  // En SSR, permitir render
+  if (!isPlatformBrowser(platformId)) {
+    return true;
+  }
+
+  // Si ya está autenticado, redirigir a upload
   if (authService.isAuthenticated()) {
-    console.log('ℹ️ Usuario ya autenticado - redirigiendo a home');
-    router.navigate(['/']);
+    console.log('ℹ️ Usuario ya autenticado - redirigiendo a upload');
+    router.navigate(['/upload']);
     return false;
   }
 
@@ -90,8 +110,8 @@ export const guestGuard: CanActivateFn = async (route, state) => {
   const hasSession = await authService.checkSession();
 
   if (hasSession) {
-    console.log('ℹ️ Sesión activa encontrada - redirigiendo a home');
-    router.navigate(['/']);
+    console.log('ℹ️ Sesión activa encontrada - redirigiendo a upload');
+    router.navigate(['/upload']);
     return false;
   }
 

@@ -5,7 +5,7 @@ import { UploadPage } from '#pages/UploadPage/UploadPage';
 import { ReviewPage } from '#pages/ReviewPage/ReviewPage';
 import { DownloadPage } from '#pages/DownloadPage/DownloadPage';
 import { ProcessingPage } from '#pages/ProcessingPage/ProcessingPage';
-import { authGuard, roleGuard } from '#guards/auth.guard';
+import { authGuard, roleGuard, guestGuard } from '#guards/auth.guard';
 import { AdminLayoutComponent } from '#pages/Admin/AdminLayout/AdminLayout';
 import { DashboardComponent } from '#pages/Admin/Dashboard/Dashboard';
 import { UsersComponent } from '#pages/Admin/Users/Users';
@@ -20,7 +20,7 @@ export const routes: Routes = [
   {
     path: 'admin',
     component: AdminLayoutComponent,
-    // canActivate: [roleGuard],
+    canActivate: [roleGuard],
     data: { role: 'admin' },
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
@@ -33,26 +33,27 @@ export const routes: Routes = [
   {
     path: 'login',
     component: LoginRegister,
+    canActivate: [guestGuard]
   },
   {
     path: 'upload',
     component: UploadPage,
-    // canActivate: [authGuard]
+    canActivate: [authGuard]
   },
   {
     path: 'download/:id',
     component: DownloadPage,
-    // canActivate: [authGuard]
+    canActivate: [authGuard]
   },
   {
     path: 'review/:id',
     component: ReviewPage,
-    // canActivate: [authGuard]
+    canActivate: [authGuard]
   },
   {
     path: 'processing/:id',
     component: ProcessingPage,
-    // canActivate: [authGuard]
+    canActivate: [authGuard]
   },
   {
     path: '**',

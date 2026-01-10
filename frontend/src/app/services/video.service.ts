@@ -55,10 +55,13 @@ export class VideoService {
     private http = inject(HttpClient);
     private apiUrl = `${environment.apiUrl}/video`;
 
-    uploadVideo(file: File): Observable<VideoUploadResponse> {
+    uploadVideo(file: File): Observable<any> {
         const formData = new FormData();
         formData.append('file', file);
-        return this.http.post<VideoUploadResponse>(`${this.apiUrl}/upload`, formData);
+        return this.http.post(`${this.apiUrl}/upload`, formData, {
+            reportProgress: true,
+            observe: 'events'
+        });
     }
 
     getVideoStatus(videoId: string): Observable<VideoResponse> {

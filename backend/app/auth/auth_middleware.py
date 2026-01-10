@@ -16,7 +16,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     
     async def dispatch(self, request: Request, call_next: Callable):
         # Permitir rutas públicas
-        if request.url.path in self.public_routes:
+        if request.url.path in self.public_routes or request.method == "OPTIONS":
             return await call_next(request)
         
         # Verificar el header de autorización
@@ -63,20 +63,25 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if not self.conn_manager.db:
                 return False
             
-            query = "SELECT * FROM session WHERE token = $token AND expiresAt > time::now();"
-            vars = {"token": token}
+            query = "SELECT * FROM session WHERE token = $session_token AND expiresAt > time::now();"
+            vars = {"session_token": token}
+            print(f"DEBUG: Verifying token: {token[:10]}... Vars: {vars}")
             response = await self.conn_manager.db.query(query, vars)
+            print(f"DEBUG: SurrealDB Auth Response: {response}")
             
             if not response: 
+                print("DEBUG: No response from DB")
                 return False
                 
             # Accessing result
             # SDK response format: [{'result': [...], 'status': 'OK', 'time': ...}]
             result_data = response[0]
             if not result_data or 'result' not in result_data:
+                print(f"DEBUG: Unexpected response structure: {result_data}")
                 return False
                 
             records = result_data['result']
+            print(f"DEBUG: Records found: {len(records)}")
             return len(records) > 0
                 
         except Exception as e:

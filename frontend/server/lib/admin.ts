@@ -25,19 +25,39 @@ interface AuthRequest extends Request {
 async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
         const auth = await getAuth();
-        // Convert IncomingHttpHeaders to Record<string, string>
-        const headers: Record<string, string> = {};
+
+        // Mejoramos la extracción de headers para Better-Auth
+        const headers = new Headers();
         for (const [key, value] of Object.entries(req.headers)) {
-            if (value) headers[key] = Array.isArray(value) ? value[0] : value;
+            if (value) {
+                headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+            }
         }
-        const session = await auth.api.getSession({ headers });
+
+        // Better-Auth getSession puede recibir el objeto headers directamente
+        const session = await auth.api.getSession({
+            headers: headers
+        });
+
+        console.log('📋 Session check result:', {
+            hasSession: !!session,
+            hasUser: !!session?.user,
+            userEmail: session?.user?.email,
+            userRole: session?.user?.role,
+        });
 
         if (!session?.user) {
+            console.warn('⚠️ Admin Access Denied: No session found');
+            // Log all cookie names
+            const cookieHeader = req.headers.cookie || '';
+            const cookieNames = cookieHeader.split(';').map(c => c.trim().split('=')[0]).filter(Boolean);
+            console.log('🍪 Cookie names received:', cookieNames);
             res.status(401).json({ error: 'Not authenticated' });
             return;
         }
 
         if (session.user.role !== 'admin') {
+            console.warn(`⚠️ Admin Access Denied: User ${session.user.email} is not an admin`);
             res.status(403).json({ error: 'Admin access required' });
             return;
         }
@@ -170,22 +190,24 @@ adminRouter.patch('/users/:userId/approve', requireAdmin, async (req: AuthReques
     try {
         const { userId } = req.params;
         const db = await getDb();
-        const recordId = createRecordId('user', userId);
+        // Extract clean ID without 'user:' prefix if present
+        const cleanUserId = userId.includes(':') ? userId.split(':')[1] : userId;
 
         // Get user info before updating
         const userResult = await db.query<[Record<string, unknown>[]]>(
-            'SELECT email, name FROM user WHERE id = $id',
-            { id: recordId }
+            'SELECT email, name FROM user WHERE id = type::thing("user", $userId)',
+            { userId: cleanUserId }
         );
         const user = userResult[0]?.[0];
 
         // Update user
-        await db.query('UPDATE $id SET isApproved = true, updatedAt = time::now()', { id: recordId });
+        await db.query('UPDATE type::thing("user", $userId) SET isApproved = true, updatedAt = time::now()', { userId: cleanUserId });
 
         // Log action
+        const adminUserId = req.user!.id.includes(':') ? req.user!.id.split(':')[1] : req.user!.id;
         await db.query(
-            `CREATE audit_log SET userId = $adminId, action = 'user_approved', targetId = $targetId, metadata = { approved_by: $adminName }`,
-            { adminId: createRecordId('user', req.user!.id), targetId: userId, adminName: req.user!.name }
+            `CREATE audit_log SET userId = type::thing('user', $adminUserId), action = 'user_approved', targetId = $targetId, metadata = { approved_by: $adminName }`,
+            { adminUserId, targetId: userId, adminName: req.user!.name }
         );
 
         // Send email notification
@@ -204,25 +226,27 @@ adminRouter.patch('/users/:userId/reject', requireAdmin, async (req: AuthRequest
     try {
         const { userId } = req.params;
         const db = await getDb();
-        const recordId = createRecordId('user', userId);
+        // Extract clean ID without 'user:' prefix if present
+        const cleanUserId = userId.includes(':') ? userId.split(':')[1] : userId;
 
         // Get user info before deleting
         const userResult = await db.query<[Record<string, unknown>[]]>(
-            'SELECT email, name FROM user WHERE id = $id',
-            { id: recordId }
+            'SELECT email, name FROM user WHERE id = type::thing("user", $userId)',
+            { userId: cleanUserId }
         );
         const user = userResult[0]?.[0];
 
         // Log action before deletion
+        const adminUserId = req.user!.id.includes(':') ? req.user!.id.split(':')[1] : req.user!.id;
         await db.query(
-            `CREATE audit_log SET userId = $adminId, action = 'user_rejected', targetId = $targetId, metadata = { rejected_by: $adminName }`,
-            { adminId: createRecordId('user', req.user!.id), targetId: userId, adminName: req.user!.name }
+            `CREATE audit_log SET userId = type::thing('user', $adminUserId), action = 'user_rejected', targetId = $targetId, metadata = { rejected_by: $adminName }`,
+            { adminUserId, targetId: userId, adminName: req.user!.name }
         );
 
         // Delete related records
-        await db.query('DELETE session WHERE userId = $id', { id: recordId });
-        await db.query('DELETE account WHERE userId = $id', { id: recordId });
-        await db.query('DELETE $id', { id: recordId });
+        await db.query('DELETE session WHERE userId = type::thing("user", $userId)', { userId: cleanUserId });
+        await db.query('DELETE account WHERE userId = type::thing("user", $userId)', { userId: cleanUserId });
+        await db.query('DELETE type::thing("user", $userId)', { userId: cleanUserId });
 
         // Send rejection email
         if (user) {
@@ -241,14 +265,16 @@ adminRouter.patch('/users/:userId/role', requireAdmin, async (req: AuthRequest, 
         const { userId } = req.params;
         const { role } = req.body;
         const db = await getDb();
-        const recordId = createRecordId('user', userId);
+        // Extract clean ID without 'user:' prefix if present
+        const cleanUserId = userId.includes(':') ? userId.split(':')[1] : userId;
 
-        await db.query('UPDATE $id SET role = $role, updatedAt = time::now()', { id: recordId, role });
+        await db.query('UPDATE type::thing("user", $userId) SET role = $role, updatedAt = time::now()', { userId: cleanUserId, role });
 
         // Log action
+        const adminUserId = req.user!.id.includes(':') ? req.user!.id.split(':')[1] : req.user!.id;
         await db.query(
-            `CREATE audit_log SET userId = $adminId, action = 'role_changed', targetId = $targetId, metadata = { new_role: $newRole, changed_by: $adminName }`,
-            { adminId: createRecordId('user', req.user!.id), targetId: userId, newRole: role, adminName: req.user!.name }
+            `CREATE audit_log SET userId = type::thing('user', $adminUserId), action = 'role_changed', targetId = $targetId, metadata = { new_role: $newRole, changed_by: $adminName }`,
+            { adminUserId, targetId: userId, newRole: role, adminName: req.user!.name }
         );
 
         res.json({ status: 'updated', user_id: userId, role });
@@ -294,9 +320,10 @@ adminRouter.put('/settings/:key', requireAdmin, async (req: AuthRequest, res: Re
         );
 
         // Log action
+        const adminUserId = req.user!.id.includes(':') ? req.user!.id.split(':')[1] : req.user!.id;
         await db.query(
-            `CREATE audit_log SET userId = $adminId, action = 'settings_changed', targetId = $key, metadata = { new_value: $value, changed_by: $adminName }`,
-            { adminId: createRecordId('user', req.user!.id), key, value: String(value), adminName: req.user!.name }
+            `CREATE audit_log SET userId = type::thing('user', $adminUserId), action = 'settings_changed', targetId = $key, metadata = { new_value: $value, changed_by: $adminName }`,
+            { adminUserId, key, value: String(value), adminName: req.user!.name }
         );
 
         res.json({ status: 'updated', key, value });

@@ -17,22 +17,25 @@ services:
       # - NEO4J_AUTH=${NEO4J_USER}/${NEO4J_PASS}
     networks:
       - backend
+
   surrealdb:
     image: surrealdb/surrealdb:latest
     container_name: surrealdb
     ports:
       - "${SURREALDB_PORT:-8000}:8000"
-    # volumes:
-    #   - surrealdb_data:/data
     environment:
       - RUST_LOG=${SURREALDB_LOG:-info}
     env_file:
       - .env
+    volumes:
+      - ./surrealdb-data:/data:rw
+      - ../db_files/schema.surql:/schema.surql:ro
     command: >
       start 
       --log ${SURREALDB_LOG:-info}
-      --user ${SURREALDB_USER}
-      --pass ${SURREALDB_PASS}
+      --username ${SURREALDB_USER}
+      --password ${SURREALDB_PASS}
+      --import-file /schema.surql
       rocksdb:/data/database.db
     restart: unless-stopped
     healthcheck:
@@ -43,9 +46,7 @@ services:
       start_period: 10s
     networks:
       - backend
-    volumes:
-      - ./surrealdb-data:/data:rw
-    user: "0:0" 
+    user: "0:0"
 
 networks:
   backend:

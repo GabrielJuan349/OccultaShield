@@ -22,7 +22,7 @@ from .models import BoundingBox, Capture, TrackedDetection, DetectionResult
 from .tracker import ObjectTracker
 from .capture_manager import CaptureManager
 from .gpu_manager import gpu_manager
-from ...services.progress_manager import progress_manager, ProcessingPhase
+from services.progress_manager import progress_manager, ProcessingPhase
 
 logger = logging.getLogger('detection_module')
 

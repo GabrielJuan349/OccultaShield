@@ -41,7 +41,9 @@ class SurrealConn:
             await self.connect()
         
         namespace = os.getenv("SURREALDB_NAMESPACE", "test")
+        print(f"Using namespace: {namespace}")
         default_db = os.getenv("SURREALDB_DB", "occultashield")
+        print(f"Using database: {default_db}")
         
         target_db = database_name or default_db
         

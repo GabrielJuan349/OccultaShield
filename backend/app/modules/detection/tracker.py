@@ -135,6 +135,7 @@ class ObjectTracker:
             matched_tracks = set()
             matched_dets = set()
             
+            for row, col in zip(row_indices, col_indices):
                 if cost_matrix[row, col] < (1.0 - self.iou_threshold):
                     track = active_tracks[row]
                     matched_tracks.add(track.track_id)

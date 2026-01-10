@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 from collections import defaultdict
 from .sub_agent import SubAgent
 from .consensus_agent import ConsensusAgent
-from ...services.progress_manager import progress_manager
+from services.progress_manager import progress_manager
 
 class ParallelProcessor:
     """

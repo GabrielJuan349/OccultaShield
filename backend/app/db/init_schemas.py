@@ -13,7 +13,7 @@ async def load_schemas():
     # Get database connection
     conn = SurrealConn()
     try:
-        db = await conn.getting_db("main")
+        db = await conn.getting_db()
     except Exception as e:
         print(f"❌ Failed to connect to SurrealDB: {e}")
         return

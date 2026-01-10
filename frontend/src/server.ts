@@ -6,6 +6,7 @@
  * 2. Archivos estáticos desde /browser
  * 3. SSR de Angular para el resto de rutas
  */
+import '@angular/compiler';
 import {
   AngularNodeAppEngine,
   createNodeRequestHandler,
@@ -13,6 +14,7 @@ import {
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
 import express from 'express';
+import cors from 'cors';
 import { join } from 'node:path';
 import { getAuth } from '#server/auth';
 import { getDb, prepareDataForSurreal } from '#server/db';
@@ -21,15 +23,27 @@ import { ENV } from '#server/env';
 // Rutas de archivos
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
-// Motor de Angular SSR
-const angularApp = new AngularNodeAppEngine();
+// Motor de Angular SSR (se inicializa solo si está disponible el manifiesto)
+let angularApp: AngularNodeAppEngine | null = null;
+try {
+  angularApp = new AngularNodeAppEngine();
+} catch (e) {
+  console.warn('⚠️ Angular SSR Engine not initialized (Normal in dev mode):', (e as Error).message);
+}
 
 // Aplicación Express (usada también por Angular CLI)
 const app = express();
 
 // =========================================================================
-// MIDDLEWARE: Parsear JSON para rutas de API
+// MIDDLEWARE: Configuración de CORS y JSON
 // =========================================================================
+app.use(cors({
+  origin: ['http://localhost:4200', 'http://127.0.0.1:4200', ENV.BASE_URL].filter(Boolean) as string[],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with'],
+}));
+
 app.use(express.json());
 
 // =========================================================================
@@ -68,7 +82,10 @@ app.all('/api/auth/*splat', async (req, res) => {
     res.status(response.status);
 
     response.headers.forEach((value, key) => {
-      res.setHeader(key, value);
+      // No duplicar headers de CORS que ya maneja el middleware de Express
+      if (!key.toLowerCase().startsWith('access-control-')) {
+        res.setHeader(key, value);
+      }
     });
 
     const body = await response.text();
@@ -144,6 +161,10 @@ app.use(
 // ANGULAR SSR (Todas las demás rutas)
 // =========================================================================
 app.use((req, res, next) => {
+  if (!angularApp) {
+    next(); // Si no hay motor SSR, pasamos al siguiente middleware (archivos estáticos)
+    return;
+  }
   angularApp
     .handle(req)
     .then((response) =>

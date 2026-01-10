@@ -15,7 +15,7 @@ try:
 except ImportError:
     KORNIA_AVAILABLE = False
 
-from ...services.progress_manager import progress_manager, ProcessingPhase
+from services.progress_manager import progress_manager, ProcessingPhase
 
 logger = logging.getLogger(__name__)
 

@@ -1,10 +1,11 @@
 import { Component, signal, computed, ChangeDetectionStrategy, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { NgOptimizedImage } from '@angular/common';
 import { form, Field, required, email, minLength, submit, validate } from '@angular/forms/signals';
 import { AuthService } from '#services/auth.service';
 
 @Component({
-  imports: [RouterLink, Field],
+  imports: [RouterLink, Field, NgOptimizedImage],
   templateUrl: './LoginRegister.html',
   styleUrls: ['./LoginRegister.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -121,8 +122,8 @@ export class LoginRegister {
     event.preventDefault();
     submit(this.registerForm, async () => {
       this.isLoading.set(true);
-      const { nameSurname, email, password } = this.registerCredentials();
-      const success = await this.authService.register(email, password, nameSurname);
+      const { nameSurname, email, password, usageType } = this.registerCredentials();
+      const success = await this.authService.register(email, password, nameSurname, usageType);
 
       if (success) {
         // In closed beta mode, show pending approval message

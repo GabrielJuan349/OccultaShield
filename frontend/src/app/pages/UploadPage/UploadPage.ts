@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal, viewChild, computed, effect } from '@angular/core';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { of, tap, switchMap, map, startWith, catchError } from 'rxjs';
+import { of, tap, switchMap, map, startWith, catchError, filter } from 'rxjs';
+import { HttpEventType } from '@angular/common/http';
 import { FileDropDirective } from '../../directives/file-drop';
 import { VideoService } from '#services/video.service';
 import { AuthService } from '#services/auth.service';
@@ -32,10 +33,17 @@ export class UploadPage {
         if (!file) return of({ status: 'idle' } as const);
         this.uploadProgress.set(10);
         return this.videoService.uploadVideo(file).pipe(
-          tap(() => this.uploadProgress.set(100)),
-          map(value => ({ status: 'success' as const, value })),
+          tap((event: any) => {
+            if (event.type === HttpEventType.UploadProgress && event.total) {
+              const percent = Math.round(100 * event.loaded / event.total);
+              this.uploadProgress.set(percent);
+            }
+          }),
+          filter((event: any) => event.type === HttpEventType.Response), // Wait for completion
+          map((event: any) => ({ status: 'success' as const, value: event.body })),
           startWith({ status: 'loading' as const }),
           catchError(error => {
+            console.error('Upload error detail:', error);
             this.uploadProgress.set(0);
             return of({ status: 'error' as const, error });
           })

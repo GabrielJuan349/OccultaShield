@@ -58,8 +58,21 @@ export const roleGuard: CanActivateFn = async (route, state) => {
 
   // Primero verificar autenticación
   if (!authService.isAuthenticated()) {
+    console.log('🔐 roleGuard: Usuario no autenticado, verificando sesión...');
     const hasSession = await authService.checkSession();
+
     if (!hasSession) {
+      console.log('🔐 roleGuard: No hay sesión válida, redirigiendo a login');
+      router.navigate(['/login'], {
+        queryParams: { returnUrl: state.url },
+      });
+      return false;
+    }
+
+    // CRUCIAL: Después de checkSession, verificar que el usuario se haya cargado
+    // Si checkSession retornó true pero user() sigue siendo null, hay un problema
+    if (!authService.isAuthenticated()) {
+      console.error('🔐 roleGuard: checkSession retornó true pero usuario no se cargó');
       router.navigate(['/login'], {
         queryParams: { returnUrl: state.url },
       });
@@ -71,6 +84,15 @@ export const roleGuard: CanActivateFn = async (route, state) => {
   const user = authService.user();
   console.log('🔐 roleGuard - User:', user);
   console.log('🔐 roleGuard - Required role:', requiredRole, '| User role:', user?.role);
+
+  // Verificar que tengamos un usuario válido
+  if (!user) {
+    console.error('🔐 roleGuard: Usuario autenticado pero datos de usuario faltantes');
+    router.navigate(['/login'], {
+      queryParams: { returnUrl: state.url },
+    });
+    return false;
+  }
 
   // Verificar rol
   if (authService.hasRole(requiredRole)) {

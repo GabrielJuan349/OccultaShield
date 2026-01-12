@@ -9,7 +9,9 @@ USE DB Occultashield_database;
 -- ============================================================================
 
 -- TABLE: user
-DEFINE TABLE user SCHEMAFULL;
+DEFINE TABLE user SCHEMAFULL
+    PERMISSIONS FULL;
+    
 DEFINE FIELD email ON user TYPE string ASSERT string::is::email($value);
 DEFINE FIELD emailVerified ON user TYPE bool DEFAULT false;
 DEFINE FIELD name ON user TYPE string;
@@ -24,7 +26,8 @@ DEFINE INDEX user_email_idx ON user FIELDS email UNIQUE;
 DEFINE INDEX user_approved_idx ON user FIELDS isApproved;
 
 -- TABLE: session
-DEFINE TABLE session SCHEMAFULL;
+DEFINE TABLE session SCHEMAFULL
+    PERMISSIONS FULL;
 DEFINE FIELD userId ON session TYPE record<user>;
 DEFINE FIELD token ON session TYPE string;
 DEFINE FIELD expiresAt ON session TYPE datetime;
@@ -36,7 +39,8 @@ DEFINE INDEX session_token_idx ON session FIELDS token UNIQUE;
 DEFINE INDEX session_userId_idx ON session FIELDS userId;
 
 -- TABLE: account
-DEFINE TABLE account SCHEMAFULL;
+DEFINE TABLE account SCHEMAFULL
+    PERMISSIONS FULL;
 DEFINE FIELD userId ON account TYPE record<user>;
 DEFINE FIELD accountId ON account TYPE any;
 DEFINE FIELD providerId ON account TYPE string;
@@ -53,7 +57,8 @@ DEFINE INDEX account_provider_idx ON account FIELDS providerId, accountId UNIQUE
 DEFINE INDEX account_userId_idx ON account FIELDS userId;
 
 -- TABLE: verification (Auth Tokens)
-DEFINE TABLE verification SCHEMAFULL;
+DEFINE TABLE verification SCHEMAFULL
+    PERMISSIONS FULL;
 DEFINE FIELD identifier ON verification TYPE string;
 DEFINE FIELD value ON verification TYPE string;
 DEFINE FIELD expiresAt ON verification TYPE datetime;
@@ -63,7 +68,8 @@ DEFINE INDEX verification_identifier_idx ON verification FIELDS identifier;
 DEFINE INDEX verification_value_idx ON verification FIELDS value UNIQUE;
 
 -- TABLE: twoFactor
-DEFINE TABLE twoFactor SCHEMAFULL;
+DEFINE TABLE twoFactor SCHEMAFULL
+    PERMISSIONS FULL;
 DEFINE FIELD userId ON twoFactor TYPE record<user>;
 DEFINE FIELD secret ON twoFactor TYPE string;
 DEFINE FIELD backupCodes ON twoFactor TYPE option<array<string>>;
@@ -73,7 +79,8 @@ DEFINE FIELD updatedAt ON twoFactor TYPE datetime DEFAULT time::now();
 DEFINE INDEX twoFactor_userId_idx ON twoFactor FIELDS userId UNIQUE;
 
 -- TABLE: organization
-DEFINE TABLE organization SCHEMAFULL;
+DEFINE TABLE organization SCHEMAFULL
+    PERMISSIONS FULL;
 DEFINE FIELD name ON organization TYPE string;
 DEFINE FIELD slug ON organization TYPE string;
 DEFINE FIELD logo ON organization TYPE option<string>;
@@ -83,7 +90,8 @@ DEFINE FIELD updatedAt ON organization TYPE datetime DEFAULT time::now();
 DEFINE INDEX organization_slug_idx ON organization FIELDS slug UNIQUE;
 
 -- TABLE: member
-DEFINE TABLE member SCHEMAFULL;
+DEFINE TABLE member SCHEMAFULL
+    PERMISSIONS FULL;
 DEFINE FIELD userId ON member TYPE record<user>;
 DEFINE FIELD organizationId ON member TYPE record<organization>;
 DEFINE FIELD role ON member TYPE string DEFAULT 'member';
@@ -93,7 +101,8 @@ DEFINE INDEX member_user_org_idx ON member FIELDS userId, organizationId UNIQUE;
 DEFINE INDEX member_org_idx ON member FIELDS organizationId;
 
 -- TABLE: invitation
-DEFINE TABLE invitation SCHEMAFULL;
+DEFINE TABLE invitation SCHEMAFULL
+    PERMISSIONS FULL;
 DEFINE FIELD email ON invitation TYPE string ASSERT string::is::email($value);
 DEFINE FIELD organizationId ON invitation TYPE record<organization>;
 DEFINE FIELD inviterId ON invitation TYPE record<user>;
@@ -108,7 +117,8 @@ DEFINE INDEX invitation_org_idx ON invitation FIELDS organizationId;
 DEFINE INDEX invitation_email_idx ON invitation FIELDS email;
 
 -- TABLE: processing_log (Extension)
-DEFINE TABLE processing_log SCHEMAFULL;
+DEFINE TABLE processing_log SCHEMAFULL
+    PERMISSIONS FULL;
 DEFINE FIELD userId ON processing_log TYPE record<user>;
 DEFINE FIELD action ON processing_log TYPE string;
 DEFINE FIELD fileName ON processing_log TYPE string;
@@ -132,7 +142,8 @@ DEFINE EVENT invitation_cleanup ON TABLE invitation WHEN $event = "CREATE" OR $e
 };
 
 -- TABLE: audit_log (Admin actions tracking)
-DEFINE TABLE audit_log SCHEMAFULL;
+DEFINE TABLE audit_log SCHEMAFULL
+    PERMISSIONS FULL;
 DEFINE FIELD userId ON audit_log TYPE record<user>;
 DEFINE FIELD action ON audit_log TYPE string 
     ASSERT $value INSIDE ['user_approved', 'user_rejected', 'role_changed', 'settings_changed', 'video_processed'];
@@ -144,7 +155,8 @@ DEFINE INDEX audit_log_action_idx ON audit_log FIELDS action;
 DEFINE INDEX audit_log_created_idx ON audit_log FIELDS createdAt;
 
 -- TABLE: app_settings (Global configuration)
-DEFINE TABLE app_settings SCHEMAFULL;
+DEFINE TABLE app_settings SCHEMAFULL
+    PERMISSIONS FULL;
 DEFINE FIELD key ON app_settings TYPE string;
 DEFINE FIELD value ON app_settings TYPE any;
 DEFINE FIELD updatedAt ON app_settings TYPE datetime DEFAULT time::now();
@@ -277,3 +289,6 @@ DEFINE INDEX idx_progress_video ON TABLE processing_progress COLUMNS video_id UN
 
 -- Obtener videos de un usuario
 -- SELECT * FROM video WHERE user_id = user:xyz;
+
+
+

@@ -1,7 +1,8 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from db.surreal_conn import SurrealConn
 import os
+
 
 # We will use this instance across the app
 _db_instance = SurrealConn()
@@ -10,30 +11,74 @@ async def get_db():
     """
     Dependency to get the SurrealDB session.
     """
-    db_name = os.getenv("SURREALDB_ITEM", "test")
+    # Use SURREALDB_DB or let getting_db use its default
+    db_name = os.getenv("SURREALDB_DB")
     return await _db_instance.getting_db(db_name)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get_db)):
+async def get_token_from_request(
+    request: Request,
+    token_query: str = None, # Allow query param ?token=...
+) -> str:
+    # 1. Try Authorization Header (via oauth2_scheme logic manually or header inspection)
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header.split(" ")[1]
+    
+    # 2. Try Query Parameter
+    if token_query:
+        return token_query
+
+    # 3. Try Cookies (if session token is stored in cookie)
+    # Better-Auth often uses a cookie named 'better-auth.session_token' or similar?
+    # For now, let's stick to query param as it's explicit for SSE.
+    
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+async def get_current_user(
+    request: Request,
+    db = Depends(get_db),
+    # We can't easily rely on Depends(oauth2_scheme) because it forces header or form.
+    # So we'll use a custom extractor.
+):
     """
     Dependency to get the current authenticated user.
-    Note: Approval check is handled by Angular SSR server.
     """
     try:
-        # Check Better-Auth Session
-        query = "SELECT * FROM session WHERE token = $token AND expiresAt > time::now() FETCH userId;"
-        vars = {"token": token}
-        response = await db.query(query, vars)
+        # Extract token from Header OR Query Param
+        token = request.query_params.get("token")
         
-        if not response or not response[0] or 'result' not in response[0]:
+        if not token:
+             # Fallback to header if no query param
+             auth_header = request.headers.get("Authorization")
+             if auth_header and auth_header.startswith("Bearer "):
+                 token = auth_header.split(" ")[1]
+        
+        if not token:
              raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
+                detail="Missing authentication credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-            
-        records = response[0]['result']
+
+        # 1. Get Session only (no FETCH to avoid complexity)
+        query = "SELECT * FROM session WHERE token = $session_token AND expiresAt > time::now();"
+        vars = {"session_token": token}
+        response = await db.query(query, vars)
+        
+        records = []
+        if isinstance(response, list) and len(response) > 0 and isinstance(response[0], dict) and 'result' in response[0]:
+            records = response[0]['result']
+        elif isinstance(response, list):
+            records = response
+        
+        print(f"DEBUG: Session records found: {records}")
+        
         if not records:
              raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -42,19 +87,63 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db = Depends(get
             )
             
         session = records[0]
-        user = session.get('userId')
+        user_val = session.get('userId')
         
-        if not user or isinstance(user, str):
+        print(f"DEBUG: userId from session: {user_val}")
+        
+        # 2. Extract User ID string
+        user_id = str(user_val) if user_val else None
+        
+        if not user_id:
              raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found for session",
+                detail="Session has no user ID",
             )
+
+        # 3. Fetch User Manualy
+        # If it's a Record ID object, conversion to str usually gives "table:id"
+        # We handle "user:id" or just "id"
+        
+        u_query = "SELECT * FROM user WHERE id = $id" 
+        u_vars = {"id": user_id}
+        
+        # If the ID doesn't contain ':', assume it's a raw ID and wrap it
+        if ":" not in user_id:
+             u_query = "SELECT * FROM user WHERE id = type::thing('user', $id)"
+        
+        # If the ID is already in format "user:...", SurrealDB query works with both string "user:id" or record link.
+        # But specifically for parameter usage, let's try direct string match first.
+        # However, if $id is passed as "user:...", type::thing('user', ...) might double wrap it.
+        # The safest way is to use the ID as provided if it has a colon.
+        
+        print(f"DEBUG: Fetching user with query: {u_query}, vars: {u_vars}")
+        
+        u_response = await db.query(u_query, u_vars)
+        
+        u_records = []
+        if isinstance(u_response, list) and len(u_response) > 0 and isinstance(u_response[0], dict) and 'result' in u_response[0]:
+            u_records = u_response[0]['result']
+        elif isinstance(u_response, list):
+            u_records = u_response
             
-        return user
+        print(f"DEBUG: User records: {u_records}")
+        
+        if u_records:
+            return u_records[0]
+        
+        print("DEBUG: User not found despite valid session. Returning minimal user object from session data.")
+        # Fallback: Create a minimal user object so the request handles standard fields if the record is missing
+        return {
+            "id": user_id,
+            "role": "user", # Default to user
+            "name": "Unknown User",
+            "email": "unknown@example.com"
+        }
         
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Auth error: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Authentication error: {e}",

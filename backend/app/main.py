@@ -16,7 +16,7 @@ surreal_conn = SurrealConn()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await surreal_conn.connect()
+    await surreal_conn.getting_db()
     
     yield
     
@@ -31,6 +31,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Configurar middleware de autenticación
+app.add_middleware(AuthMiddleware, surreal_conn=surreal_conn)
+
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
@@ -42,9 +45,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
-
-# Configurar middleware de autenticación
-app.add_middleware(AuthMiddleware, surreal_conn=surreal_conn)
 
 # Inicializar auth service (si se usa globalmente)
 # auth_service = AuthService(surreal_conn)  <-- Removed per user request

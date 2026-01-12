@@ -15,6 +15,7 @@ import {
   CompleteEvent,
   ErrorEvent
 } from '#interface/processing-events';
+import { AuthService } from './auth.service';
 
 @Injectable({
   providedIn: 'root'
@@ -22,6 +23,7 @@ import {
 export class ProcessingSSEService implements OnDestroy {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly router = inject(Router);
+  private readonly authService = inject(AuthService);
 
   private eventSource: EventSource | null = null;
   private startTime: number = 0;
@@ -131,7 +133,8 @@ export class ProcessingSSEService implements OnDestroy {
     this.reset();
 
     const baseUrl = `${environment.apiUrl}/process`;
-    const url = `${baseUrl}/${videoId}/progress`;
+    const token = this.authService.getToken();
+    const url = `${baseUrl}/${videoId}/progress${token ? `?token=${token}` : ''}`;
 
     this.startTime = Date.now();
     this.startElapsedTimer();

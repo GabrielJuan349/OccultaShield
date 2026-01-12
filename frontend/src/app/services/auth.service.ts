@@ -40,6 +40,8 @@ export class AuthService {
   private readonly router = inject(Router);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
+  private _sessionCheckPromise: Promise<boolean> | null = null;
+  private _hasCheckedSession = false; // Track if we've already verified session
 
   // Estado reactivo
   private readonly _user = signal<User | null>(null);
@@ -62,7 +64,8 @@ export class AuthService {
   constructor() {
     // Verificar sesión existente al inicializar (solo en browser)
     if (this.isBrowser) {
-      this.checkSession();
+      // Guardar la promesa para que los guards puedan esperarla
+      this._sessionCheckPromise = this.checkSession();
     }
   }
 
@@ -72,37 +75,71 @@ export class AuthService {
   async checkSession(): Promise<boolean> {
     if (!this.isBrowser) return false;
 
+    // Si ya tenemos un usuario autenticado Y ya hemos verificado antes, confiar en el estado local
+    if (this._user() !== null && this._hasCheckedSession) {
+      console.log('✅ AuthService: Usuario ya autenticado en memoria, usando estado local');
+      return true;
+    }
+
+    // Si ya hay una verificación en progreso, esperar a que termine
+    if (this._sessionCheckPromise) {
+      console.log('🔄 AuthService: Reutilizando verificación en progreso...');
+      return this._sessionCheckPromise;
+    }
+
     this._isLoading.set(true);
     this._error.set(null);
     console.log('🔄 AuthService: Checking session...');
 
-    try {
-      const result = await getSession({
-        fetchOptions: {
-          credentials: 'include',
-        },
-      });
-      console.log('🔄 AuthService: getSession result:', result);
+    // Create new promise for this check
+    const checkPromise = (async () => {
+      try {
+        const result = await getSession({
+          fetchOptions: {
+            credentials: 'include',
+          },
+        });
+        console.log('🔄 AuthService: getSession result:', result);
 
-      if (result.data?.session && result.data?.user) {
-        console.log('✅ AuthService: Session valid for user:', result.data.user.email);
-        this._user.set(result.data.user as User);
-        this._session.set(result.data.session as Session);
-        return true;
+        if (result.data?.session && result.data?.user) {
+          console.log('✅ AuthService: Session valid for user:', result.data.user.email);
+
+          // Recuperar token de localStorage si better-auth no lo devuelve
+          let token = result.data.session.token;
+          if (!token) {
+            token = localStorage.getItem('session_token') || '';
+          }
+
+          this._user.set(result.data.user as User);
+          this._session.set({
+            ...result.data.session,
+            token: token
+          } as Session);
+
+          this._hasCheckedSession = true; // Mark as checked
+          return true;
+        }
+
+        console.warn('⚠️ AuthService: No active session found');
+        this._user.set(null);
+        this._session.set(null);
+        localStorage.removeItem('session_token'); // Limpiar si no hay sesión válida
+        return false;
+      } catch (error) {
+        console.error('❌ AuthService: Error checking session:', error);
+        this._user.set(null);
+        this._session.set(null);
+        return false;
+      } finally {
+        this._isLoading.set(false);
+        // Clear the promise after completion
+        this._sessionCheckPromise = null;
       }
+    })();
 
-      console.warn('⚠️ AuthService: No active session found');
-      this._user.set(null);
-      this._session.set(null);
-      return false;
-    } catch (error) {
-      console.error('❌ AuthService: Error checking session:', error);
-      this._user.set(null);
-      this._session.set(null);
-      return false;
-    } finally {
-      this._isLoading.set(false);
-    }
+    // Store and return the promise
+    this._sessionCheckPromise = checkPromise;
+    return checkPromise;
   }
 
   /**
@@ -129,12 +166,14 @@ export class AuthService {
         this._user.set(result.data.user as User);
         // Better-Auth devuelve token, creamos objeto session
         if (result.data.token) {
+          localStorage.setItem('session_token', result.data.token);
           this._session.set({
             id: crypto.randomUUID(),
             userId: result.data.user.id,
             token: result.data.token,
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
           });
+          this._hasCheckedSession = true;
         }
         return true;
       }
@@ -184,12 +223,14 @@ export class AuthService {
         this._user.set(result.data.user as User);
         // Better-Auth devuelve token, creamos objeto session
         if (result.data.token) {
+          localStorage.setItem('session_token', result.data.token);
           this._session.set({
             id: crypto.randomUUID(),
             userId: result.data.user.id,
             token: result.data.token,
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
           });
+          this._hasCheckedSession = true;
         }
         return true;
       }
@@ -231,6 +272,8 @@ export class AuthService {
       this._user.set(null);
       this._session.set(null);
       this._isLoading.set(false);
+      this._hasCheckedSession = false;
+      localStorage.removeItem('session_token');
 
       // Redirigir y forzar recarga completa para limpiar todo el estado
       window.location.href = '/login';

@@ -19,6 +19,7 @@ import { join } from 'node:path';
 import { getAuth } from '#server/auth';
 import { getDb, prepareDataForSurreal } from '#server/db';
 import { ENV } from '#server/env';
+import { initializeAdminUser } from '#server/init-admin';
 
 // Rutas de archivos
 const browserDistFolder = join(import.meta.dirname, '../browser');
@@ -177,12 +178,21 @@ app.use((req, res, next) => {
 // INICIALIZACIÓN DEL SERVIDOR
 // ============================================================================
 if (isMainModule(import.meta.url) || ENV.RUN_UNDER_PROCESS_MANAGER) {
-  const PORT = Number(ENV.PORT ?? 4000);
+  const PORT = Number(ENV.PORT ?? 4201);
   console.log(`🚀 OccultaShield Server starting on port ${PORT}`);
 
   // Inicializar conexión a SurrealDB y Better-Auth
   Promise.all([getDb(), getAuth()])
-    .then(() => {
+    .then(async () => {
+      console.log('✅ DB and Auth initialized successfully');
+      console.log('🔧 Starting admin user initialization...');
+      // Initialize admin user after DB and Auth are ready
+      try {
+        await initializeAdminUser();
+      } catch (error) {
+        console.error('⚠️  Admin initialization failed (non-fatal):', error);
+      }
+
       app.listen(PORT, () => {
         console.log(`✅ OccultaShield Server running at http://localhost:${PORT}`);
         console.log(`   Auth endpoints: http://localhost:${PORT}/api/auth/*`);

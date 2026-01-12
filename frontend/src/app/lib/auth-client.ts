@@ -10,11 +10,13 @@ import { environment } from '#environments/environment';
  * Usa las APIs de Better-Auth para comunicarse con el servidor
  */
 export const authClient = createAuthClient({
-  // Si estamos en el navegador, usamos la origin actual (ej: localhost:4200 en dev o localhost:4000 en prod)
-  // Si estamos en el servidor (SSR), apuntamos al puerto interno 4000.
+  // En el navegador, usar URL relativa para que el proxy de Angular funcione
+  // El proxy en proxy.conf.json redirige /api/* a http://localhost:4201
+  // Esto asegura que las cookies se creen en el mismo origen (localhost:4200)
+  // En SSR, conectamos directamente al servidor de auth en el puerto 4201
   baseURL: typeof window !== 'undefined'
-    ? window.location.origin
-    : (process.env['BASE_URL'] || 'http://localhost:4000'),
+    ? ''  // URL relativa - usa el mismo origen que la página
+    : 'http://localhost:4201',
 });
 
 // Exportar métodos específicos para facilitar el uso

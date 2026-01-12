@@ -17,7 +17,7 @@ const isProduction = process.env['Production'] === 'True' ? 'production' : 'deve
 
 export const ENV = {
   NODE_ENV: isProduction,
-  PORT: Number(process.env['PORT'] ?? '4200'),
+  PORT: Number(process.env['PORT'] ?? '4201'),
   BASE_URL: process.env['CLIENT_URL'] ?? 'http://localhost:4200',
   AUTH_SECRET: process.env['BETTERAUTH_SECRET'] ?? 'development-secret-change-in-production',
   SURREAL_URL: process.env['SURREALDB_HOST'] ? `http://${process.env['SURREALDB_HOST']}:${process.env['SURREALDB_PORT'] ?? '8000'}` : 'http://127.0.0.1:8000',

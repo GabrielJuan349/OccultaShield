@@ -188,7 +188,7 @@ adminRouter.get('/users/pending', requireAdmin, async (req: AuthRequest, res: Re
 
 adminRouter.patch('/users/:userId/approve', requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
-        const { userId } = req.params;
+        const userId = req.params['userId'] as string;
         const db = await getDb();
         // Extract clean ID without 'user:' prefix if present
         const cleanUserId = userId.includes(':') ? userId.split(':')[1] : userId;
@@ -224,7 +224,7 @@ adminRouter.patch('/users/:userId/approve', requireAdmin, async (req: AuthReques
 
 adminRouter.patch('/users/:userId/reject', requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
-        const { userId } = req.params;
+        const userId = req.params['userId'] as string;
         const db = await getDb();
         // Extract clean ID without 'user:' prefix if present
         const cleanUserId = userId.includes(':') ? userId.split(':')[1] : userId;
@@ -262,7 +262,7 @@ adminRouter.patch('/users/:userId/reject', requireAdmin, async (req: AuthRequest
 
 adminRouter.patch('/users/:userId/role', requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
-        const { userId } = req.params;
+        const userId = req.params['userId'] as string;
         const { role } = req.body;
         const db = await getDb();
         // Extract clean ID without 'user:' prefix if present

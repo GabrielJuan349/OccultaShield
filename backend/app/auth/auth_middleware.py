@@ -1,16 +1,19 @@
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from typing import Callable
+from typing import Callable, Dict, Tuple
 import json
+import time
 from db.surreal_conn import SurrealConn
 
 class AuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, surreal_conn: SurrealConn):
         super().__init__(app)
         self.conn_manager = surreal_conn
-        # database selection should be handled in lifespan or per-request
-        # self.surreal_conn = surreal_conn.getting_db("test")
+        # Cache de tokens verificados: {token: (timestamp, is_valid)}
+        self._token_cache: Dict[str, Tuple[float, bool]] = {}
+        self._cache_ttl = 300  # 5 minutos de caché
+        
         # Rutas que no requieren autenticación
         self.public_routes = ["/", "/auth/login", "/auth/register", "/docs", "/openapi.json"]
     
@@ -21,16 +24,25 @@ class AuthMiddleware(BaseHTTPMiddleware):
         
         # Verificar el header de autorización
         auth_header = request.headers.get("Authorization")
+        token = None
         
-        if not auth_header:
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+        
+        # Fallback: Verificar query param (necesario para SSE)
+        if not token:
+            token = request.query_params.get("token")
+        
+        if not token:
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 content={"error": "No token provided"}
             )
         
         try:
-            # Extraer el token (formato: "Bearer <token>")
-            token = auth_header.split(" ")[1]
+            # Si venía del header ya lo tenemos limpio, si es query param es el token directo
+             
+            # Verificar el token con SurrealDB
             
             # Verificar el token con SurrealDB
             is_valid = await self.verify_token(token)
@@ -57,36 +69,69 @@ class AuthMiddleware(BaseHTTPMiddleware):
             )
     
     async def verify_token(self, token: str) -> bool:
-        """Verifica el token usando SurrealDB"""
+        """Verifica el token usando SurrealDB con caché"""
         try:
-            # Autenticar con el token JWT
+            # 1. Verificar caché primero
+            current_time = time.time()
+            if token in self._token_cache:
+                cached_time, is_valid = self._token_cache[token]
+                # Si el caché es reciente y válido, usarlo
+                if current_time - cached_time < self._cache_ttl:
+                    print(f"DEBUG: Token verificado desde caché (edad: {current_time - cached_time:.1f}s)")
+                    return is_valid
+                else:
+                    # Caché expirado, eliminar
+                    del self._token_cache[token]
+            
+            # 2. Verificar con la base de datos
             if not self.conn_manager.db:
                 return False
             
             query = "SELECT * FROM session WHERE token = $session_token AND expiresAt > time::now();"
             vars = {"session_token": token}
-            print(f"DEBUG: Verifying token: {token[:10]}... Vars: {vars}")
+            print(f"DEBUG: Verifying token from DB: {token[:10]}...")
             response = await self.conn_manager.db.query(query, vars)
             print(f"DEBUG: SurrealDB Auth Response: {response}")
             
             if not response: 
                 print("DEBUG: No response from DB")
+                self._token_cache[token] = (current_time, False)
                 return False
                 
-            # Accessing result
-            # SDK response format: [{'result': [...], 'status': 'OK', 'time': ...}]
-            result_data = response[0]
-            if not result_data or 'result' not in result_data:
-                print(f"DEBUG: Unexpected response structure: {result_data}")
+            # Handle different response formats
+            # Case 1: Wrapped response [{'result': [...], 'status': 'OK'}]
+            if isinstance(response, list) and len(response) > 0 and isinstance(response[0], dict) and 'result' in response[0]:
+                records = response[0]['result']
+            # Case 2: Direct list of records [{...}, {...}]
+            elif isinstance(response, list):
+                records = response
+            else:
+                print(f"DEBUG: Unexpected response type: {type(response)}")
+                self._token_cache[token] = (current_time, False)
                 return False
                 
-            records = result_data['result']
-            print(f"DEBUG: Records found: {len(records)}")
-            return len(records) > 0
+            is_valid = len(records) > 0
+            print(f"DEBUG: Records found: {len(records)}, is_valid: {is_valid}")
+            
+            # 3. Actualizar caché
+            self._token_cache[token] = (current_time, is_valid)
+            
+            # 4. Limpiar caché antigua (cada 100 verificaciones)
+            if len(self._token_cache) > 100:
+                self._cleanup_cache(current_time)
+            
+            return is_valid
                 
         except Exception as e:
             print(f"Token verification failed: {e}")
             return False
-        except Exception as e:
-            print(f"Token verification failed: {e}")
-            return False
+    
+    def _cleanup_cache(self, current_time: float):
+        """Elimina entradas de caché expiradas"""
+        expired_tokens = [
+            token for token, (cached_time, _) in self._token_cache.items()
+            if current_time - cached_time >= self._cache_ttl
+        ]
+        for token in expired_tokens:
+            del self._token_cache[token]
+        print(f"DEBUG: Cache cleanup - removed {len(expired_tokens)} expired tokens")

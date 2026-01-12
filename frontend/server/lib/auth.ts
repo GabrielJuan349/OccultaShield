@@ -34,9 +34,9 @@ async function createAuth() {
   const db = await getDb();
 
   return betterAuth({
-    // URL base de la aplicación
-    //plugins: [twoFactor(), organization(), passkey()],
-    baseURL: ENV.BASE_URL,
+    // URL base del servidor de autenticación (puerto 4201)
+    // Las peticiones desde el cliente (4200) se proxean a este puerto
+    baseURL: `http://localhost:${ENV.PORT}`,
 
     // Secreto para firmar tokens (DEBE ser seguro en producción)
     secret: ENV.AUTH_SECRET,
@@ -98,6 +98,13 @@ async function createAuth() {
       user: {
         create: {
           after: async (user) => {
+            // Skip email notification for admin user
+            const adminEmail = process.env['ADMIN_EMAIL'];
+            if (adminEmail && user.email === adminEmail) {
+              console.log(`⏭️  Skipping email notification for admin user: ${user.email}`);
+              return;
+            }
+
             // Enviar email de notificación de registro pendiente
             if (user.email && user.name) {
               try {
@@ -129,10 +136,10 @@ async function createAuth() {
 
     // Trusted origins para CORS
     trustedOrigins: [
-      'http://localhost:4000',
-      'http://localhost:4200',
-      'http://127.0.0.1:4000',
+      'http://localhost:4200',  // Angular dev server
+      'http://localhost:4201',  // Better-Auth server
       'http://127.0.0.1:4200',
+      'http://127.0.0.1:4201',
       ENV.BASE_URL,
     ].filter(Boolean) as string[],
   });

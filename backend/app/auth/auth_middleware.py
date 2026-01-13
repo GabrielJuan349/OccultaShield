@@ -33,13 +33,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not token:
             token = request.query_params.get("token")
 
-        # Fallback 2: Verificar cookies de Better-Auth (occultashield.session_token)
+        # Fallback 2: Verificar cookies de Better-Auth
         if not token:
-            # Better-Auth usa el prefijo "occultashield" para las cookies
-            session_cookie = request.cookies.get("occultashield.session_token")
-            if session_cookie:
-                token = session_cookie
-                print(f"DEBUG: Token recuperado de cookie: {token[:20]}...")
+            # Intentar múltiples formatos de cookie que Better-Auth podría usar
+            cookie_names = [
+                "occultashield.session_token",  # Formato con punto
+                "occultashield_session.token",  # Formato con underscore
+                "better-auth.session_token",    # Formato por defecto
+                "occultashield-session-token",  # Formato con guiones
+                "session_token",                 # Sin prefijo
+            ]
+
+            # Debug: Mostrar todas las cookies disponibles
+            print(f"DEBUG: Available cookies: {list(request.cookies.keys())}")
+
+            for cookie_name in cookie_names:
+                session_cookie = request.cookies.get(cookie_name)
+                if session_cookie:
+                    token = session_cookie
+                    print(f"DEBUG: Token encontrado en cookie '{cookie_name}': {token[:20] if len(token) > 20 else token}...")
+                    break
 
         if not token:
             return JSONResponse(

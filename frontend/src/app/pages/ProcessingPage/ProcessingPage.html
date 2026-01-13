@@ -132,5 +132,20 @@
       </span>
     </div>
 
+    <!-- Live Updates Feed -->
+    @if (sse.liveUpdates().length > 0) {
+      <div class="live-updates-section">
+        <h4 class="live-updates-title">Recent Activity</h4>
+        <div class="live-updates-list">
+          @for (update of sse.liveUpdates(); track update.timestamp) {
+            <div class="live-update-item" [attr.data-type]="update.type">
+              <span class="update-timestamp">{{ update.timestamp }}</span>
+              <span class="update-message">{{ update.message }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
   </main>
 </div>

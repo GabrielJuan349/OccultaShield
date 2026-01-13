@@ -95,13 +95,13 @@ async def upload_video(
         )
         print(f"   📊 Metadata: {actual_frames} frames, {actual_fps:.1f} FPS, {actual_width}x{actual_height}")
         
-        # 5. Create DB record with status UPLOADED (not processing yet)
+        # 5. Create DB record with initial status UPLOADED (will change to PROCESSING immediately)
         video_data = {
             "id": video_id,
             "user_id": current_user["id"],
             "filename": file.filename,
             "original_path": str(file_path),
-            "status": "uploaded",  # User must click "Start Processing" to begin
+            "status": "uploaded",  # Status inicial, cambiará a PROCESSING inmediatamente
             "metadata": metadata.model_dump(),
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()

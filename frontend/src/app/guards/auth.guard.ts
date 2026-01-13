@@ -5,150 +5,106 @@ import { Router } from '@angular/router';
 import { AuthService } from '#services/auth.service';
 
 /**
- * Guard funcional para proteger rutas que requieren autenticación
- * Compatible con Better-Auth - verifica la sesión de forma asíncrona
+ * Guard unificado para manejo de autenticación y roles
+ *
+ * Uso:
+ * - Sin data: Solo verifica autenticación
+ * - Con data.role: Verifica autenticación + rol específico
+ * - Con data.guestOnly: Permite solo usuarios NO autenticados
  */
 export const authGuard: CanActivateFn = async (route, state) => {
   const authService = inject(AuthService);
   const router = inject(Router);
   const platformId = inject(PLATFORM_ID);
 
-  // En SSR, permitir render
+  // En SSR, permitir render (hidratación se encargará en cliente)
   if (!isPlatformBrowser(platformId)) {
-    console.log('🔐 authGuard: SSR detected, allowing render');
     return true;
   }
 
-  console.log('🔐 authGuard: Checking access to', state.url);
-  console.log('   isAuthenticated():', authService.isAuthenticated());
-  console.log('   user():', authService.user());
+  // Leer configuración del guard
+  const requiredRole = route.data['role'] as string | undefined;
+  const guestOnly = route.data['guestOnly'] === true;
 
-  // Si ya tenemos usuario en memoria, permitir acceso
-  if (authService.isAuthenticated()) {
-    console.log('✅ authGuard: Usuario autenticado - permitiendo acceso');
-    return true;
-  }
+  // --- GUEST ONLY MODE ---
+  if (guestOnly) {
+    // Ya autenticado? Redirigir a upload
+    if (authService.isAuthenticated()) {
+      router.navigate(['/upload']);
+      return false;
+    }
 
-  // Verificar sesión con el servidor (por si hay cookie válida)
-  console.log('🔐 authGuard: No hay usuario en memoria, verificando sesión...');
-  const hasSession = await authService.checkSession();
-  console.log('🔐 authGuard: checkSession() result:', hasSession);
-
-  if (hasSession) {
-    console.log('✅ authGuard: Sesión válida - permitiendo acceso');
-    return true;
-  }
-
-  // Si no está autenticado, redirigir al login
-  console.log('⚠️ authGuard: Sin sesión válida - redirigiendo a /login');
-  router.navigate(['/login'], {
-    queryParams: { returnUrl: state.url },
-  });
-
-  return false;
-};
-
-/**
- * Guard para rutas que requieren un rol específico
- * Lee el rol requerido de route.data['role']
- */
-export const roleGuard: CanActivateFn = async (route, state) => {
-  const authService = inject(AuthService);
-  const router = inject(Router);
-  const platformId = inject(PLATFORM_ID);
-  const requiredRole = route.data['role'] as string;
-
-  // En SSR no tenemos acceso a cookies, permitir render y verificar en cliente
-  if (!isPlatformBrowser(platformId)) {
-    console.log('🔐 roleGuard: SSR detected, allowing render');
-    return true;
-  }
-
-  if (!requiredRole) {
-    console.error('❌ roleGuard: No se especificó el rol requerido en route.data');
-    return false;
-  }
-
-  // Primero verificar autenticación
-  if (!authService.isAuthenticated()) {
-    console.log('🔐 roleGuard: Usuario no autenticado, verificando sesión...');
+    // Verificar sesión por si hay cookie válida
     const hasSession = await authService.checkSession();
+    if (hasSession) {
+      router.navigate(['/upload']);
+      return false;
+    }
 
+    // No hay sesión, permitir acceso
+    return true;
+  }
+
+  // --- AUTHENTICATED MODE (con o sin rol) ---
+
+  // Ya autenticado? Continuar
+  let isAuth = authService.isAuthenticated();
+
+  // Si no está en memoria, verificar sesión
+  if (!isAuth) {
+    const hasSession = await authService.checkSession();
     if (!hasSession) {
-      console.log('🔐 roleGuard: No hay sesión válida, redirigiendo a login');
+      // No hay sesión válida, ir a login
       router.navigate(['/login'], {
-        queryParams: { returnUrl: state.url },
+        queryParams: { returnUrl: state.url }
       });
       return false;
     }
 
-    // CRUCIAL: Después de checkSession, verificar que el usuario se haya cargado
-    // Si checkSession retornó true pero user() sigue siendo null, hay un problema
-    if (!authService.isAuthenticated()) {
-      console.error('🔐 roleGuard: checkSession retornó true pero usuario no se cargó');
+    // checkSession debería haber actualizado el estado
+    isAuth = authService.isAuthenticated();
+    if (!isAuth) {
+      // Estado inconsistente, ir a login
       router.navigate(['/login'], {
-        queryParams: { returnUrl: state.url },
+        queryParams: { returnUrl: state.url }
       });
       return false;
     }
   }
 
-  // Debug: ver qué usuario y rol tenemos
+  // Autenticado confirmado
   const user = authService.user();
-  console.log('🔐 roleGuard - User:', user);
-  console.log('🔐 roleGuard - Required role:', requiredRole, '| User role:', user?.role);
-
-  // Verificar que tengamos un usuario válido
   if (!user) {
-    console.error('🔐 roleGuard: Usuario autenticado pero datos de usuario faltantes');
+    // Autenticado pero sin datos de usuario (estado inconsistente)
     router.navigate(['/login'], {
-      queryParams: { returnUrl: state.url },
+      queryParams: { returnUrl: state.url }
     });
     return false;
   }
 
-  // Verificar rol
-  if (authService.hasRole(requiredRole)) {
-    console.log(`✅ Usuario tiene rol ${requiredRole} - permitiendo acceso`);
+  // Si no requiere rol específico, permitir
+  if (!requiredRole) {
     return true;
   }
 
-  // Si no tiene el rol, redirigir a upload sin dejar rastro
-  console.log(`⚠️ Usuario no tiene rol ${requiredRole} - redirigiendo a upload`);
+  // Verificar rol
+  if (authService.hasRole(requiredRole)) {
+    return true;
+  }
+
+  // No tiene el rol requerido, redirigir a upload
   router.navigate(['/upload'], { replaceUrl: true });
   return false;
 };
 
+/**
+ * DEPRECATED: Usar authGuard con data.role en su lugar
+ * Se mantiene por compatibilidad
+ */
+export const roleGuard: CanActivateFn = authGuard;
 
 /**
- * Guard para rutas de solo invitados (login, register)
- * Redirige a upload si el usuario ya está autenticado
+ * DEPRECATED: Usar authGuard con data.guestOnly en su lugar
+ * Se mantiene por compatibilidad
  */
-export const guestGuard: CanActivateFn = async (route, state) => {
-  const authService = inject(AuthService);
-  const router = inject(Router);
-  const platformId = inject(PLATFORM_ID);
-
-  // En SSR, permitir render
-  if (!isPlatformBrowser(platformId)) {
-    return true;
-  }
-
-  // Si ya está autenticado, redirigir a upload
-  if (authService.isAuthenticated()) {
-    console.log('ℹ️ Usuario ya autenticado - redirigiendo a upload');
-    router.navigate(['/upload']);
-    return false;
-  }
-
-  // Verificar si hay sesión activa
-  const hasSession = await authService.checkSession();
-
-  if (hasSession) {
-    console.log('ℹ️ Sesión activa encontrada - redirigiendo a upload');
-    router.navigate(['/upload']);
-    return false;
-  }
-
-  return true;
-};
+export const guestGuard: CanActivateFn = authGuard;

@@ -188,8 +188,16 @@ class VideoProcessor:
                 f"Analysis complete. Found {total_violations} potential violations. Waiting for review."
             )
 
+            # Send additional progress update to ensure frontend receives the message
+            await progress_manager.update_progress(
+                video_id,
+                progress=100,
+                message=f"Analysis complete. Found {total_violations} violations requiring review."
+            )
+
             print(f"\n✅ [PIPELINE COMPLETE] Video: {video_id}")
             print(f"   Status: WAITING_FOR_REVIEW")
+            print(f"   Total violations pending review: {total_violations}")
             print(f"{'='*60}\n")
 
         except asyncio.TimeoutError:

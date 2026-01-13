@@ -8,6 +8,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     const token = authService.getToken();
     const isApiUrl = req.url.startsWith(environment.apiUrl) || req.url.startsWith('/api');
 
+    console.log('🔐 Auth Interceptor:', {
+        url: req.url,
+        isApiUrl,
+        hasToken: !!token,
+        tokenLength: token?.length,
+        environmentApiUrl: environment.apiUrl
+    });
+
     if (isApiUrl) {
         req = req.clone({
             withCredentials: true,

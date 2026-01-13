@@ -7,6 +7,22 @@ import { Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
 import { authClient, signIn, signUp, signOut, getSession } from '#lib/auth-client';
 
+/**
+ * Genera un UUID v4 compatible con navegador y servidor
+ */
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  // Fallback para Node.js o navegadores antiguos
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 // Tipos
 export interface User {
   id: string;
@@ -178,7 +194,7 @@ export class AuthService {
         if (result.data.token) {
           localStorage.setItem('session_token', result.data.token);
           this._session.set({
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             userId: result.data.user.id,
             token: result.data.token,
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
@@ -234,7 +250,7 @@ export class AuthService {
         if (result.data.token) {
           localStorage.setItem('session_token', result.data.token);
           this._session.set({
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             userId: result.data.user.id,
             token: result.data.token,
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
@@ -298,7 +314,18 @@ export class AuthService {
    * Obtiene el token de sesión actual (para headers de API)
    */
   getToken(): string | null {
-    return this._session()?.token ?? null;
+    // Primero intentar desde la sesión en memoria
+    const sessionToken = this._session()?.token;
+    if (sessionToken) {
+      return sessionToken;
+    }
+
+    // Fallback a localStorage si no está en memoria
+    if (this.isBrowser) {
+      return localStorage.getItem('session_token');
+    }
+
+    return null;
   }
 
   /**

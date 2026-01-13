@@ -25,10 +25,13 @@ export class ProcessingPage implements OnInit, OnDestroy {
       const videoId = this.route.snapshot.paramMap.get('id');
 
       if (currentPhase === 'waiting_for_review' && videoId) {
+        console.log('%c[PROCESSING] 🎯 Fase waiting_for_review detectada', 'color: #FF9800; font-weight: bold');
+        console.log(`%c[PROCESSING] 📡 Solicitando datos de violaciones para video: ${videoId}`, 'color: #2196F3');
+
         // Only navigate if we are coming from upload
         if (this.comingFrom() === 'upload') {
-          // Add slight delay to allow user to see "Analysis Complete" message if desired,
-          // but immediate is usually better for flow.
+          // Navigate to review page which will fetch violations
+          console.log('%c[PROCESSING] 🔀 Navegando a página de revisión...', 'color: #4CAF50');
           this.router.navigate(['/review', videoId]);
         }
       }
@@ -36,6 +39,7 @@ export class ProcessingPage implements OnInit, OnDestroy {
       // If completed, navigate to download
       // Can come from upload (no violations) or review (after edition)
       if (currentPhase === 'completed' && videoId) {
+        console.log('%c[PROCESSING] ✅ Proceso completado, navegando a descarga', 'color: #4CAF50; font-weight: bold');
         this.router.navigate(['/download', videoId]);
       }
     });

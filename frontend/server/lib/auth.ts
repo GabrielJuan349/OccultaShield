@@ -138,8 +138,13 @@ async function createAuth() {
     trustedOrigins: [
       'http://localhost:4200',  // Angular dev server
       'http://localhost:4201',  // Better-Auth server
+      'http://localhost:8980',  // Backend FastAPI
       'http://127.0.0.1:4200',
       'http://127.0.0.1:4201',
+      'http://127.0.0.1:8980',
+      'http://mise-ralph.uab.cat:4200',
+      'http://mise-ralph.uab.cat:4201',
+      'http://mise-ralph.uab.cat:8980',
       ENV.BASE_URL,
     ].filter(Boolean) as string[],
   });

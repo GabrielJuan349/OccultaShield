@@ -61,10 +61,23 @@ async def get_current_user(
 
         # Fallback to Better-Auth cookie
         if not token:
-            session_cookie = request.cookies.get("occultashield.session_token")
-            if session_cookie:
-                token = session_cookie
-                print(f"DEBUG: Token from cookie in get_current_user: {token[:20]}...")
+            # Intentar múltiples formatos de cookie que Better-Auth podría usar
+            cookie_names = [
+                "occultashield.session_token",
+                "occultashield_session.token",
+                "better-auth.session_token",
+                "occultashield-session-token",
+                "session_token",
+            ]
+
+            print(f"DEBUG [get_current_user]: Available cookies: {list(request.cookies.keys())}")
+
+            for cookie_name in cookie_names:
+                session_cookie = request.cookies.get(cookie_name)
+                if session_cookie:
+                    token = session_cookie
+                    print(f"DEBUG: Token from cookie '{cookie_name}': {token[:20] if len(token) > 20 else token}...")
+                    break
 
         if not token:
              raise HTTPException(

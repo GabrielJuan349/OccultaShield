@@ -31,21 +31,28 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configurar middleware de autenticación
-app.add_middleware(AuthMiddleware, surreal_conn=surreal_conn)
-
-# Configurar CORS
+# IMPORTANTE: CORS debe ir ANTES del middleware de autenticación
+# para que las preflight requests (OPTIONS) sean manejadas correctamente
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:4200",
         "http://localhost:4201",
-        "http://localhost:4000"
+        "http://localhost:4000",
+        "http://127.0.0.1:4200",
+        "http://127.0.0.1:4201",
+        "http://127.0.0.1:4000",
+        "http://mise-ralph.uab.cat:4200",
+        "http://mise-ralph.uab.cat:4201",
+        "http://mise-ralph.uab.cat:8980"
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Configurar middleware de autenticación (DESPUÉS de CORS)
+app.add_middleware(AuthMiddleware, surreal_conn=surreal_conn)
 
 # Inicializar auth service (si se usa globalmente)
 # auth_service = AuthService(surreal_conn)  <-- Removed per user request

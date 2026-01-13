@@ -89,21 +89,25 @@ class HybridDetectorManager:
             self.person_detector = None
         
         self.plate_detector = None
-        # Only load plate detector if a model is explicitly provided or we have a default path that exists
-        # For now, let's assume we might use standard yolov8n.pt if not specified, but usually plate detection needs specialized model.
+
+        # Intentar cargar modelo de placas
         if plate_model:
              try:
                 self.plate_detector = YOLO(plate_model)
                 logger.info(f"✓ YOLO plate detector loaded: {plate_model}")
              except Exception as e:
                 logger.warning(f"Could not load plate model: {e}")
-        elif config["plate"]: # Try loading default generic model simply to avoid error, though it won't detect plates well without fine-tuning
+        else:
+            # FALLBACK: Usar YOLO estándar para detectar vehículos (cars, trucks, buses)
+            # Esto permite al menos identificar zonas donde probablemente hay placas
             try:
-                # self.plate_detector = YOLO(config["plate"]) 
-                # Actually, standard YOLO models don't detect plates well. User notebook had "license_plate_detector.pt".
-                # We skip unless provided to avoid waste.
-                pass
-            except: pass
+                fallback_model = config["plate"]  # yolov8n.pt
+                self.plate_detector = YOLO(fallback_model)
+                logger.info(f"✓ YOLO vehicle detector loaded as plate fallback: {fallback_model}")
+                logger.warning("⚠️  Using vehicle detection as plate proxy. For better plate detection, provide a specialized model.")
+            except Exception as e:
+                logger.warning(f"Could not load vehicle detector fallback: {e}")
+                self.plate_detector = None
     
     def _numpy_to_tensor(self, frame: np.ndarray) -> torch.Tensor:
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -270,12 +274,29 @@ class HybridDetectorManager:
         # === PLATE DETECTION ===
         total_plates = 0
         if self.plate_detector is not None:
+            # Si usamos fallback, detectamos vehículos (car=2, truck=7, bus=5, motorcycle=3)
+            # Si es modelo especializado, confiar en que detecta placas directamente
+            vehicle_classes = [2, 3, 5, 7]  # car, motorcycle, bus, truck en COCO
+
             results_batch = self.plate_detector.predict(
-                frames, conf=self.person_confidence, verbose=False, device=self.device, batch=len(frames)
+                frames,
+                conf=self.person_confidence,
+                verbose=False,
+                device=self.device,
+                batch=len(frames)
             )
+
             for frame_idx, r in enumerate(results_batch):
                 frame_num = frame_nums[frame_idx]
                 for box in r.boxes:
+                    # Si tiene clase, verificar si es vehículo (fallback) o placa directa
+                    cls = int(box.cls[0]) if hasattr(box, 'cls') else None
+
+                    # Si es modelo COCO estándar y no es vehículo, skip
+                    if cls is not None and cls not in vehicle_classes and cls != 0:
+                        # 0 podría ser persona, pero en modelo de placas custom sería placa
+                        continue
+
                     x1, y1, x2, y2 = box.xyxy[0].tolist()
                     bbox = BoundingBox(x1, y1, x2, y2, float(box.conf[0]), frame_num)
                     if bbox.area >= MIN_DETECTION_AREA:

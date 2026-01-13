@@ -21,18 +21,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Permitir rutas públicas
         if request.url.path in self.public_routes or request.method == "OPTIONS":
             return await call_next(request)
-        
+
         # Verificar el header de autorización
         auth_header = request.headers.get("Authorization")
         token = None
-        
+
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
-        
-        # Fallback: Verificar query param (necesario para SSE)
+
+        # Fallback 1: Verificar query param (necesario para SSE)
         if not token:
             token = request.query_params.get("token")
-        
+
+        # Fallback 2: Verificar cookies de Better-Auth (occultashield.session_token)
+        if not token:
+            # Better-Auth usa el prefijo "occultashield" para las cookies
+            session_cookie = request.cookies.get("occultashield.session_token")
+            if session_cookie:
+                token = session_cookie
+                print(f"DEBUG: Token recuperado de cookie: {token[:20]}...")
+
         if not token:
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,

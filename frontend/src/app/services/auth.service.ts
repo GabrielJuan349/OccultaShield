@@ -41,7 +41,6 @@ export class AuthService {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
   private _sessionCheckPromise: Promise<boolean> | null = null;
-  private _hasCheckedSession = false; // Track if we've already verified session
 
   // Estado reactivo
   private readonly _user = signal<User | null>(null);
@@ -73,41 +72,48 @@ export class AuthService {
    * Verifica si hay una sesión activa
    */
   async checkSession(): Promise<boolean> {
-    if (!this.isBrowser) return false;
-
-    // Si ya tenemos un usuario autenticado Y ya hemos verificado antes, confiar en el estado local
-    if (this._user() !== null && this._hasCheckedSession) {
-      console.log('✅ AuthService: Usuario ya autenticado en memoria, usando estado local');
-      return true;
+    if (!this.isBrowser) {
+      console.log('🔄 AuthService: Not in browser, returning false');
+      return false;
     }
 
     // Si ya hay una verificación en progreso, esperar a que termine
     if (this._sessionCheckPromise) {
-      console.log('🔄 AuthService: Reutilizando verificación en progreso...');
+      console.log('🔄 AuthService: Esperando verificación en progreso...');
       return this._sessionCheckPromise;
+    }
+
+    // Si ya tenemos un usuario autenticado, verificar rápidamente
+    if (this._user() !== null) {
+      console.log('✅ AuthService: Usuario ya en memoria:', this._user()?.email);
+      return true;
     }
 
     this._isLoading.set(true);
     this._error.set(null);
-    console.log('🔄 AuthService: Checking session...');
+    console.log('🔄 AuthService: Iniciando checkSession...');
 
     // Create new promise for this check
     const checkPromise = (async () => {
       try {
+        console.log('🔄 AuthService: Calling getSession()...');
         const result = await getSession({
           fetchOptions: {
             credentials: 'include',
           },
         });
-        console.log('🔄 AuthService: getSession result:', result);
+        console.log('🔄 AuthService: getSession raw result:', JSON.stringify(result, null, 2));
 
         if (result.data?.session && result.data?.user) {
-          console.log('✅ AuthService: Session valid for user:', result.data.user.email);
+          const userData = result.data.user as unknown as User;
+          console.log('✅ AuthService: Sesión válida para:', userData.email);
+          console.log('   Rol del usuario:', userData.role || 'no role set');
 
           // Recuperar token de localStorage si better-auth no lo devuelve
           let token = result.data.session.token;
           if (!token) {
             token = localStorage.getItem('session_token') || '';
+            console.log('   Token recuperado de localStorage:', !!token);
           }
 
           this._user.set(result.data.user as User);
@@ -116,19 +122,23 @@ export class AuthService {
             token: token
           } as Session);
 
-          this._hasCheckedSession = true; // Mark as checked
           return true;
         }
 
-        console.warn('⚠️ AuthService: No active session found');
+        // Check if there was an error response
+        if (result.error) {
+          console.warn('⚠️ AuthService: getSession returned error:', result.error);
+        }
+
+        console.warn('⚠️ AuthService: No hay sesión activa');
         this._user.set(null);
         this._session.set(null);
-        localStorage.removeItem('session_token'); // Limpiar si no hay sesión válida
+        // Don't remove token here, it might still be valid for API calls
         return false;
       } catch (error) {
-        console.error('❌ AuthService: Error checking session:', error);
-        this._user.set(null);
-        this._session.set(null);
+        console.error('❌ AuthService: Error en checkSession:', error);
+        // Don't clear user state on error - the session might still be valid
+        // Only clear if we're sure it's an auth error
         return false;
       } finally {
         this._isLoading.set(false);
@@ -173,7 +183,6 @@ export class AuthService {
             token: result.data.token,
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
           });
-          this._hasCheckedSession = true;
         }
         return true;
       }
@@ -230,7 +239,6 @@ export class AuthService {
             token: result.data.token,
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
           });
-          this._hasCheckedSession = true;
         }
         return true;
       }
@@ -272,7 +280,6 @@ export class AuthService {
       this._user.set(null);
       this._session.set(null);
       this._isLoading.set(false);
-      this._hasCheckedSession = false;
       localStorage.removeItem('session_token');
 
       // Redirigir y forzar recarga completa para limpiar todo el estado

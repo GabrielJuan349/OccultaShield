@@ -1,6 +1,6 @@
 from typing import List, Tuple, Dict, Optional
 import numpy as np
-import cv2 # Added for KalmanFilter
+import cv2
 from scipy.optimize import linear_sum_assignment
 from .models import BoundingBox
 
@@ -35,8 +35,8 @@ class Track:
             [0,0,0,0,0,0,0,1]
         ], np.float32)
         
-        self.kf.processNoiseCov = np.eye(8, dtype=np.float32) * 0.03 # Tunable
-        self.kf.measurementNoiseCov = np.eye(4, dtype=np.float32) * 0.1 # Tunable
+        self.kf.processNoiseCov = np.eye(8, dtype=np.float32) * 0.03
+        self.kf.measurementNoiseCov = np.eye(4, dtype=np.float32) * 0.1
         
         # Initial state
         self.kf.statePost = np.array([bbox.x1, bbox.y1, bbox.x2, bbox.y2, 0, 0, 0, 0], np.float32)
@@ -70,21 +70,30 @@ class ObjectTracker:
     """
     Rastreador de objetos mejorado con Hungarian Algorithm para asignación óptima.
     """
-    def __init__(self, iou_threshold=0.3, max_age=30, min_hits=3):
+    def __init__(self, iou_threshold=0.3, max_age=1000, min_hits=0):
+        # max_age=1000: Tracks survive practically forever even if lost
+        # min_hits=0: Tracks are confirmed IMMEDIATELY
         self.iou_threshold = iou_threshold
         self.max_age = max_age
         self.min_hits = min_hits
         self.tracks = {}
         self.next_id = 1
+        print(f"   [TRACKER] Initialized: iou_threshold={iou_threshold}, max_age={max_age}, min_hits={min_hits}")
         
     def update(self, detections: List[Tuple[str, BoundingBox]], frame_num: int) -> List[Tuple[int, str, BoundingBox]]:
-        # Envejecer tracks existentes
-        for t in self.tracks.values():
+        # DEBUG: Log incoming detections
+        if detections:
+            print(f"   [TRACKER] Frame {frame_num}: {len(detections)} detections incoming")
+            for cls, bbox in detections:
+                print(f"      - {cls}: conf={bbox.confidence:.2f}, area={bbox.area:.0f}")
+        
+        # Envejecer tracks existentes y guardar predicciones
+        predictions = {}  # track_id -> predicted_bbox
+        for tid, t in self.tracks.items():
             t.age += 1
-            # Propagate prediction
-            t.predict()
+            pred = t.predict()
+            predictions[tid] = pred
             
-        confirmed_out = []
         dets_by_type = {}
         for cls, bbox in detections:
             dets_by_type.setdefault(cls, []).append(bbox)
@@ -92,44 +101,34 @@ class ObjectTracker:
         for cls, bboxes in dets_by_type.items():
             active_tracks = [t for t in self.tracks.values() if t.detection_type == cls]
             
-            # Si no hay tracks o detecciones, manejar casos edge
+            # Si no hay tracks, crear nuevos para todas las detecciones
             if not active_tracks:
                 for bbox in bboxes:
                     self._create_track(cls, bbox, frame_num)
+                    print(f"   [TRACKER] Created new track for {cls} (no active tracks)")
                 continue
                 
             if not bboxes:
                 continue
             
-            # MEJORADO: Construir matriz de costos para Hungarian Algorithm
+            # Construir matriz de costos para Hungarian Algorithm
             num_tracks = len(active_tracks)
             num_dets = len(bboxes)
             cost_matrix = np.ones((num_tracks, num_dets), dtype=np.float32)
             
             for i, trk in enumerate(active_tracks):
                 for j, det in enumerate(bboxes):
-                    # Use Kalman prediction for matching if available, else last_bbox
-                    # Here we use last known *state* which comes from prediction if predict() was called
-                    # But Track.predict() returns a BoundingBox object as prediction.
-                    # Ideally we match against Prediction.
-                    predicted_bbox = trk.predict() # This might double predict if not careful, but predict() updates internal state? 
-                    # Actually cv2.KalmanFilter predict updates statePre.
-                    # We called t.predict() in the loop above for all tracks.
-                    # So statePre is updated. We should use Pre state for matching.
-                    
-                    # Re-implementing:
-                    # Efficient way: Store prediction in track object during the first loop.
-                    
-                    # Since I modified the code above to call t.predict(), let's adjust this loop.
-                    # Getting prediction from the KF state directly or storing it on the object
-                    x1, y1, x2, y2 = trk.kf.statePre[:4].flatten()
-                    pred_box = BoundingBox(x1, y1, x2, y2, 0.0, frame_num)
+                    # Use stored prediction
+                    pred_box = predictions.get(trk.track_id)
+                    if pred_box is None:
+                        x1, y1, x2, y2 = trk.kf.statePre[:4].flatten()
+                        pred_box = BoundingBox(x1, y1, x2, y2, 0.0, frame_num)
                     
                     iou = self._calculate_iou(pred_box, det)
                     if iou >= self.iou_threshold:
                         cost_matrix[i, j] = 1.0 - iou  # Menor costo = mejor match
             
-            # MEJORADO: Asignación óptima con Hungarian Algorithm (scipy)
+            # Asignación óptima con Hungarian Algorithm
             row_indices, col_indices = linear_sum_assignment(cost_matrix)
             
             matched_tracks = set()
@@ -142,25 +141,30 @@ class ObjectTracker:
                     matched_dets.add(col)
                     self.tracks[track.track_id].update(bboxes[col], frame_num)
                     
-            # Check unconfirmed tracks (Kalman prediction update if missed? Maybe simple coasting?)
-            # For now, just let update handle matches.
-            pass
-                    
-            # Create new tracks for unmatches
+            # Create new tracks for unmatched detections
             for j, det in enumerate(bboxes):
                 if j not in matched_dets:
                     self._create_track(cls, det, frame_num)
+                    print(f"   [TRACKER] Created new track for unmatched {cls}")
                     
-        # Limpieza de tracks muertos y reporte de confirmados
+        # Limpieza de tracks y reporte
         dead = []
+        confirmed_out = []
+        
         for tid, t in self.tracks.items():
             if t.age > self.max_age:
                 dead.append(tid)
-            elif t.hits >= self.min_hits:
+                print(f"   [TRACKER] Track {tid} died (age > {self.max_age})")
+            else:
+                # Retornamos TODOS los tracks activos, independientemente de hits
+                # El usuario quiere ver todo, aunque sea pequeño.
                 confirmed_out.append((tid, t.detection_type, t.last_bbox))
                 
         for tid in dead:
             del self.tracks[tid]
+        
+        if confirmed_out:
+            print(f"   [TRACKER] Reporting {len(confirmed_out)} active tracks")
         
         return confirmed_out
 

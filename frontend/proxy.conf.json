@@ -1,4 +1,10 @@
 {
+    "/api/v1": {
+        "target": "http://localhost:8980",
+        "secure": false,
+        "logLevel": "debug",
+        "changeOrigin": true
+    },
     "/api": {
         "target": "http://localhost:4201",
         "secure": false,

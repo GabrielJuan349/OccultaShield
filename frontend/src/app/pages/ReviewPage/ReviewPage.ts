@@ -66,6 +66,14 @@ export class ReviewPage implements OnInit {
             confidence: v.confidence
           };
         });
+
+        // If no violations found, skip review and go directly to download
+        if (mapped.length === 0) {
+          console.log('No violations found - navigating to download page');
+          this.router.navigate(['/download', id]);
+          return;
+        }
+
         this.violations.set(mapped);
       },
       error: (err) => console.error("Error loading violations", err)

@@ -39,6 +39,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:4200",
+        "http://localhost:4201",
         "http://localhost:4000"
     ],
     allow_credentials=True,
@@ -59,5 +60,5 @@ def read_root():
 
 if __name__ == "__main__":
     host = os.getenv("SERVER_HOST", "0.0.0.0")
-    port = int(os.getenv("SERVER_PORT", 8900))
+    port = int(os.getenv("SERVER_PORT", 8980))
     uvicorn.run("main:app", host=host, port=port, reload=True)

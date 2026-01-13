@@ -101,7 +101,7 @@ app.all('/api/auth/*splat', async (req, res) => {
 // RUTAS DE ADMINISTRACIÓN (/api/admin/*)
 // Importado desde admin.ts - incluye approval workflow, settings, audit log
 // =========================================================================
-import { adminRouter, checkUserApproval } from '#server/admin';
+import { adminRouter } from '#server/admin';
 
 app.use('/api/admin', adminRouter);
 

@@ -2,13 +2,18 @@
 
 /* 1. TOKENS DE DISEÑO */
 :host {
-  --primary: #00A9E0;       /* Cyan brillante */
+  --primary: #00A9E0;
+  /* Cyan brillante */
   --primary-dark: #007BA7;
-  --secondary: #08203E;     /* Azul oscuro (Textos principales) */
-  --bg-page: #F3F6F9;       /* Fondo exacto de la imagen objetivo */
+  --secondary: #08203E;
+  /* Azul oscuro (Textos principales) */
+  --bg-page: #F3F6F9;
+  /* Fondo exacto de la imagen objetivo */
   --bg-card: #FFFFFF;
-  --bg-drop: #F8FAFC;       /* Fondo zona drop (Slate 50) */
-  --text-gray: #64748B;     /* Texto secundario */
+  --bg-drop: #F8FAFC;
+  /* Fondo zona drop (Slate 50) */
+  --text-gray: #64748B;
+  /* Texto secundario */
   --border-dashed: #CBD5E1;
   --success: #16A34A;
 
@@ -22,7 +27,8 @@
 /* 2. LAYOUT DE PÁGINA */
 .page-container {
   display: flex;
-  flex-direction: column; /* Apilar header y main verticalmente */
+  flex-direction: column;
+  /* Apilar header y main verticalmente */
   align-items: center;
   justify-content: center;
   width: 100%;
@@ -30,7 +36,8 @@
   padding: 2rem 1rem;
   box-sizing: border-box;
   font-family: var(--font-family);
-  background-color: var(--bg-page); /* Color de fondo corregido */
+  background-color: var(--bg-page);
+  /* Color de fondo corregido */
 }
 
 /* === NUEVOS ESTILOS DEL ENCABEZADO === */
@@ -145,9 +152,11 @@
 
 .upload-card {
   width: 100%;
-  max-width: 850px; /* Ancho más amplio */
+  max-width: 850px;
+  /* Ancho más amplio */
   background-color: var(--bg-card);
-  padding: 3.5rem; /* Padding interno de la tarjeta */
+  padding: 3.5rem;
+  /* Padding interno de la tarjeta */
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   /* Quitamos el borde sólido para coincidir con la imagen final */
@@ -166,7 +175,8 @@
   border-radius: 0.75rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  position: relative; /* Necesario para el icono absoluto */
+  position: relative;
+  /* Necesario para el icono absoluto */
 }
 
 .drop-area:hover,
@@ -191,18 +201,24 @@
 }
 
 @keyframes pulse-border {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 0 4px rgba(0, 169, 224, 0.2), 0 8px 25px rgba(0, 169, 224, 0.15);
   }
+
   50% {
     box-shadow: 0 0 0 8px rgba(0, 169, 224, 0.1), 0 12px 35px rgba(0, 169, 224, 0.25);
   }
 }
 
 @keyframes bounce-subtle {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-3px);
   }
@@ -293,7 +309,9 @@
   transform: translateY(-1px);
 }
 
-.hidden { display: none; }
+.hidden {
+  display: none;
+}
 
 /* 7. VISTA DE PROGRESO (Sin cambios) */
 .progress-area {
@@ -309,7 +327,10 @@
   color: var(--secondary);
 }
 
-.percent { color: var(--primary); font-weight: 700; }
+.percent {
+  color: var(--primary);
+  font-weight: 700;
+}
 
 .progress-track {
   width: 100%;
@@ -338,8 +359,27 @@
   animation: slideUp 0.3s ease-out;
 }
 
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 /* 8. BOTÓN CONTINUAR */
 .btn-continue {
@@ -381,4 +421,36 @@
 
 .btn-continue:hover .material-icons-outlined {
   transform: translateX(4px);
+}
+
+.btn-success {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 1rem 2rem;
+  background-color: var(--success);
+  color: white;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-size: 1.125rem;
+  font-weight: 700;
+  font-family: var(--font-family);
+  cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.3);
+  transition: var(--transition);
+  animation: slideUp 0.3s ease-out 0.2s both;
+}
+
+.btn-success:hover {
+  background-color: #15803d;
+  /* dark green */
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px -2px rgba(22, 163, 74, 0.4);
+}
+
+.btn-success .material-icons-outlined {
+  font-size: 1.25rem;
 }

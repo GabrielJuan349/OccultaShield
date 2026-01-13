@@ -11,23 +11,36 @@ import { AuthService } from '#services/auth.service';
 export const authGuard: CanActivateFn = async (route, state) => {
   const authService = inject(AuthService);
   const router = inject(Router);
+  const platformId = inject(PLATFORM_ID);
+
+  // En SSR, permitir render
+  if (!isPlatformBrowser(platformId)) {
+    console.log('🔐 authGuard: SSR detected, allowing render');
+    return true;
+  }
+
+  console.log('🔐 authGuard: Checking access to', state.url);
+  console.log('   isAuthenticated():', authService.isAuthenticated());
+  console.log('   user():', authService.user());
 
   // Si ya tenemos usuario en memoria, permitir acceso
   if (authService.isAuthenticated()) {
-    console.log('✅ Usuario autenticado - permitiendo acceso a:', state.url);
+    console.log('✅ authGuard: Usuario autenticado - permitiendo acceso');
     return true;
   }
 
   // Verificar sesión con el servidor (por si hay cookie válida)
+  console.log('🔐 authGuard: No hay usuario en memoria, verificando sesión...');
   const hasSession = await authService.checkSession();
+  console.log('🔐 authGuard: checkSession() result:', hasSession);
 
   if (hasSession) {
-    console.log('✅ Sesión válida - permitiendo acceso a:', state.url);
+    console.log('✅ authGuard: Sesión válida - permitiendo acceso');
     return true;
   }
 
   // Si no está autenticado, redirigir al login
-  console.log('⚠️ Acceso denegado - Redirigiendo al login');
+  console.log('⚠️ authGuard: Sin sesión válida - redirigiendo a /login');
   router.navigate(['/login'], {
     queryParams: { returnUrl: state.url },
   });

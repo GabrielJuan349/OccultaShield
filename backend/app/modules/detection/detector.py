@@ -193,21 +193,99 @@ class HybridDetectorManager:
         return results
     
     async def detect_all(self, frames: List[np.ndarray], frame_nums: List[int], conf_threshold: float = 0.5) -> Dict[int, List[Tuple[str, BoundingBox]]]:
-        all_detections = {fn: [] for fn in frame_nums}
+        """
+        Optimizado para GPU: procesa múltiples frames en batch y ejecuta detectores en paralelo.
+        """
+        import asyncio
+        import time
         
-        for frame, frame_num in zip(frames, frame_nums):
-            persons = self.detect_persons(frame, frame_num)
-            all_detections[frame_num].extend(persons)
+        all_detections = {fn: [] for fn in frame_nums}
+        start_time = time.time()
+        
+        # === BATCHED PERSON DETECTION (YOLO procesa múltiples frames a la vez) ===
+        total_persons = 0
+        if self.person_detector is not None:
+            # YOLO puede procesar un batch completo de frames
+            results_batch = self.person_detector.predict(
+                frames,
+                conf=self.person_confidence,
+                verbose=False,
+                device=self.device,
+                classes=[0],  # person class
+                retina_masks=True,
+                batch=len(frames)  # Batch size
+            )
             
-            if self.face_detector is not None:
-                tensor = self._numpy_to_tensor(frame)
-                faces = self.detect_faces_kornia(tensor, frame_num)
-            else:
+            for frame_idx, r in enumerate(results_batch):
+                frame_num = frame_nums[frame_idx]
+                masks_xy = r.masks.xy if r.masks is not None else []
+                
+                for i, box in enumerate(r.boxes):
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()
+                    mask_points = None
+                    if i < len(masks_xy):
+                        mask_points = masks_xy[i].flatten().tolist()
+                    
+                    bbox = BoundingBox(x1, y1, x2, y2, float(box.conf[0]), frame_num, mask=mask_points)
+                    if bbox.area >= MIN_DETECTION_AREA:
+                        all_detections[frame_num].append(("person", bbox))
+                        total_persons += 1
+        
+        # === PARALLEL FACE DETECTION ===
+        total_faces = 0
+        if self.face_detector is not None:
+            # Convertir todos los frames a tensores y concatenar para batch
+            tensors = [self._numpy_to_tensor(f) for f in frames]
+            batch_tensor = torch.cat(tensors, dim=0)
+            
+            with torch.no_grad():
+                detections = self.face_detector(batch_tensor)
+            
+            for frame_idx, det in enumerate(detections):
+                frame_num = frame_nums[frame_idx]
+                try:
+                    face_result = FaceDetectorResult(det)
+                    if face_result.score.numel() == 0:
+                        continue
+                    
+                    top_left = face_result.top_left.int().tolist()
+                    bottom_right = face_result.bottom_right.int().tolist()
+                    scores = face_result.score.tolist()
+                    
+                    for score, tl, br in zip(scores, top_left, bottom_right):
+                        if score >= self.face_confidence:
+                            bbox = BoundingBox(float(tl[0]), float(tl[1]), float(br[0]), float(br[1]), float(score), frame_num)
+                            if bbox.area >= MIN_DETECTION_AREA:
+                                all_detections[frame_num].append(("face", bbox))
+                                total_faces += 1
+                except Exception:
+                    pass
+        else:
+            # Fallback to OpenCV (sequential)
+            for frame, frame_num in zip(frames, frame_nums):
                 faces = self.detect_faces_opencv(frame, frame_num)
-            all_detections[frame_num].extend(faces)
-            
-            plates = self.detect_plates(frame, frame_num)
-            all_detections[frame_num].extend(plates)
+                all_detections[frame_num].extend(faces)
+                total_faces += len(faces)
+        
+        # === PLATE DETECTION ===
+        total_plates = 0
+        if self.plate_detector is not None:
+            results_batch = self.plate_detector.predict(
+                frames, conf=self.person_confidence, verbose=False, device=self.device, batch=len(frames)
+            )
+            for frame_idx, r in enumerate(results_batch):
+                frame_num = frame_nums[frame_idx]
+                for box in r.boxes:
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()
+                    bbox = BoundingBox(x1, y1, x2, y2, float(box.conf[0]), frame_num)
+                    if bbox.area >= MIN_DETECTION_AREA:
+                        all_detections[frame_num].append(("license_plate", bbox))
+                        total_plates += 1
+        
+        elapsed = time.time() - start_time
+        if total_persons > 0 or total_faces > 0 or total_plates > 0:
+            fps = len(frames) / elapsed if elapsed > 0 else 0
+            print(f"   [DETECTOR] Batch {len(frames)} frames in {elapsed:.2f}s ({fps:.1f} FPS): {total_persons} persons, {total_faces} faces, {total_plates} plates")
         
         return all_detections
     
@@ -254,82 +332,128 @@ class VideoDetector:
         logger.info(f"VideoDetector initialized: {self.hybrid_manager.get_info()}")
 
     async def process_video(
-        self, 
+        self,
         video_id: str,
-        video_path: str, 
+        video_path: str,
         output_dir: str
     ) -> DetectionResult:
-        
+
         start_time = time.time()
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
-        
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            raise ValueError(f"Could not open video: {video_path}")
-            
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        
-        tracker = ObjectTracker()
-        cm = CaptureManager()
-        tracked_objects = {}
-        frame_num = 0
-        
-        frame_buffer = []
-        frame_nums = []
-        
-        logger.info(f"Processing video {video_id}: {total_frames} frames at {fps} FPS")
-        
-        # Notify start
-        await progress_manager.change_phase(
-            video_id, ProcessingPhase.DETECTING, "Iniciando detección de objetos..."
-        )
-        
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                if frame_buffer:
+
+        cap = None
+        try:
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                raise ValueError(f"Could not open video: {video_path}")
+
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+            tracker = ObjectTracker()
+            cm = CaptureManager()
+            tracked_objects = {}
+            frame_num = 0
+
+            frame_buffer = []
+            frame_nums = []
+
+            logger.info(f"Processing video {video_id}: {total_frames} frames at {fps} FPS")
+
+            # Notify start
+            await progress_manager.change_phase(
+                video_id, ProcessingPhase.DETECTING, "Iniciando detección de objetos..."
+            )
+
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    if frame_buffer:
+                        await self._process_batch(
+                            video_id, frame_buffer, frame_nums, tracker, cm,
+                            tracked_objects, output_path, fps, total_frames
+                        )
+                    break
+
+                frame_num += 1
+                frame_buffer.append(frame)
+                frame_nums.append(frame_num)
+
+                if len(frame_buffer) >= self.batch_size:
                     await self._process_batch(
                         video_id, frame_buffer, frame_nums, tracker, cm,
                         tracked_objects, output_path, fps, total_frames
                     )
-                break
-            
-            frame_num += 1
-            frame_buffer.append(frame)
-            frame_nums.append(frame_num)
-            
-            if len(frame_buffer) >= self.batch_size:
-                await self._process_batch(
-                    video_id, frame_buffer, frame_nums, tracker, cm,
-                    tracked_objects, output_path, fps, total_frames
-                )
-                frame_buffer = []
-                frame_nums = []
-                
-        cap.release()
-        
-        processing_time = time.time() - start_time
-        
-        # Notify completion of detection phase
-        await progress_manager.update_progress(
-            video_id, 100, total_frames, total_frames, "Detección completada"
-        )
-        
-        return DetectionResult(
-            video_path=video_path, 
-            total_frames=total_frames, 
-            fps=fps, 
-            duration_seconds=total_frames/fps if fps > 0 else 0, 
-            width=width, 
-            height=height, 
-            detections=list(tracked_objects.values()),
-            frames_processed=frame_num,
-            processing_time_seconds=processing_time
-        )
+                    frame_buffer = []
+                    frame_nums = []
+
+            processing_time = time.time() - start_time
+
+            # Notify completion of detection phase
+            await progress_manager.update_progress(
+                video_id, 100, total_frames, total_frames, "Detección completada"
+            )
+
+            # Summary log
+            print(f"\n📊 [DETECTION SUMMARY]")
+            print(f"   Total frames processed: {frame_num}")
+            print(f"   Total unique tracks: {len(tracked_objects)}")
+            for tid, track in tracked_objects.items():
+                print(f"      Track {tid}: {track.detection_type}, frames {track.first_frame}-{track.last_frame}, {len(track.captures)} captures")
+            print(f"   Processing time: {processing_time:.2f}s ({total_frames/processing_time:.1f} FPS)")
+
+            return DetectionResult(
+                video_path=video_path,
+                total_frames=total_frames,
+                fps=fps,
+                duration_seconds=total_frames/fps if fps > 0 else 0,
+                width=width,
+                height=height,
+                detections=list(tracked_objects.values()),
+                frames_processed=frame_num,
+                processing_time_seconds=processing_time
+            )
+
+        except Exception as e:
+            logger.error(f"Detection failed for video {video_id}: {e}", exc_info=True)
+            # Clean up captured files on error
+            try:
+                if output_path.exists():
+                    import shutil
+                    shutil.rmtree(output_path)
+                    logger.info(f"Cleaned up capture directory: {output_path}")
+            except Exception as cleanup_error:
+                logger.error(f"Failed to cleanup captures: {cleanup_error}")
+            raise
+
+        finally:
+            # Always release video capture
+            if cap is not None:
+                cap.release()
+                logger.debug(f"Released video capture for {video_id}")
+
+            # Phase 2.4: Release GPU memory explicitly (CRITICAL for NVIDIA DGX Spark)
+            if torch.cuda.is_available():
+                try:
+                    allocated = torch.cuda.memory_allocated() / 1024**3  # GB
+                    reserved = torch.cuda.memory_reserved() / 1024**3    # GB
+                    logger.info(f"GPU memory before cleanup: allocated={allocated:.2f}GB, reserved={reserved:.2f}GB")
+
+                    # Clear GPU cache
+                    torch.cuda.empty_cache()
+
+                    # Synchronize to ensure all GPU operations finished
+                    torch.cuda.synchronize()
+
+                    allocated_after = torch.cuda.memory_allocated() / 1024**3
+                    reserved_after = torch.cuda.memory_reserved() / 1024**3
+                    logger.info(f"GPU memory after cleanup: allocated={allocated_after:.2f}GB, reserved={reserved_after:.2f}GB")
+                    logger.info(f"GPU memory freed: {(reserved - reserved_after):.2f}GB")
+                except Exception as gpu_cleanup_error:
+                    logger.error(f"Failed to cleanup GPU memory: {gpu_cleanup_error}")
 
     async def _process_batch(
         self, 

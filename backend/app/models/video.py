@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 class VideoStatus(str, Enum):
     PENDING = "pending"
+    UPLOADED = "uploaded"  # Added: status after successful upload
     PROCESSING = "processing"
     DETECTED = "detected"
     VERIFIED = "verified"

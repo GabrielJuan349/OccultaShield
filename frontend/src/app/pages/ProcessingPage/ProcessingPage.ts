@@ -27,14 +27,15 @@ export class ProcessingPage implements OnInit, OnDestroy {
       if (currentPhase === 'waiting_for_review' && videoId) {
         // Only navigate if we are coming from upload
         if (this.comingFrom() === 'upload') {
-          // Add slight delay to allow user to see "Analysis Complete" message if desired, 
+          // Add slight delay to allow user to see "Analysis Complete" message if desired,
           // but immediate is usually better for flow.
           this.router.navigate(['/review', videoId]);
         }
       }
 
-      // If completed and we came from review -> go to download
-      if (currentPhase === 'completed' && videoId && this.comingFrom() === 'review') {
+      // If completed, navigate to download
+      // Can come from upload (no violations) or review (after edition)
+      if (currentPhase === 'completed' && videoId) {
         this.router.navigate(['/download', videoId]);
       }
     });
@@ -45,9 +46,15 @@ export class ProcessingPage implements OnInit, OnDestroy {
     const videoId = this.route.snapshot.paramMap.get('id');
     const from = this.route.snapshot.queryParamMap.get('from');
 
+    console.log('ProcessingPage ngOnInit - videoId:', videoId, 'from:', from);
+
     if (videoId) {
+      console.log('Connecting to SSE for video:', videoId);
       this.sse.connect(videoId);
+    } else {
+      console.error('No video ID found in route');
     }
+
     if (from) {
       this.comingFrom.set(from);
     }

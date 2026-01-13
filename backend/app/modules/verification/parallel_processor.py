@@ -31,7 +31,10 @@ class ParallelProcessor:
         Groups by track_id, processes frames in parallel, then aggregates.
         """
         if not requests:
+            print(f"   [VERIFIER] No verification requests to process")
             return []
+        
+        print(f"   [VERIFIER] Starting verification of {len(requests)} requests...")
         
         # --- Group requests by track_id for consensus ---
         track_requests: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
@@ -43,7 +46,11 @@ class ParallelProcessor:
         completed_tracks = 0
         final_results = []
         
+        print(f"   [VERIFIER] Grouped into {total_tracks} tracks for consensus analysis")
+        
         for track_id, track_reqs in track_requests.items():
+            print(f"   [VERIFIER] Processing track {track_id} ({len(track_reqs)} frames)...")
+            
             # Process all frames for this track in parallel
             frame_tasks = []
             for req in track_reqs:
@@ -57,6 +64,9 @@ class ParallelProcessor:
             consensus_result["track_id"] = track_id
             consensus_result["detection_id"] = track_reqs[0]["detection"].get("id")
             
+            violation_status = "⚠️ VIOLATION" if consensus_result.get("is_violation") else "✓ OK"
+            print(f"      Track {track_id}: {violation_status} (confidence: {consensus_result.get('final_confidence', 0):.2f})")
+            
             final_results.append(consensus_result)
             
             completed_tracks += 1
@@ -68,6 +78,7 @@ class ParallelProcessor:
                 total_tracks
             )
         
+        print(f"   [VERIFIER] ✅ Completed verification of {total_tracks} tracks")
         return final_results
         
     async def _process_single(self, image_path: str, detection: Dict[str, Any]) -> Dict[str, Any]:

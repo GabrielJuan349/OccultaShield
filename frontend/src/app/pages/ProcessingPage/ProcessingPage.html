@@ -110,14 +110,17 @@
     <!-- Botones de acción -->
     @if (sse.isError()) {
       <div class="error-actions">
+        @if (sse.redirectCountdown() !== null) {
+          <p class="redirect-notice">Redirecting to upload in {{ sse.redirectCountdown() }} seconds...</p>
+        }
         <button class="btn-retry" (click)="retry()">
           <span class="material-symbols-outlined">refresh</span>
           Retry Processing
         </button>
-        <button class="btn-back" [routerLink]="comingFrom()">
+        <a class="btn-back" routerLink="/upload">
           <span class="material-symbols-outlined">arrow_back</span>
-          Back to {{ comingFrom() === 'upload' ? 'Upload' : 'Review' }}
-        </button>
+          Back to Upload Now
+        </a>
       </div>
     }
 

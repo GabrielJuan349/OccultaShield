@@ -9,7 +9,7 @@
             <div class="setting-header">
                 <h3>Modo Beta Cerrado</h3>
                 <label class="toggle-switch">
-                    <input type="checkbox" [checked]="settings()?.closedBetaMode" (change)="toggleClosedBeta()">
+                    <input type="checkbox" [checked]="settings().closedBetaMode" (change)="toggleClosedBeta()">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -17,8 +17,8 @@
                 Cuando está activado, los nuevos usuarios que se registren necesitarán ser aprobados
                 manualmente por un administrador antes de poder acceder a la plataforma.
             </p>
-            <div class="setting-status" [class.active]="settings()?.closedBetaMode">
-                @if (settings()?.closedBetaMode) {
+            <div class="setting-status" [class.active]="settings().closedBetaMode">
+                @if (settings().closedBetaMode) {
                 <span class="status-badge pending">🔒 Activo</span>
                 <span>Los nuevos registros requieren aprobación</span>
                 } @else {

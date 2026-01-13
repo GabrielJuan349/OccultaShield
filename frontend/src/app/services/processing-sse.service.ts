@@ -2,7 +2,6 @@
 import { Injectable, signal, computed, inject, PLATFORM_ID, OnDestroy } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
-import { environment } from '#environments/environment';
 import {
   ProcessingPhase,
   ProcessingState,
@@ -28,6 +27,9 @@ export class ProcessingSSEService implements OnDestroy {
   private eventSource: EventSource | null = null;
   private startTime: number = 0;
   private elapsedInterval: ReturnType<typeof setInterval> | null = null;
+  private redirectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private countdownInterval: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // ===== SIGNALS (Estado Reactivo) =====
 
@@ -44,6 +46,7 @@ export class ProcessingSSEService implements OnDestroy {
   private readonly _errorMessage = signal<string | null>(null);
   private readonly _redirectUrl = signal<string | null>(null);
   private readonly _isConnected = signal<boolean>(false);
+  private readonly _redirectCountdown = signal<number | null>(null);
 
   // ===== SIGNALS PÚBLICOS (ReadOnly) =====
 
@@ -57,6 +60,7 @@ export class ProcessingSSEService implements OnDestroy {
   readonly errorMessage = this._errorMessage.asReadonly();
   readonly redirectUrl = this._redirectUrl.asReadonly();
   readonly isConnected = this._isConnected.asReadonly();
+  readonly redirectCountdown = this._redirectCountdown.asReadonly();
 
   // ===== COMPUTED SIGNALS =====
 
@@ -132,9 +136,13 @@ export class ProcessingSSEService implements OnDestroy {
     this.disconnect();
     this.reset();
 
-    const baseUrl = `${environment.apiUrl}/process`;
+    // Connect directly to backend for SSE (proxy doesn't support EventSource well)
+    const baseUrl = `http://localhost:8980/api/v1/process`;
     const token = this.authService.getToken();
     const url = `${baseUrl}/${videoId}/progress${token ? `?token=${token}` : ''}`;
+
+    console.log('SSE connecting to URL:', url);
+    console.log('Video ID:', videoId);
 
     this.startTime = Date.now();
     this.startElapsedTimer();
@@ -152,7 +160,11 @@ export class ProcessingSSEService implements OnDestroy {
 
       // Intentar reconectar después de 3 segundos
       if (this.eventSource?.readyState === EventSource.CLOSED) {
-        setTimeout(() => this.connect(videoId), 3000);
+        // Limpiar timeout anterior si existe
+        if (this.reconnectTimeout) {
+          clearTimeout(this.reconnectTimeout);
+        }
+        this.reconnectTimeout = setTimeout(() => this.connect(videoId), 3000);
       }
     };
 
@@ -182,10 +194,28 @@ export class ProcessingSSEService implements OnDestroy {
     this._isError.set(false);
     this._errorMessage.set(null);
     this._redirectUrl.set(null);
+    this._redirectCountdown.set(null);
   }
 
   ngOnDestroy(): void {
     this.disconnect();
+    this.stopElapsedTimer();
+
+    // Limpiar todos los timers para evitar memory leaks
+    if (this.redirectTimeout) {
+      clearTimeout(this.redirectTimeout);
+      this.redirectTimeout = null;
+    }
+
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
+
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
   }
 
   // ===== MÉTODOS PRIVADOS =====
@@ -272,7 +302,7 @@ export class ProcessingSSEService implements OnDestroy {
       this.stopElapsedTimer();
 
       // Auto-redirect después de 2 segundos
-      setTimeout(() => {
+      this.redirectTimeout = setTimeout(() => {
         if (data.redirect_url) {
           this.router.navigateByUrl(data.redirect_url);
         }
@@ -290,6 +320,28 @@ export class ProcessingSSEService implements OnDestroy {
 
       this.stopElapsedTimer();
       this.disconnect();
+
+      // Start countdown and redirect to upload after 5 seconds
+      this._redirectCountdown.set(5);
+
+      // Limpiar countdown anterior si existe
+      if (this.countdownInterval) {
+        clearInterval(this.countdownInterval);
+      }
+
+      this.countdownInterval = setInterval(() => {
+        const current = this._redirectCountdown();
+        if (current !== null && current > 1) {
+          this._redirectCountdown.set(current - 1);
+        } else {
+          if (this.countdownInterval) {
+            clearInterval(this.countdownInterval);
+            this.countdownInterval = null;
+          }
+          this._redirectCountdown.set(null);
+          this.router.navigate(['/upload']);
+        }
+      }, 1000);
     });
 
     // Heartbeat

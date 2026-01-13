@@ -15,6 +15,7 @@ import {
   ErrorEvent
 } from '#interface/processing-events';
 import { AuthService } from './auth.service';
+import { VideoService, ViolationCard } from './video.service';
 import { environment } from '#environments/environment';
 
 @Injectable({
@@ -24,6 +25,7 @@ export class ProcessingSSEService implements OnDestroy {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly router = inject(Router);
   private readonly authService = inject(AuthService);
+  private readonly videoService = inject(VideoService);
 
   private eventSource: EventSource | null = null;
   private startTime: number = 0;
@@ -34,6 +36,7 @@ export class ProcessingSSEService implements OnDestroy {
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 10;
   private currentVideoId: string | null = null;
+  private violationsFetched: boolean = false;  // Track if we've already fetched violations
 
   // ===== SIGNALS (Estado Reactivo) =====
 
@@ -52,8 +55,13 @@ export class ProcessingSSEService implements OnDestroy {
   private readonly _isConnected = signal<boolean>(false);
   private readonly _redirectCountdown = signal<number | null>(null);
 
+  // Violations from verification module (fetched when waiting_for_review)
+  private readonly _violations = signal<ViolationCard[]>([]);
+  private readonly _violationsLoading = signal<boolean>(false);
+  private readonly _violationsError = signal<string | null>(null);
+
   // Live updates (últimos 5 eventos)
-  private readonly _liveUpdates = signal<Array<{timestamp: string, message: string, type: string}>>([]);
+  private readonly _liveUpdates = signal<Array<{ timestamp: string, message: string, type: string }>>([]);
 
   // Para cálculo dinámico de tiempo restante
   private lastProgressUpdate: number = 0;
@@ -73,6 +81,11 @@ export class ProcessingSSEService implements OnDestroy {
   readonly isConnected = this._isConnected.asReadonly();
   readonly redirectCountdown = this._redirectCountdown.asReadonly();
   readonly liveUpdates = this._liveUpdates.asReadonly();
+
+  // Violations signals (public readonly)
+  readonly violations = this._violations.asReadonly();
+  readonly violationsLoading = this._violationsLoading.asReadonly();
+  readonly violationsError = this._violationsError.asReadonly();
 
   // ===== COMPUTED SIGNALS =====
 
@@ -256,6 +269,11 @@ export class ProcessingSSEService implements OnDestroy {
     this._redirectUrl.set(null);
     this._redirectCountdown.set(null);
     this._liveUpdates.set([]);
+    // Reset violations state
+    this._violations.set([]);
+    this._violationsLoading.set(false);
+    this._violationsError.set(null);
+    this.violationsFetched = false;
     this.reconnectAttempts = 0;
     this.currentVideoId = null;
     this.lastProgressUpdate = 0;
@@ -320,6 +338,12 @@ export class ProcessingSSEService implements OnDestroy {
       this._currentItem.set(data.current || 0);
       this._totalItems.set(data.total || 0);
 
+      // 🎯 Si el estado inicial ya es waiting_for_review, hacer fetch de violations
+      if (data.phase === 'waiting_for_review' && this.currentVideoId && !this.violationsFetched) {
+        console.log('%c[SSE] 📋 Initial state waiting_for_review - Solicitando violations...', 'color: #E91E63; font-weight: bold');
+        this.fetchViolations(this.currentVideoId);
+      }
+
       // Live update
       this.addLiveUpdate(`Connected - ${data.phase} phase`, 'success');
     });
@@ -338,6 +362,12 @@ export class ProcessingSSEService implements OnDestroy {
 
       if (data.estimated_time_seconds) {
         this._estimatedTime.set(data.estimated_time_seconds);
+      }
+
+      // 🎯 Detectar waiting_for_review y hacer petición de violations
+      if (data.phase === 'waiting_for_review' && this.currentVideoId && !this.violationsFetched) {
+        console.log('%c[SSE] 📋 Phase waiting_for_review detectada - Solicitando violations...', 'color: #E91E63; font-weight: bold');
+        this.fetchViolations(this.currentVideoId);
       }
 
       // Live update
@@ -521,5 +551,50 @@ export class ProcessingSSEService implements OnDestroy {
       'minor': 'child_care'
     };
     return icons[type] || 'help_outline';
+  }
+
+  /**
+   * Fetches all violations from the verification module when waiting_for_review phase is detected.
+   * This preloads the violations data so it's available when navigating to the review page.
+   */
+  private fetchViolations(videoId: string): void {
+    if (this.violationsFetched) {
+      console.log('%c[SSE] 📋 Violations already fetched, skipping...', 'color: #9E9E9E');
+      return;
+    }
+
+    this.violationsFetched = true;
+    this._violationsLoading.set(true);
+    this._violationsError.set(null);
+
+    console.log(`%c[SSE] 📋 Fetching violations for video: ${videoId}`, 'color: #E91E63; font-weight: bold');
+
+    this.videoService.getViolations(videoId).subscribe({
+      next: (response) => {
+        console.log('%c[SSE] ✅ Violations received:', 'color: #4CAF50; font-weight: bold', {
+          total: response.total,
+          itemsCount: response.items.length
+        });
+
+        // Log full JSON response for debugging
+        console.log('%c[SSE] 📦 Full violations JSON:', 'color: #2196F3; font-weight: bold');
+        console.log(JSON.stringify(response, null, 2));
+
+        this._violations.set(response.items);
+        this._violationsLoading.set(false);
+
+        // Live update
+        this.addLiveUpdate(`Loaded ${response.items.length} violations`, 'success');
+      },
+      error: (err) => {
+        console.error('%c[SSE] ❌ Error fetching violations:', 'color: #f44336; font-weight: bold', err);
+        this._violationsError.set(err.userMessage || 'Error loading violations');
+        this._violationsLoading.set(false);
+        this.violationsFetched = false; // Allow retry
+
+        // Live update
+        this.addLiveUpdate('Failed to load violations', 'error');
+      }
+    });
   }
 }

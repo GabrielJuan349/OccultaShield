@@ -5,24 +5,43 @@
       <img class="brand-icon" src="logo_1_escudo_sin.png" alt="OccultaShield Logo" />
       <h1 class="page-title">OccultaShield Privacy Review</h1>
     </div>
-    <p class="page-subtitle">
-      Our analysis detected potential GDPR violations in your video.
-      Please review each item and choose a modification to ensure compliance.
-    </p>
+    @if (violations().length > 0) {
+      <p class="page-subtitle">
+        Our analysis detected potential GDPR violations in your video.
+        Please review each item and choose a modification to ensure compliance.
+      </p>
+    } @else {
+      <p class="page-subtitle">
+        No privacy violations were detected in your video.
+        Your content appears to be GDPR compliant. You can proceed to download.
+      </p>
+    }
   </header>
 
   <main class="content-list">
 
-    @for (violation of violations(); track violation.id) {
-      <app-violation-card
-        [data]="violation"
-        (selectionChange)="updateViolation(violation.id, $event)"
-      />
+    @if (violations().length > 0) {
+      @for (violation of violations(); track violation.id) {
+        <app-violation-card
+          [data]="violation"
+          (selectionChange)="updateViolation(violation.id, $event)"
+        />
+      }
+    } @else {
+      <div class="no-violations-message">
+        <span class="material-symbols-outlined success-icon">verified</span>
+        <h2>All Clear!</h2>
+        <p>Your video has been analyzed and no privacy concerns were found.</p>
+      </div>
     }
 
     <div class="actions-footer">
       <button class="btn-primary" (click)="applyAndContinue()">
-        Apply Modifications & Continue
+        @if (violations().length > 0) {
+          Apply Modifications & Continue
+        } @else {
+          Continue to Download
+        }
       </button>
     </div>
 

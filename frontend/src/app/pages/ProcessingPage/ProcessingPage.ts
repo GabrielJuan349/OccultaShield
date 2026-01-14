@@ -1,7 +1,9 @@
 import { DecimalPipe, NgOptimizedImage } from '@angular/common';
 import { ChangeDetectionStrategy, Component, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { ProcessingSSEService } from '#services/processing-sse.service';
+import { environment } from '#environments/environment';
 
 @Component({
   imports: [DecimalPipe, NgOptimizedImage, RouterLink],
@@ -13,77 +15,80 @@ export class ProcessingPage implements OnInit, OnDestroy {
 
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly http = inject(HttpClient);
   protected readonly sse = inject(ProcessingSSEService);
 
   // Determina si viene de upload (va a review) o de review (va a download)
   protected readonly comingFrom = signal<string>('upload');
+  private readonly videoId = signal<string | null>(null);
 
   // Track if we've already navigated to prevent duplicate navigations
   private hasNavigatedToReview = false;
   private hasNavigatedToDownload = false;
 
   constructor() {
-    // Effect to monitor phase changes AND initial state
-    // This will trigger when phase signal changes, including when initial_state sets it
+    // Effect: Monitorear cambios de fase para navegación
     effect(() => {
       const currentPhase = this.sse.phase();
       const isConnected = this.sse.isConnected();
-      const videoId = this.route.snapshot.paramMap.get('id');
+      const currentVideoId = this.videoId();
 
-      console.log(`%c[PROCESSING] 📡 Phase check: ${currentPhase}, connected: ${isConnected}, videoId: ${videoId}`, 'color: #9C27B0');
+      console.log(`%c[PROCESSING] 📡 Phase check: ${currentPhase}, connected: ${isConnected}`, 'color: #9C27B0');
 
-      // Only proceed if we're connected (meaning we have valid state from server)
-      if (!isConnected || !videoId) return;
+      // Solo proceder si estamos conectados
+      if (!isConnected || !currentVideoId) return;
 
       if (currentPhase === 'waiting_for_review' && !this.hasNavigatedToReview) {
         console.log('%c[PROCESSING] 🎯 Fase waiting_for_review detectada', 'color: #FF9800; font-weight: bold');
-        console.log(`%c[PROCESSING] 📡 Solicitando datos de violaciones para video: ${videoId}`, 'color: #2196F3');
 
-        // Only navigate if we are coming from upload
+        // Solo navegar si venimos de upload
         if (this.comingFrom() === 'upload') {
-          // Navigate to review page which will fetch violations
           console.log('%c[PROCESSING] 🔀 Navegando a página de revisión...', 'color: #4CAF50');
           this.hasNavigatedToReview = true;
-          // Small delay to ensure SSE state is fully processed
           setTimeout(() => {
-            this.router.navigate(['/review', videoId]);
+            this.router.navigate(['/review', currentVideoId]);
           }, 100);
         }
       }
 
-      // If completed, navigate to download
-      // Can come from upload (no violations) or review (after edition)
+      // Si está completado, navegar a download
       if (currentPhase === 'completed' && !this.hasNavigatedToDownload) {
         console.log('%c[PROCESSING] ✅ Proceso completado, navegando a descarga', 'color: #4CAF50; font-weight: bold');
         this.hasNavigatedToDownload = true;
         setTimeout(() => {
-          this.router.navigate(['/download', videoId]);
+          this.router.navigate(['/download', currentVideoId]);
         }, 100);
       }
     });
   }
 
   ngOnInit(): void {
-    // Leer ID de la ruta
     const videoId = this.route.snapshot.paramMap.get('id');
     const from = this.route.snapshot.queryParamMap.get('from');
 
-    console.log('ProcessingPage ngOnInit - videoId:', videoId, 'from:', from);
+    console.log('%c[PROCESSING] 🎬 Iniciando ProcessingPage', 'color: #673AB7; font-weight: bold');
+    console.log(`   videoId: ${videoId}, from: ${from}`);
 
-    // Reset navigation flags when entering the page
+    // Reset flags
     this.hasNavigatedToReview = false;
     this.hasNavigatedToDownload = false;
 
-    if (videoId) {
-      console.log('Connecting to SSE for video:', videoId);
-      this.sse.connect(videoId);
-    } else {
-      console.error('No video ID found in route');
+    if (!videoId) {
+      console.error('%c[PROCESSING] ❌ No video ID found in route', 'color: #f44336');
+      return;
     }
+
+    // Setear el videoId como signal para que el effect lo detecte
+    this.videoId.set(videoId);
 
     if (from) {
       this.comingFrom.set(from);
     }
+
+    // Conectar al SSE - el backend detectará la conexión y auto-iniciará el procesamiento
+    console.log('%c[PROCESSING] 🔌 Conectando al SSE...', 'color: #2196F3');
+    console.log('%c[PROCESSING] 💡 El backend auto-iniciará el procesamiento al detectar la conexión', 'color: #2196F3');
+    this.sse.connect(videoId);
   }
 
   ngOnDestroy(): void {

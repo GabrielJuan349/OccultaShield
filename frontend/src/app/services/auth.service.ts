@@ -6,6 +6,10 @@ import { Injectable, signal, computed, inject, PLATFORM_ID } from '@angular/core
 import { Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
 import { authClient, signIn, signUp, signOut, getSession } from '#lib/auth-client';
+import type { User, Session, UsageType } from '#interface/auth.interface';
+
+// Re-export for backwards compatibility
+export type { User, Session, UsageType };
 
 /**
  * Genera un UUID v4 compatible con navegador y servidor
@@ -21,32 +25,6 @@ function generateUUID(): string {
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
-}
-
-// Tipos
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  image?: string;
-  role?: string;
-  emailVerified: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Session {
-  id: string;
-  userId: string;
-  token: string;
-  expiresAt: Date;
-}
-
-export interface AuthState {
-  user: User | null;
-  session: Session | null;
-  isLoading: boolean;
-  error: string | null;
 }
 
 @Injectable({
@@ -222,7 +200,7 @@ export class AuthService {
     email: string,
     password: string,
     name: string,
-    usageType: 'individual' | 'researcher' | 'agency' = 'individual'
+    usageType: UsageType = 'individual'
   ): Promise<boolean> {
     if (!this.isBrowser) return false;
 

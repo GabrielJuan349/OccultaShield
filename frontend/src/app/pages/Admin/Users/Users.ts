@@ -1,5 +1,6 @@
 import { Component, inject, OnInit, signal, computed, ChangeDetectionStrategy } from '@angular/core';
-import { AdminService, User } from '#services/admin.service';
+import { AdminService } from '#services/admin.service';
+import type { AdminUser as User } from '#interface/admin.interface';
 import { ToastService } from '#services/toast.service';
 import { DatePipe, NgOptimizedImage } from '@angular/common';
 

@@ -2,46 +2,25 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { catchError, tap } from 'rxjs/operators';
 import { of } from 'rxjs';
+import type {
+  AdminStats,
+  AdminUser,
+  AppSettings,
+  AuditLogEntry,
+  UserRole
+} from '#interface/admin.interface';
 
-export interface AdminStats {
-  total_users: number;
-  pending_users: number;
-  approved_users: number;
-  total_videos: number;
-  total_violations: number;
-  active_sessions: number;
-  recentActivity: {
-    id: string;
-    action: string;
-    fileName?: string;
-    status: string;
-    createdAt: string;
-  }[];
-}
+// Re-export for backwards compatibility
+export type {
+  AdminStats,
+  AdminUser,
+  AppSettings,
+  AuditLogEntry,
+  UserRole
+};
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  isApproved: boolean;
-  usageType: 'individual' | 'researcher' | 'agency';
-  createdAt: string;
-  image?: string;
-}
-
-export interface AppSettings {
-  closedBetaMode: boolean;
-}
-
-export interface AuditLogEntry {
-  id: string;
-  userId: string;
-  action: string;
-  targetId?: string;
-  metadata: Record<string, unknown>;
-  createdAt: string;
-}
+// Alias for backwards compatibility
+export type User = AdminUser;
 
 @Injectable({
   providedIn: 'root'
@@ -51,7 +30,7 @@ export class AdminService {
 
   // Signals
   stats = signal<AdminStats | null>(null);
-  users = signal<User[]>([]);
+  users = signal<AdminUser[]>([]);
   settings = signal<AppSettings>({ closedBetaMode: true });
   auditLog = signal<AuditLogEntry[]>([]);
   loading = signal<boolean>(false);
@@ -85,7 +64,7 @@ export class AdminService {
 
   getUsers() {
     this.loading.set(true);
-    return this.http.get<User[]>('/api/admin/users').pipe(
+    return this.http.get<AdminUser[]>('/api/admin/users').pipe(
       tap(users => {
         this.users.set(users);
         this.loading.set(false);
@@ -122,7 +101,7 @@ export class AdminService {
     );
   }
 
-  updateUserRole(userId: string, role: 'user' | 'admin') {
+  updateUserRole(userId: string, role: UserRole) {
     return this.http.patch(`/api/admin/users/${userId}/role`, { role }).pipe(
       tap(() => {
         this.users.update(users =>

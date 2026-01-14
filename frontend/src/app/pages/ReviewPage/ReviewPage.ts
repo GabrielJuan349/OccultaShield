@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { ViolationCard } from '#components/ViolationCard/ViolationCard';
-import { ModificationType, Violation } from '#interface/violation-models';
-import { VideoService, UserDecision } from '#services/video.service';
+import type { ModificationType, Violation } from '#interface/violation.interface';
+import { VideoService } from '#services/video.service';
+import type { UserDecision } from '#interface/violation.interface';
 import { environment } from '#environments/environment';
 
 @Component({
@@ -34,7 +35,7 @@ export class ReviewPage implements OnInit {
       next: (response) => {
         // Map Backend ViolationCard to UI Violation model
         const mapped: Violation[] = response.items.map(v => {
-          // Need to handle image URL. 
+          // Need to handle image URL.
           // If backend sends relative path or full URL. Usually relative in 'capture_image_url' like '/api/v1/...'
 
           let imgUrl = v.capture_image_url;
@@ -59,21 +60,17 @@ export class ReviewPage implements OnInit {
             articleTitle: `Detected: ${v.detection_type}`,
             articleSubtitle: `${v.severity} Severity`,
             description: v.description,
-            fineText: v.violated_articles.join(', ') || "Potential GDPR Violation",
+            fineText: v.fine_text || v.violated_articles.join(', ') || "Potential GDPR Violation",
             imageUrl: imgUrl || 'assets/images/placeholder.png',
             selectedOption: defaultOption,
-            framesAnalyzed: v.frames_analyzed,  // Temporal Consensus
+            framesAnalyzed: v.frames_analyzed ?? 1,  // Temporal Consensus
             confidence: v.confidence
           };
         });
 
-        // If no violations found, skip review and go directly to download
-        if (mapped.length === 0) {
-          console.log('No violations found - navigating to download page');
-          this.router.navigate(['/download', id]);
-          return;
-        }
-
+        // Always show ReviewPage, even if no violations found
+        // User can still continue to download from here
+        console.log(`Loaded ${mapped.length} violations for review`);
         this.violations.set(mapped);
       },
       error: (err) => console.error("Error loading violations", err)

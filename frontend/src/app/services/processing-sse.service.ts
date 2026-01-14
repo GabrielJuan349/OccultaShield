@@ -1,96 +1,100 @@
-// services/processing-sse.service.ts
-import { Injectable, signal, computed, inject, PLATFORM_ID, OnDestroy } from '@angular/core';
+/**
+ * ProcessingSSEService - SSE connection for video processing progress
+ * Refactored for Angular 21 zoneless using signals
+ */
+import { Injectable, signal, computed, inject, PLATFORM_ID, DestroyRef } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
-import {
+import { Observable, Subject } from 'rxjs';
+import { takeUntil, tap, share, finalize } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import type {
   ProcessingPhase,
-  ProcessingState,
-  SSEEvent,
   DetectionCount,
   PhaseChangeEvent,
   ProgressEvent,
   DetectionEvent,
   VerificationEvent,
   CompleteEvent,
-  ErrorEvent
-} from '#interface/processing-events';
+  ErrorEvent,
+  InitialStateEvent,
+  ProcessingInternalState,
+  SSEEventUnion
+} from '#interface/processing-events.interface';
+import type { ViolationCard } from '#interface/violation.interface';
 import { AuthService } from './auth.service';
-import { VideoService, ViolationCard } from './video.service';
+import { VideoService } from './video.service';
 import { environment } from '#environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
-export class ProcessingSSEService implements OnDestroy {
+export class ProcessingSSEService {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly router = inject(Router);
   private readonly authService = inject(AuthService);
   private readonly videoService = inject(VideoService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  private eventSource: EventSource | null = null;
+  // === Control del stream SSE ===
+  private readonly disconnect$ = new Subject<void>();
+  private currentVideoId: string | null = null;
+  private sseSubscription: { unsubscribe: () => void } | null = null;
+
+  // === Estado interno como signal ===
+  private readonly _state = signal<ProcessingInternalState>({
+    phase: 'idle',
+    progress: 0,
+    message: '',
+    current: 0,
+    total: 0,
+    detections: new Map(),
+    isComplete: false,
+    isError: false,
+    errorMessage: null,
+    redirectUrl: null,
+    isConnected: false
+  });
+
+  // Timer signals
+  private readonly _elapsedTime = signal<number>(0);
+  private readonly _redirectCountdown = signal<number | null>(null);
   private startTime: number = 0;
   private elapsedInterval: ReturnType<typeof setInterval> | null = null;
-  private redirectTimeout: ReturnType<typeof setTimeout> | null = null;
   private countdownInterval: ReturnType<typeof setInterval> | null = null;
-  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-  private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 10;
-  private currentVideoId: string | null = null;
-  private violationsFetched: boolean = false;  // Track if we've already fetched violations
 
-  // ===== SIGNALS (Estado Reactivo) =====
-
-  private readonly _phase = signal<ProcessingPhase>('idle');
-  private readonly _progress = signal<number>(0);
-  private readonly _message = signal<string>('');
-  private readonly _currentItem = signal<number>(0);
-  private readonly _totalItems = signal<number>(0);
-  private readonly _detections = signal<Map<string, DetectionCount>>(new Map());
-  private readonly _estimatedTime = signal<number | null>(null);
-  private readonly _elapsedTime = signal<number>(0);
-  private readonly _isComplete = signal<boolean>(false);
-  private readonly _isError = signal<boolean>(false);
-  private readonly _errorMessage = signal<string | null>(null);
-  private readonly _redirectUrl = signal<string | null>(null);
-  private readonly _isConnected = signal<boolean>(false);
-  private readonly _redirectCountdown = signal<number | null>(null);
-
-  // Violations from verification module (fetched when waiting_for_review)
+  // Violations (se cargan cuando llega waiting_for_review)
   private readonly _violations = signal<ViolationCard[]>([]);
   private readonly _violationsLoading = signal<boolean>(false);
   private readonly _violationsError = signal<string | null>(null);
+  private violationsFetched = false;
 
-  // Live updates (últimos 5 eventos)
-  private readonly _liveUpdates = signal<Array<{ timestamp: string, message: string, type: string }>>([]);
+  // Live updates
+  private readonly _liveUpdates = signal<Array<{ timestamp: string; message: string; type: string }>>([]);
 
-  // Para cálculo dinámico de tiempo restante
-  private lastProgressUpdate: number = 0;
-  private lastProgressValue: number = 0;
+  // === Signals públicos (derivados del estado) ===
 
-  // ===== SIGNALS PÚBLICOS (ReadOnly) =====
-
-  readonly phase = this._phase.asReadonly();
-  readonly progress = this._progress.asReadonly();
-  readonly message = this._message.asReadonly();
-  readonly currentItem = this._currentItem.asReadonly();
-  readonly totalItems = this._totalItems.asReadonly();
-  readonly isComplete = this._isComplete.asReadonly();
-  readonly isError = this._isError.asReadonly();
-  readonly errorMessage = this._errorMessage.asReadonly();
-  readonly redirectUrl = this._redirectUrl.asReadonly();
-  readonly isConnected = this._isConnected.asReadonly();
+  readonly phase = computed(() => this._state().phase);
+  readonly progress = computed(() => this._state().progress);
+  readonly message = computed(() => this._state().message);
+  readonly currentItem = computed(() => this._state().current);
+  readonly totalItems = computed(() => this._state().total);
+  readonly isComplete = computed(() => this._state().isComplete);
+  readonly isError = computed(() => this._state().isError);
+  readonly errorMessage = computed(() => this._state().errorMessage);
+  readonly redirectUrl = computed(() => this._state().redirectUrl);
+  readonly isConnected = computed(() => this._state().isConnected);
   readonly redirectCountdown = this._redirectCountdown.asReadonly();
   readonly liveUpdates = this._liveUpdates.asReadonly();
 
-  // Violations signals (public readonly)
+  // Violations
   readonly violations = this._violations.asReadonly();
   readonly violationsLoading = this._violationsLoading.asReadonly();
   readonly violationsError = this._violationsError.asReadonly();
 
-  // ===== COMPUTED SIGNALS =====
-
+  // Computed: lista de detecciones
   readonly detectionsList = computed(() => {
-    return Array.from(this._detections().values());
+    return Array.from(this._state().detections.values());
   });
 
   readonly totalDetections = computed(() => {
@@ -98,24 +102,21 @@ export class ProcessingSSEService implements OnDestroy {
   });
 
   readonly estimatedTimeRemaining = computed(() => {
-    const progress = this._progress();
+    const progress = this._state().progress;
     const elapsed = this._elapsedTime();
 
-    if (this._isComplete() || this._isError()) return '—';
+    if (this._state().isComplete || this._state().isError) return '—';
     if (progress === 0) return 'Calculating...';
 
-    // Cálculo dinámico: estimar basado en velocidad actual
-    // Si tenemos X% completado en Y segundos, entonces 100% tomará (100/X)*Y segundos
     const estimatedTotal = (elapsed / progress) * 100;
     const remaining = Math.max(0, estimatedTotal - elapsed);
 
     if (remaining < 60) {
       return `~${Math.ceil(remaining)}s`;
-    } else {
-      const minutes = Math.floor(remaining / 60);
-      const seconds = Math.ceil(remaining % 60);
-      return `~${minutes}m ${seconds}s`;
     }
+    const minutes = Math.floor(remaining / 60);
+    const seconds = Math.ceil(remaining % 60);
+    return `~${minutes}m ${seconds}s`;
   });
 
   readonly elapsedTimeFormatted = computed(() => {
@@ -138,7 +139,7 @@ export class ProcessingSSEService implements OnDestroy {
       'completed': 'Complete!',
       'error': 'Error'
     };
-    return labels[this._phase()];
+    return labels[this._state().phase];
   });
 
   readonly phaseIcon = computed(() => {
@@ -154,134 +155,337 @@ export class ProcessingSSEService implements OnDestroy {
       'completed': 'check_circle',
       'error': 'error'
     };
-    return icons[this._phase()];
+    return icons[this._state().phase];
   });
 
-  // ===== MÉTODOS PÚBLICOS =====
+  // === Métodos públicos ===
 
   connect(videoId: string): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
-    // Si es una nueva conexión (diferente video), resetear intentos
-    if (this.currentVideoId !== videoId) {
-      this.reconnectAttempts = 0;
-      this.currentVideoId = videoId;
-      console.log('%c[SSE] 🔌 Iniciando conexión...', 'color: #4CAF50; font-weight: bold');
-      console.log(`%c[SSE] 📹 Video ID: ${videoId}`, 'color: #2196F3');
-    } else {
-      this.reconnectAttempts++;
-      console.log(`%c[SSE] 🔄 Reintento #${this.reconnectAttempts}/${this.maxReconnectAttempts}`, 'color: #FF9800; font-weight: bold');
-    }
+    console.log('%c[SSE] 🔌 Conectando...', 'color: #4CAF50; font-weight: bold');
+    console.log(`%c[SSE] 📹 Video ID: ${videoId}`, 'color: #2196F3');
 
-    // Si excedemos los reintentos, mostrar error
-    if (this.reconnectAttempts > this.maxReconnectAttempts) {
-      console.error('%c[SSE] ❌ Máximo de reintentos alcanzado', 'color: #f44336; font-weight: bold');
-      this._isError.set(true);
-      this._errorMessage.set('No se pudo conectar con el servidor después de varios intentos');
-      return;
-    }
-
+    // Desconectar conexión anterior si existe
     this.disconnect();
-    if (this.reconnectAttempts === 0) {
-      this.reset(); // Solo reset en primera conexión
-    }
 
-    // Construir URL del SSE usando el environment
-    // Reemplazar /video con /process para el endpoint de SSE
-    const apiUrl = environment.apiUrl.replace('/video', '');
-    const baseUrl = `${apiUrl}/process`;
-    const token = this.authService.getToken();
-    const url = `${baseUrl}/${videoId}/progress${token ? `?token=${token}` : ''}`;
+    // Reset estado
+    this.reset();
+    this.currentVideoId = videoId;
+    this.startTime = Date.now();
+    this.startElapsedTimer();
 
-    console.log(`%c[SSE] 🌐 URL: ${url}`, 'color: #9C27B0');
-    console.log(`%c[SSE] 🔑 Token presente: ${!!token}`, 'color: #FF9800');
-
-    if (this.reconnectAttempts === 0) {
-      this.startTime = Date.now();
-      this.startElapsedTimer();
-    }
-
-    try {
-      this.eventSource = new EventSource(url);
-
-      this.eventSource.onopen = () => {
-        console.log('%c[SSE] ✅ Conexión establecida exitosamente', 'color: #4CAF50; font-weight: bold; font-size: 14px');
-        this._isConnected.set(true);
-        this.reconnectAttempts = 0; // Reset exitoso
-      };
-
-      this.eventSource.onerror = (error) => {
-        console.error('%c[SSE] ❌ Error en la conexión', 'color: #f44336; font-weight: bold', error);
-        console.log(`%c[SSE] 🔄 Estado de conexión: ${this.eventSource?.readyState}`, 'color: #FF5722');
-        this._isConnected.set(false);
-
-        // Intentar reconectar con backoff exponencial limitado
-        if (this.eventSource?.readyState === EventSource.CLOSED) {
-          // Backoff: 500ms, 1s, 1.5s, 2s, 2.5s, luego siempre 3s
-          const delay = Math.min(500 + (this.reconnectAttempts * 500), 3000);
-          console.log(`%c[SSE] ⏳ Reintentando conexión en ${delay}ms...`, 'color: #FFC107');
-
-          // Limpiar timeout anterior si existe
-          if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout);
-          }
-
-          this.reconnectTimeout = setTimeout(() => {
-            console.log('%c[SSE] 🔄 Reconectando...', 'color: #03A9F4; font-weight: bold');
-            this.connect(videoId);
-          }, delay);
-        }
-      };
-
-      // Registrar handlers para cada tipo de evento
-      this.registerEventHandlers();
-    } catch (error) {
-      console.error('%c[SSE] 💥 Error al crear EventSource', 'color: #f44336; font-weight: bold', error);
-      this._isError.set(true);
-      this._errorMessage.set('Error al conectar con el servidor de eventos');
-    }
+    // Crear y suscribirse al stream SSE
+    const sseObservable = this.createSSEObservable(videoId);
+    this.sseSubscription = sseObservable.pipe(
+      takeUntil(this.disconnect$)
+    ).subscribe();
   }
 
   disconnect(): void {
-    if (this.eventSource) {
-      console.log('%c[SSE] 🔌 Cerrando conexión...', 'color: #FF5722');
-      this.eventSource.close();
-      this.eventSource = null;
-      console.log('%c[SSE] ✅ Conexión cerrada', 'color: #9E9E9E');
+    console.log('%c[SSE] 🔌 Desconectando...', 'color: #FF5722');
+    this.disconnect$.next();
+
+    if (this.sseSubscription) {
+      this.sseSubscription.unsubscribe();
+      this.sseSubscription = null;
     }
-    this._isConnected.set(false);
+
     this.stopElapsedTimer();
+    this.updateState({ isConnected: false });
   }
 
   reset(): void {
     console.log('%c[SSE] 🔄 Reseteando estado...', 'color: #9E9E9E');
-    this._phase.set('idle');
-    this._progress.set(0);
-    this._message.set('');
-    this._currentItem.set(0);
-    this._totalItems.set(0);
-    this._detections.set(new Map());
-    this._estimatedTime.set(null);
+    this._state.set({
+      phase: 'idle',
+      progress: 0,
+      message: '',
+      current: 0,
+      total: 0,
+      detections: new Map(),
+      isComplete: false,
+      isError: false,
+      errorMessage: null,
+      redirectUrl: null,
+      isConnected: false
+    });
     this._elapsedTime.set(0);
-    this._isComplete.set(false);
-    this._isError.set(false);
-    this._errorMessage.set(null);
-    this._redirectUrl.set(null);
     this._redirectCountdown.set(null);
     this._liveUpdates.set([]);
-    // Reset violations state
     this._violations.set([]);
     this._violationsLoading.set(false);
     this._violationsError.set(null);
     this.violationsFetched = false;
-    this.reconnectAttempts = 0;
     this.currentVideoId = null;
-    this.lastProgressUpdate = 0;
-    this.lastProgressValue = 0;
+    this.stopElapsedTimer();
+    this.clearCountdown();
   }
 
-  // Agregar evento a live updates (máximo 5)
-  private addLiveUpdate(message: string, type: string = 'info'): void {
+  // === Métodos privados ===
+
+  /**
+   * Crea un Observable que encapsula el EventSource SSE
+   */
+  private createSSEObservable(videoId: string): Observable<SSEEventUnion> {
+    return new Observable<SSEEventUnion>(subscriber => {
+      const apiUrl = environment.apiUrl.replace('/video', '');
+      const baseUrl = `${apiUrl}/process`;
+      const token = this.authService.getToken();
+      const url = `${baseUrl}/${videoId}/progress${token ? `?token=${token}` : ''}`;
+
+      console.log(`%c[SSE] 🌐 URL: ${url}`, 'color: #9C27B0');
+
+      const eventSource = new EventSource(url);
+
+      // Handler de conexión abierta
+      eventSource.onopen = () => {
+        console.log('%c[SSE] ✅ Conexión establecida', 'color: #4CAF50; font-weight: bold');
+        subscriber.next({ type: 'connected' });
+      };
+
+      // Handler de errores
+      eventSource.onerror = (error) => {
+        console.error('%c[SSE] ❌ Error en conexión', 'color: #f44336', error);
+        subscriber.next({ type: 'disconnected' });
+      };
+
+      // Handlers de eventos específicos
+      const eventTypes = [
+        'initial_state',
+        'phase_change',
+        'progress',
+        'detection',
+        'verification',
+        'complete',
+        'error',
+        'heartbeat'
+      ] as const;
+
+      eventTypes.forEach(eventType => {
+        eventSource.addEventListener(eventType, (event: MessageEvent) => {
+          try {
+            if (!event.data || event.data === 'undefined') return;
+            const data = JSON.parse(event.data);
+            subscriber.next({ type: eventType, data } as SSEEventUnion);
+          } catch (e) {
+            console.warn(`[SSE] Warning parsing ${eventType} data:`, event.data);
+          }
+        });
+      });
+
+      // Cleanup cuando se desuscribe
+      return () => {
+        console.log('%c[SSE] 🔌 Cerrando EventSource', 'color: #FF5722');
+        eventSource.close();
+      };
+    }).pipe(
+      // Procesar cada evento y actualizar estado
+      tap(event => this.handleSSEEvent(event)),
+      // Compartir entre múltiples suscriptores
+      share(),
+      // Finalize para cleanup
+      finalize(() => {
+        console.log('%c[SSE] 🏁 Stream finalizado', 'color: #9E9E9E');
+      })
+    );
+  }
+
+  /**
+   * Procesa cada evento SSE y actualiza el estado
+   */
+  private handleSSEEvent(event: SSEEventUnion): void {
+    switch (event.type) {
+      case 'connected':
+        // No marcamos isConnected aquí - esperamos initial_state
+        break;
+
+      case 'disconnected':
+        this.updateState({ isConnected: false });
+        break;
+
+      case 'initial_state':
+        this.handleInitialState(event.data);
+        break;
+
+      case 'phase_change':
+        this.handlePhaseChange(event.data);
+        break;
+
+      case 'progress':
+        this.handleProgress(event.data);
+        break;
+
+      case 'detection':
+        this.handleDetection(event.data);
+        break;
+
+      case 'verification':
+        this.handleVerification(event.data);
+        break;
+
+      case 'complete':
+        this.handleComplete(event.data);
+        break;
+
+      case 'error':
+        this.handleError(event.data);
+        break;
+
+      case 'heartbeat':
+        console.log('%c[SSE] 💓 Heartbeat', 'color: #E91E63');
+        break;
+    }
+  }
+
+  private handleInitialState(data: InitialStateEvent): void {
+    console.log('%c[SSE] 🎬 Estado inicial:', 'color: #00BCD4; font-weight: bold', data);
+
+    // Convertir detections de objeto a Map
+    const detectionsMap = new Map<string, DetectionCount>();
+    if (data.detections) {
+      Object.entries(data.detections).forEach(([type, count]) => {
+        detectionsMap.set(type, {
+          type,
+          count: count as number,
+          icon: this.getDetectionIcon(type)
+        });
+      });
+    }
+
+    this.updateState({
+      isConnected: true,
+      phase: data.phase,
+      progress: data.progress || 0,
+      message: data.message || '',
+      current: data.current || 0,
+      total: data.total || 0,
+      detections: detectionsMap
+    });
+
+    this.addLiveUpdate(`Connected - ${data.phase} phase`, 'success');
+  }
+
+  private handlePhaseChange(data: PhaseChangeEvent): void {
+    console.log('%c[SSE] 🔄 CAMBIO DE FASE:', 'color: #FF5722; font-weight: bold', data);
+
+    this.updateState({
+      phase: data.phase,
+      message: data.message,
+      progress: 0
+    });
+
+    // Detectar waiting_for_review y cargar violations
+    if (data.phase === 'waiting_for_review' && !this.violationsFetched && this.currentVideoId) {
+      console.log('%c[SSE] 📋 Cargando violations...', 'color: #E91E63; font-weight: bold');
+      this.fetchViolations(this.currentVideoId);
+    }
+
+    this.addLiveUpdate(`Phase: ${this.phaseLabel()}`, 'phase');
+  }
+
+  private handleProgress(data: ProgressEvent): void {
+    console.log(`%c[SSE] 📊 Progreso: ${data.progress}%`, 'color: #4CAF50', data);
+
+    const currentProgress = this._state().progress;
+
+    this.updateState({
+      progress: data.progress,
+      message: data.message,
+      ...(data.current !== null && { current: data.current }),
+      ...(data.total !== null && { total: data.total })
+    });
+
+    // Live update solo si cambio significativo (>5%)
+    if (Math.abs(data.progress - currentProgress) >= 5) {
+      this.addLiveUpdate(`${data.progress}% - ${data.message}`, 'progress');
+    }
+  }
+
+  private handleDetection(data: DetectionEvent): void {
+    console.log('%c[SSE] 🔍 DETECCIÓN:', 'color: #FF9800; font-weight: bold', data);
+
+    this._state.update(state => {
+      const newDetections = new Map(state.detections);
+      newDetections.set(data.detection_type, {
+        type: data.detection_type,
+        count: data.count,
+        icon: this.getDetectionIcon(data.detection_type)
+      });
+
+      return {
+        ...state,
+        detections: newDetections,
+        message: data.message
+      };
+    });
+
+    this.addLiveUpdate(`Found ${data.count} ${data.detection_type}`, 'detection');
+  }
+
+  private handleVerification(data: VerificationEvent): void {
+    const verificationProgress = data.total_agents > 0
+      ? Math.round((data.agents_completed / data.total_agents) * 100)
+      : 0;
+
+    console.log('%c[SSE] 🤖 VERIFICACIÓN:', 'color: #9C27B0; font-weight: bold', data);
+
+    this.updateState({
+      message: data.message,
+      ...(data.total_agents > 0 && { progress: verificationProgress })
+    });
+
+    this.addLiveUpdate(`AI agents: ${data.agents_completed}/${data.total_agents}`, 'verification');
+  }
+
+  private handleComplete(data: CompleteEvent): void {
+    console.log('%c[SSE] ✅ COMPLETADO!', 'color: #4CAF50; font-weight: bold; font-size: 16px', data);
+
+    this.updateState({
+      phase: 'completed',
+      progress: 100,
+      message: data.message,
+      isComplete: true,
+      redirectUrl: data.redirect_url
+    });
+
+    this.stopElapsedTimer();
+    this.addLiveUpdate('Processing completed!', 'success');
+
+    // Auto-redirect después de 2 segundos
+    setTimeout(() => {
+      if (data.redirect_url) {
+        console.log(`%c[SSE] 🔀 Navegando a: ${data.redirect_url}`, 'color: #2196F3');
+        this.router.navigateByUrl(data.redirect_url);
+      }
+    }, 2000);
+  }
+
+  private handleError(data: ErrorEvent): void {
+    console.error('%c[SSE] ❌ ERROR:', 'color: #f44336; font-weight: bold', data);
+
+    this.updateState({
+      phase: 'error',
+      isError: true,
+      errorMessage: data.message,
+      message: data.message
+    });
+
+    this.stopElapsedTimer();
+    this.addLiveUpdate(`Error: ${data.message}`, 'error');
+
+    // Iniciar countdown para redirect
+    this._redirectCountdown.set(5);
+    this.startCountdown();
+  }
+
+  // === Helpers ===
+
+  private updateState(partial: Partial<ProcessingInternalState>): void {
+    this._state.update(state => ({ ...state, ...partial }));
+  }
+
+  private addLiveUpdate(message: string, type: string): void {
     const timestamp = new Date().toLocaleTimeString('en-US', {
       hour12: false,
       hour: '2-digit',
@@ -291,244 +495,12 @@ export class ProcessingSSEService implements OnDestroy {
 
     this._liveUpdates.update(updates => {
       const newUpdates = [{ timestamp, message, type }, ...updates];
-      return newUpdates.slice(0, 5); // Mantener solo los últimos 5
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.disconnect();
-    this.stopElapsedTimer();
-
-    // Limpiar todos los timers para evitar memory leaks
-    if (this.redirectTimeout) {
-      clearTimeout(this.redirectTimeout);
-      this.redirectTimeout = null;
-    }
-
-    if (this.countdownInterval) {
-      clearInterval(this.countdownInterval);
-      this.countdownInterval = null;
-    }
-
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-  }
-
-  // ===== MÉTODOS PRIVADOS =====
-
-  private registerEventHandlers(): void {
-    if (!this.eventSource) return;
-
-    console.log('%c[SSE] 📡 Registrando handlers de eventos', 'color: #673AB7; font-weight: bold');
-
-    // Estado inicial
-    this.eventSource.addEventListener('initial_state', (event: MessageEvent) => {
-      const data = JSON.parse(event.data);
-      console.log('%c[SSE] 🎬 Estado inicial recibido:', 'color: #00BCD4; font-weight: bold', {
-        fase: data.phase,
-        progreso: `${data.progress || 0}%`,
-        mensaje: data.message || '',
-        items: `${data.current || 0}/${data.total || 0}`
-      });
-      this._phase.set(data.phase);
-      this._progress.set(data.progress || 0);
-      this._message.set(data.message || '');
-      this._currentItem.set(data.current || 0);
-      this._totalItems.set(data.total || 0);
-
-      // 🎯 Si el estado inicial ya es waiting_for_review, hacer fetch de violations
-      if (data.phase === 'waiting_for_review' && this.currentVideoId && !this.violationsFetched) {
-        console.log('%c[SSE] 📋 Initial state waiting_for_review - Solicitando violations...', 'color: #E91E63; font-weight: bold');
-        this.fetchViolations(this.currentVideoId);
-      }
-
-      // Live update
-      this.addLiveUpdate(`Connected - ${data.phase} phase`, 'success');
-    });
-
-    // Cambio de fase
-    this.eventSource.addEventListener('phase_change', (event: MessageEvent) => {
-      const data: PhaseChangeEvent = JSON.parse(event.data);
-      console.log('%c[SSE] 🔄 CAMBIO DE FASE:', 'color: #FF5722; font-weight: bold; font-size: 14px', {
-        nuevaFase: data.phase,
-        mensaje: data.message,
-        tiempoEstimado: data.estimated_time_seconds ? `${data.estimated_time_seconds}s` : 'N/A'
-      });
-      this._phase.set(data.phase);
-      this._message.set(data.message);
-      this._progress.set(0);  // Reset en cambio de fase
-
-      if (data.estimated_time_seconds) {
-        this._estimatedTime.set(data.estimated_time_seconds);
-      }
-
-      // 🎯 Detectar waiting_for_review y hacer petición de violations
-      if (data.phase === 'waiting_for_review' && this.currentVideoId && !this.violationsFetched) {
-        console.log('%c[SSE] 📋 Phase waiting_for_review detectada - Solicitando violations...', 'color: #E91E63; font-weight: bold');
-        this.fetchViolations(this.currentVideoId);
-      }
-
-      // Live update
-      this.addLiveUpdate(`Phase: ${this.phaseLabel()}`, 'phase');
-    });
-
-    // Progreso
-    this.eventSource.addEventListener('progress', (event: MessageEvent) => {
-      const data: ProgressEvent = JSON.parse(event.data);
-      console.log(`%c[SSE] 📊 Progreso: ${data.progress}% - ${data.message}`, 'color: #4CAF50', {
-        items: data.current !== null && data.total !== null ? `${data.current}/${data.total}` : 'N/A'
-      });
-
-      const currentProgress = this._progress();
-      this._progress.set(data.progress);
-      this._message.set(data.message);
-
-      if (data.current !== null) this._currentItem.set(data.current);
-      if (data.total !== null) this._totalItems.set(data.total);
-
-      // Live update solo si el progreso cambió significativamente (>5%)
-      if (Math.abs(data.progress - currentProgress) >= 5) {
-        this.addLiveUpdate(`${data.progress}% - ${data.message}`, 'progress');
-      }
-    });
-
-    // Detección
-    this.eventSource.addEventListener('detection', (event: MessageEvent) => {
-      const data: DetectionEvent = JSON.parse(event.data);
-      console.log('%c[SSE] 🔍 DETECCIÓN:', 'color: #FF9800; font-weight: bold', {
-        tipo: data.detection_type,
-        cantidad: data.count,
-        mensaje: data.message
-      });
-
-      this._detections.update(map => {
-        const newMap = new Map(map);
-        newMap.set(data.detection_type, {
-          type: data.detection_type,
-          count: data.count,
-          icon: this.getDetectionIcon(data.detection_type)
-        });
-        return newMap;
-      });
-
-      this._message.set(data.message);
-
-      // Live update
-      this.addLiveUpdate(`Found ${data.count} ${data.detection_type}`, 'detection');
-    });
-
-    // Verificación
-    this.eventSource.addEventListener('verification', (event: MessageEvent) => {
-      const data: VerificationEvent = JSON.parse(event.data);
-      const verificationProgress = data.total_agents > 0 ?
-        Math.round((data.agents_completed / data.total_agents) * 100) : 0;
-
-      console.log('%c[SSE] 🤖 VERIFICACIÓN IA:', 'color: #9C27B0; font-weight: bold', {
-        agentes: `${data.agents_completed}/${data.total_agents}`,
-        progreso: `${verificationProgress}%`,
-        mensaje: data.message
-      });
-
-      this._message.set(data.message);
-
-      // Calcular progreso de verificación
-      if (data.total_agents > 0) {
-        this._progress.set(verificationProgress);
-      }
-
-      // Live update
-      this.addLiveUpdate(`AI agents: ${data.agents_completed}/${data.total_agents}`, 'verification');
-    });
-
-    // Completado
-    this.eventSource.addEventListener('complete', (event: MessageEvent) => {
-      const data: CompleteEvent = JSON.parse(event.data);
-      console.log('%c[SSE] ✅ PROCESO COMPLETADO!', 'color: #4CAF50; font-weight: bold; font-size: 16px; background: #C8E6C9; padding: 5px 10px;', {
-        mensaje: data.message,
-        urlRedirect: data.redirect_url
-      });
-
-      this._phase.set('completed');
-      this._progress.set(100);
-      this._message.set(data.message);
-      this._isComplete.set(true);
-      this._redirectUrl.set(data.redirect_url);
-
-      this.stopElapsedTimer();
-
-      // Live update
-      this.addLiveUpdate('✅ Processing completed!', 'success');
-
-      // Auto-redirect después de 2 segundos
-      console.log('%c[SSE] 🔀 Redirigiendo en 2 segundos...', 'color: #2196F3');
-      this.redirectTimeout = setTimeout(() => {
-        if (data.redirect_url) {
-          console.log(`%c[SSE] 🔀 Navegando a: ${data.redirect_url}`, 'color: #2196F3; font-weight: bold');
-          this.router.navigateByUrl(data.redirect_url);
-        }
-      }, 2000);
-    });
-
-    // Error
-    this.eventSource.addEventListener('error', (event: MessageEvent) => {
-      const data: ErrorEvent = JSON.parse(event.data);
-      console.error('%c[SSE] ❌ ERROR EN EL PROCESO:', 'color: #f44336; font-weight: bold; font-size: 14px; background: #FFCDD2; padding: 5px 10px;', {
-        mensaje: data.message
-      });
-
-      this._phase.set('error');
-      this._isError.set(true);
-      this._errorMessage.set(data.message);
-      this._message.set(data.message);
-
-      // Live update
-      this.addLiveUpdate(`❌ Error: ${data.message}`, 'error');
-
-      this.stopElapsedTimer();
-      this.disconnect();
-
-      // Start countdown and redirect to upload after 5 seconds
-      this._redirectCountdown.set(5);
-      console.log('%c[SSE] ⏱️ Redirigiendo a /upload en 5 segundos...', 'color: #FFC107');
-
-      // Limpiar countdown anterior si existe
-      if (this.countdownInterval) {
-        clearInterval(this.countdownInterval);
-      }
-
-      this.countdownInterval = setInterval(() => {
-        const current = this._redirectCountdown();
-        if (current !== null && current > 1) {
-          this._redirectCountdown.set(current - 1);
-          console.log(`%c[SSE] ⏱️ Redireccionando en ${current - 1}...`, 'color: #FFC107');
-        } else {
-          if (this.countdownInterval) {
-            clearInterval(this.countdownInterval);
-            this.countdownInterval = null;
-          }
-          this._redirectCountdown.set(null);
-          console.log('%c[SSE] 🔀 Navegando a /upload', 'color: #2196F3; font-weight: bold');
-          this.router.navigate(['/upload']);
-        }
-      }, 1000);
-    });
-
-    // Heartbeat
-    this.eventSource.addEventListener('heartbeat', () => {
-      console.log('%c[SSE] 💓 Heartbeat', 'color: #E91E63');
-    });
-
-    // Mensaje genérico (catch-all)
-    this.eventSource.addEventListener('message', (event: MessageEvent) => {
-      console.log('%c[SSE] 📨 Mensaje genérico:', 'color: #607D8B', event.data);
+      return newUpdates.slice(0, 5);
     });
   }
 
   private startElapsedTimer(): void {
     this.stopElapsedTimer();
-
     this.elapsedInterval = setInterval(() => {
       const elapsed = (Date.now() - this.startTime) / 1000;
       this._elapsedTime.set(elapsed);
@@ -542,6 +514,53 @@ export class ProcessingSSEService implements OnDestroy {
     }
   }
 
+  private startCountdown(): void {
+    this.clearCountdown();
+    this.countdownInterval = setInterval(() => {
+      const current = this._redirectCountdown();
+      if (current !== null && current > 1) {
+        this._redirectCountdown.set(current - 1);
+      } else {
+        this.clearCountdown();
+        this._redirectCountdown.set(null);
+        this.router.navigate(['/upload']);
+      }
+    }, 1000);
+  }
+
+  private clearCountdown(): void {
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
+  }
+
+  private fetchViolations(videoId: string): void {
+    if (this.violationsFetched) return;
+
+    this.violationsFetched = true;
+    this._violationsLoading.set(true);
+    this._violationsError.set(null);
+
+    this.videoService.getViolations(videoId).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: (response) => {
+        console.log('%c[SSE] ✅ Violations recibidas:', 'color: #4CAF50', response);
+        this._violations.set(response.items);
+        this._violationsLoading.set(false);
+        this.addLiveUpdate(`Loaded ${response.items.length} violations`, 'success');
+      },
+      error: (err) => {
+        console.error('%c[SSE] ❌ Error cargando violations:', 'color: #f44336', err);
+        this._violationsError.set(err.userMessage || 'Error loading violations');
+        this._violationsLoading.set(false);
+        this.violationsFetched = false; // Allow retry
+        this.addLiveUpdate('Failed to load violations', 'error');
+      }
+    });
+  }
+
   private getDetectionIcon(type: string): string {
     const icons: Record<string, string> = {
       'face': 'face',
@@ -553,48 +572,4 @@ export class ProcessingSSEService implements OnDestroy {
     return icons[type] || 'help_outline';
   }
 
-  /**
-   * Fetches all violations from the verification module when waiting_for_review phase is detected.
-   * This preloads the violations data so it's available when navigating to the review page.
-   */
-  private fetchViolations(videoId: string): void {
-    if (this.violationsFetched) {
-      console.log('%c[SSE] 📋 Violations already fetched, skipping...', 'color: #9E9E9E');
-      return;
-    }
-
-    this.violationsFetched = true;
-    this._violationsLoading.set(true);
-    this._violationsError.set(null);
-
-    console.log(`%c[SSE] 📋 Fetching violations for video: ${videoId}`, 'color: #E91E63; font-weight: bold');
-
-    this.videoService.getViolations(videoId).subscribe({
-      next: (response) => {
-        console.log('%c[SSE] ✅ Violations received:', 'color: #4CAF50; font-weight: bold', {
-          total: response.total,
-          itemsCount: response.items.length
-        });
-
-        // Log full JSON response for debugging
-        console.log('%c[SSE] 📦 Full violations JSON:', 'color: #2196F3; font-weight: bold');
-        console.log(JSON.stringify(response, null, 2));
-
-        this._violations.set(response.items);
-        this._violationsLoading.set(false);
-
-        // Live update
-        this.addLiveUpdate(`Loaded ${response.items.length} violations`, 'success');
-      },
-      error: (err) => {
-        console.error('%c[SSE] ❌ Error fetching violations:', 'color: #f44336; font-weight: bold', err);
-        this._violationsError.set(err.userMessage || 'Error loading violations');
-        this._violationsLoading.set(false);
-        this.violationsFetched = false; // Allow retry
-
-        // Live update
-        this.addLiveUpdate('Failed to load violations', 'error');
-      }
-    });
-  }
 }

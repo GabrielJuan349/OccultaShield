@@ -1,8 +1,10 @@
-import { Component, signal, ChangeDetectionStrategy, afterNextRender, PLATFORM_ID, inject } from '@angular/core';
+import { Component, signal, ChangeDetectionStrategy, PLATFORM_ID, inject, OnInit } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 import { AuthService } from '#services/auth.service';
 import { VideoService } from '#services/video.service';
+import { environment } from '#environments/environment';
+import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 
 @Component({
   imports: [RouterLink],
@@ -10,23 +12,41 @@ import { VideoService } from '#services/video.service';
   styleUrl: './DownloadPage.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DownloadPage {
+export class DownloadPage implements OnInit {
   private readonly platformId = inject(PLATFORM_ID);
   protected readonly authService = inject(AuthService);
   private readonly videoService = inject(VideoService);
   private readonly route = inject(ActivatedRoute);
+  private readonly sanitizer = inject(DomSanitizer);
 
   // --- ESTADO (Signals) ---
-  protected readonly videoUrl = signal('https://files.vidstack.io/sprite-fight/720p.mp4');
-  protected readonly shareUrl = signal('https://occultashield.io/v/xY2zAbc...');
+  protected readonly videoUrl = signal<SafeUrl | null>(null);
+  protected readonly shareUrl = signal<string>('');
   protected readonly isDownloading = signal(false);
   protected readonly isCopied = signal(false);
   protected readonly isClient = signal(false);
+  protected readonly videoId = signal<string | null>(null);
 
   constructor() {
     // Verificación inmediata de plataforma
     if (isPlatformBrowser(this.platformId)) {
       this.isClient.set(true);
+    }
+  }
+
+  ngOnInit(): void {
+    const id = this.route.snapshot.paramMap.get('id');
+    if (id) {
+      this.videoId.set(id);
+      // Build the video streaming URL with auth token
+      const token = this.authService.getToken();
+      const baseUrl = environment.apiUrl.replace('/video', '');
+      const streamUrl = `${baseUrl}/video/${id}/download${token ? `?token=${token}` : ''}`;
+      this.videoUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(streamUrl));
+
+      // Build share URL
+      const origin = isPlatformBrowser(this.platformId) ? window.location.origin : '';
+      this.shareUrl.set(`${origin}/download/${id}`);
     }
   }
 

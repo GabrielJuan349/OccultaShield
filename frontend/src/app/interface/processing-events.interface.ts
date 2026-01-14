@@ -1,4 +1,10 @@
-// interface/processing-events.ts
+/**
+ * SSE Processing Events interfaces and types
+ * Used by: ProcessingSSEService, ProcessingPage
+ */
+
+// === Processing Phases ===
+
 export type ProcessingPhase =
   | 'idle'
   | 'uploading'
@@ -6,10 +12,12 @@ export type ProcessingPhase =
   | 'tracking'
   | 'verifying'
   | 'saving'
-  | 'waiting_for_review' // New
-  | 'anonymizing' // New
+  | 'waiting_for_review'
+  | 'anonymizing'
   | 'completed'
   | 'error';
+
+// === SSE Event Types ===
 
 export interface ProgressEvent {
   event_type: 'progress';
@@ -70,6 +78,8 @@ export interface ErrorEvent {
   timestamp: string;
 }
 
+// === Union Type for all SSE Events ===
+
 export type SSEEvent =
   | ProgressEvent
   | PhaseChangeEvent
@@ -77,6 +87,8 @@ export type SSEEvent =
   | VerificationEvent
   | CompleteEvent
   | ErrorEvent;
+
+// === Internal Service Types ===
 
 export interface DetectionCount {
   type: string;
@@ -97,4 +109,55 @@ export interface ProcessingState {
   isError: boolean;
   errorMessage: string | null;
   redirectUrl: string | null;
+}
+
+// === Initial State Event (from SSE connection) ===
+
+export interface InitialStateEvent {
+  video_id: string;
+  phase: ProcessingPhase;
+  progress: number;
+  current: number;
+  total: number;
+  message: string;
+  detections: Record<string, number>;
+  elapsed_seconds: number;
+}
+
+// === Internal Processing State ===
+
+export interface ProcessingInternalState {
+  phase: ProcessingPhase;
+  progress: number;
+  message: string;
+  current: number;
+  total: number;
+  detections: Map<string, DetectionCount>;
+  isComplete: boolean;
+  isError: boolean;
+  errorMessage: string | null;
+  redirectUrl: string | null;
+  isConnected: boolean;
+}
+
+// === SSE Event Union (for internal handling) ===
+
+export type SSEEventUnion =
+  | { type: 'initial_state'; data: InitialStateEvent }
+  | { type: 'phase_change'; data: PhaseChangeEvent }
+  | { type: 'progress'; data: ProgressEvent }
+  | { type: 'detection'; data: DetectionEvent }
+  | { type: 'verification'; data: VerificationEvent }
+  | { type: 'complete'; data: CompleteEvent }
+  | { type: 'error'; data: ErrorEvent }
+  | { type: 'heartbeat'; data: Record<string, never> }
+  | { type: 'connected' }
+  | { type: 'disconnected' };
+
+// === Live Update Entry ===
+
+export interface LiveUpdateEntry {
+  timestamp: string;
+  message: string;
+  type: string;
 }

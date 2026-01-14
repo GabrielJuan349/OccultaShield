@@ -110,14 +110,17 @@
     <!-- Botones de acción -->
     @if (sse.isError()) {
       <div class="error-actions">
+        @if (sse.redirectCountdown() !== null) {
+          <p class="redirect-notice">Redirecting to upload in {{ sse.redirectCountdown() }} seconds...</p>
+        }
         <button class="btn-retry" (click)="retry()">
           <span class="material-symbols-outlined">refresh</span>
           Retry Processing
         </button>
-        <button class="btn-back" [routerLink]="comingFrom()">
+        <a class="btn-back" routerLink="/upload">
           <span class="material-symbols-outlined">arrow_back</span>
-          Back to {{ comingFrom() === 'upload' ? 'Upload' : 'Review' }}
-        </button>
+          Back to Upload Now
+        </a>
       </div>
     }
 
@@ -128,6 +131,21 @@
         {{ sse.isConnected() ? 'Live updates' : 'Reconnecting...' }}
       </span>
     </div>
+
+    <!-- Live Updates Feed -->
+    @if (sse.liveUpdates().length > 0) {
+      <div class="live-updates-section">
+        <h4 class="live-updates-title">Recent Activity</h4>
+        <div class="live-updates-list">
+          @for (update of sse.liveUpdates(); track update.timestamp) {
+            <div class="live-update-item" [attr.data-type]="update.type">
+              <span class="update-timestamp">{{ update.timestamp }}</span>
+              <span class="update-message">{{ update.message }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    }
 
   </main>
 </div>

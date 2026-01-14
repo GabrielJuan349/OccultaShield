@@ -50,15 +50,35 @@ async def get_current_user(
     Dependency to get the current authenticated user.
     """
     try:
-        # Extract token from Header OR Query Param
+        # Extract token from Header, Query Param, or Cookie
         token = request.query_params.get("token")
-        
+
         if not token:
              # Fallback to header if no query param
              auth_header = request.headers.get("Authorization")
              if auth_header and auth_header.startswith("Bearer "):
                  token = auth_header.split(" ")[1]
-        
+
+        # Fallback to Better-Auth cookie
+        if not token:
+            # Intentar múltiples formatos de cookie que Better-Auth podría usar
+            cookie_names = [
+                "occultashield.session_token",
+                "occultashield_session.token",
+                "better-auth.session_token",
+                "occultashield-session-token",
+                "session_token",
+            ]
+
+            print(f"DEBUG [get_current_user]: Available cookies: {list(request.cookies.keys())}")
+
+            for cookie_name in cookie_names:
+                session_cookie = request.cookies.get(cookie_name)
+                if session_cookie:
+                    token = session_cookie
+                    print(f"DEBUG: Token from cookie '{cookie_name}': {token[:20] if len(token) > 20 else token}...")
+                    break
+
         if not token:
              raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

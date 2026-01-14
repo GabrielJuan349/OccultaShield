@@ -27,7 +27,7 @@
     </header>
 
     <section class="video-card">
-      @defer (on idle) {
+      @if (videoUrl()) {
         <video
           class="video-player"
           [src]="videoUrl()"
@@ -37,20 +37,10 @@
         >
           Tu navegador no soporta el elemento de video.
         </video>
-      } @placeholder {
-        <div class="video-placeholder">
-          <span class="material-symbols-outlined">play_circle</span>
-          <p>Video Preview</p>
-        </div>
-      } @loading (minimum 300ms) {
+      } @else {
         <div class="video-placeholder">
           <span class="material-symbols-outlined loading-spinner">sync</span>
-          <p>Cargando video...</p>
-        </div>
-      } @error {
-        <div class="video-placeholder error">
-          <span class="material-symbols-outlined">error</span>
-          <p>Error al cargar el video</p>
+          <p>Loading video...</p>
         </div>
       }
     </section>
@@ -115,10 +105,12 @@
         </div>
 
         <div class="action-links">
-          <a routerLink="/review" class="link-item">
-            <span class="material-symbols-outlined">edit</span>
-            Re-edit Modifications
-          </a>
+          @if (videoId()) {
+            <a [routerLink]="['/review', videoId()]" class="link-item">
+              <span class="material-symbols-outlined">edit</span>
+              Re-edit Modifications
+            </a>
+          }
           <a routerLink="/upload" class="link-item">
             <span class="material-symbols-outlined">upload_file</span>
             Process Another Video

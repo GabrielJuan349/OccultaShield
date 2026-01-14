@@ -39,7 +39,7 @@ const app = express();
 // MIDDLEWARE: Configuración de CORS y JSON
 // =========================================================================
 app.use(cors({
-  origin: ['http://localhost:4200', 'http://127.0.0.1:4200', ENV.BASE_URL].filter(Boolean) as string[],
+  origin: ['http://localhost:4200', 'http://127.0.0.1:4200', 'http://mise-ralph.uab.cat:4200', ENV.BASE_URL].filter(Boolean) as string[],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with'],
@@ -101,7 +101,7 @@ app.all('/api/auth/*splat', async (req, res) => {
 // RUTAS DE ADMINISTRACIÓN (/api/admin/*)
 // Importado desde admin.ts - incluye approval workflow, settings, audit log
 // =========================================================================
-import { adminRouter, checkUserApproval } from '#server/admin';
+import { adminRouter } from '#server/admin';
 
 app.use('/api/admin', adminRouter);
 

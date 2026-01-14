@@ -9,18 +9,18 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}=== OccultaShield Setup & Initialization ===${NC}"
 
 # --- System Update ---
-echo -e "${BLUE}[1/8] System Update & Upgrade...${NC}"
+echo -e "${BLUE}[1/9] System Update & Upgrade...${NC}"
 echo "Running sudo apt update && sudo apt upgrade -y..."
 sudo apt update && sudo apt upgrade -y
 
 # --- Git Configuration ---
-echo -e "${BLUE}[2/8] Configuring Git...${NC}"
+echo -e "${BLUE}[2/9] Configuring Git...${NC}"
 git config --global user.email "gabijuan872@gmail.com"
 git config --global user.name "Gabriel Juan"
 echo -e "${GREEN}Git identity configured.${NC}"
 
 # --- Bun Setup ---
-echo -e "${BLUE}[3/8] Setting up Bun...${NC}"
+echo -e "${BLUE}[3/9] Setting up Bun...${NC}"
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
@@ -34,7 +34,7 @@ fi
 echo -e "${GREEN}Bun version: $(bun -v)${NC}"
 
 # --- Node & Angular CLI (via Bun) ---
-echo -e "${BLUE}[4/8] Setting up Node.js & Angular CLI...${NC}"
+echo -e "${BLUE}[4/9] Setting up Node.js & Angular CLI...${NC}"
 export NVM_DIR="$HOME/.nvm"
 
 # Install NVM if not exists (Node is still needed for Angular runtime)
@@ -59,7 +59,7 @@ bun add -g @angular/cli
 
 
 # --- Check Other Dependencies ---
-echo -e "${BLUE}[5/8] Checking Other Dependencies...${NC}"
+echo -e "${BLUE}[5/9] Checking Other Dependencies...${NC}"
 
 check_command() {
     local cmd=$1
@@ -117,7 +117,7 @@ check_command docker
 
 echo -e "${GREEN}All dependencies found.${NC}"
 # --- Environment Setup ---
-echo -e "${BLUE}[6/8] Setting up Environment Variables...${NC}"
+echo -e "${BLUE}[6/9] Setting up Environment Variables...${NC}"
 
 # Backend
 if [ ! -f "backend/app/.env" ]; then
@@ -157,7 +157,7 @@ fi
 
 
 # --- Installation ---
-echo -e "${BLUE}[7/8] Installing Dependencies (Front/Back)...${NC}"
+echo -e "${BLUE}[7/9] Installing Dependencies (Front/Back)...${NC}"
 
 # Backend
 echo "Installing Backend dependencies (uv)..."
@@ -174,7 +174,7 @@ cd ..
 
 
 # --- Infrastructure ---
-echo -e "${BLUE}[8/8] Infrastructure Setup...${NC}"
+echo -e "${BLUE}[8/9] Infrastructure Setup...${NC}"
 
 read -p "Do you want to start Docker services (databases)? [y/N]: " start_docker
 if [[ "$start_docker" =~ ^[Yy]$ ]]; then
@@ -183,8 +183,50 @@ if [[ "$start_docker" =~ ^[Yy]$ ]]; then
     docker compose up -d
     cd ..
     echo -e "${GREEN}Docker services started.${NC}"
+
+    # Wait for Neo4j to be ready
+    echo "Waiting for Neo4j to be ready (10 seconds)..."
+    sleep 10
 else
     echo -e "${BLUE}Skipping Docker services startup.${NC}"
+fi
+
+
+# --- GDPR Knowledge Graph Ingestion ---
+echo -e "${BLUE}[9/9] GDPR Knowledge Graph Setup...${NC}"
+
+# Check if Neo4j is running
+if nc -z localhost 7687 2>/dev/null; then
+    echo -e "${GREEN}Neo4j detected on port 7687${NC}"
+
+    read -p "Do you want to ingest GDPR data into Neo4j? [Y/n]: " ingest_gdpr
+    if [[ ! "$ingest_gdpr" =~ ^[Nn]$ ]]; then
+        echo "Running GDPR Knowledge Graph Ingestion..."
+        cd backend/app || exit
+
+        # Check if .kaggle/kaggle.json exists and set environment
+        if [ -f ".kaggle/kaggle.json" ]; then
+            echo "✅ Kaggle credentials found"
+            KAGGLE_CONFIG_DIR="$(pwd)/.kaggle" uv run python scripts/gdpr_ingestion/enhanced_ingest_gdpr.py
+        else
+            echo "⚠️  Kaggle credentials not found (optional)"
+            uv run python scripts/gdpr_ingestion/enhanced_ingest_gdpr.py
+        fi
+
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ GDPR Knowledge Graph ingestion completed!${NC}"
+        else
+            echo -e "${RED}❌ GDPR ingestion failed. Check logs above.${NC}"
+        fi
+        cd ../..
+    else
+        echo -e "${BLUE}Skipping GDPR ingestion.${NC}"
+    fi
+else
+    echo -e "${RED}⚠️  Neo4j not detected on port 7687${NC}"
+    echo "GDPR Knowledge Graph requires Neo4j. You can:"
+    echo "  1. Start Neo4j manually"
+    echo "  2. Run setup_gdpr.sh later: cd backend/app && ./setup_gdpr.sh"
 fi
 
 

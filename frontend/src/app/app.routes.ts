@@ -5,7 +5,7 @@ import { UploadPage } from '#pages/UploadPage/UploadPage';
 import { ReviewPage } from '#pages/ReviewPage/ReviewPage';
 import { DownloadPage } from '#pages/DownloadPage/DownloadPage';
 import { ProcessingPage } from '#pages/ProcessingPage/ProcessingPage';
-import { authGuard, roleGuard, guestGuard } from '#guards/auth.guard';
+import { authGuard } from '#guards/auth.guard';
 import { AdminLayoutComponent } from '#pages/Admin/AdminLayout/AdminLayout';
 import { DashboardComponent } from '#pages/Admin/Dashboard/Dashboard';
 import { UsersComponent } from '#pages/Admin/Users/Users';
@@ -20,7 +20,7 @@ export const routes: Routes = [
   {
     path: 'admin',
     component: AdminLayoutComponent,
-    canActivate: [authGuard, roleGuard],
+    canActivate: [authGuard],
     data: { role: 'admin' },
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
@@ -33,7 +33,8 @@ export const routes: Routes = [
   {
     path: 'login',
     component: LoginRegister,
-    canActivate: [guestGuard]
+    canActivate: [authGuard],
+    data: { guestOnly: true }
   },
   {
     path: 'upload',
@@ -57,6 +58,7 @@ export const routes: Routes = [
   },
   {
     path: '**',
-    redirectTo: ''
+    redirectTo: '',
+    pathMatch: 'full'
   }
 ];

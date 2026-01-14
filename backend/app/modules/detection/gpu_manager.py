@@ -55,16 +55,25 @@ class GPUManager:
     def get_strategy(self):
         """
         Determina la estrategia óptima según VRAM disponible.
+        Optimizado para NVIDIA DGX Spark con batches grandes.
         Returns: (strategy, model_size, batch_size)
         """
         vram_gb = self.vram_total_mb / 1024
         
         if vram_gb < 8:
-            return "sequential", "nano", 4
+            logger.warning(f"Less than 8GB VRAM detected: {vram_gb:.0f}GB")
+            return "sequential", "nano", 8  # Increased from 4
         elif vram_gb < 16:
-            return "parallel", "small", 16
-        else:  # 16GB+ → usar medium (máximo permitido) con batch escalable
-            return "parallel", "medium", min(64, int(vram_gb * 2))
+            logger.warning(f"Less than 16GB VRAM detected: {vram_gb:.0f}GB")
+            return "parallel", "small", 32  # Increased from 16
+        elif vram_gb < 32:
+            logger.warning(f"Less than 32GB VRAM detected: {vram_gb:.0f}GB")
+            return "parallel", "medium", 64  # High VRAM
+        else:  # 32GB+ (DGX Spark level)
+            # Use maximum batch sizes for DGX Spark
+            batch = min(128, int(vram_gb * 3))  # Up to 128 frames per batch
+            print(f"🚀 [GPU] DGX Spark mode: {vram_gb:.0f}GB VRAM, batch_size={batch}")
+            return "parallel", "medium", batch
 
 # Instancia global
 gpu_manager = GPUManager()

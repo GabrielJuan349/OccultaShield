@@ -51,3 +51,15 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.14.0",
 ]
+
+[tool.uv]
+# Use PyTorch CUDA index for GPU support on DGX Spark
+index-strategy = "unsafe-best-match"
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }

@@ -34,61 +34,95 @@ async def upload_video(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
-    print(f"DEBUG: upload_video called for file: {file.filename}")
+    print(f"\n📤 [UPLOAD] New video upload request")
+    print(f"   Filename: {file.filename}")
+    print(f"   Content-Type: {file.content_type}")
+    print(f"   User: {current_user.get('id', 'unknown')}")
     try:
         # 1. Validate file
         if not file.content_type.startswith("video/"):
+            print(f"   ❌ Invalid file type")
             raise HTTPException(400, "Invalid file type")
         
         # 2. Generate ID
         video_id = f"vid_{uuid.uuid4().hex[:12]}"
+        print(f"   ✅ Generated video ID: {video_id}")
         
         # 3. Save file
         file_ext = Path(file.filename).suffix
         safename = f"{video_id}{file_ext}"
         file_path = UPLOAD_DIR / safename
-        
+
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-            
-        # 4. Extract metadata (Placeholder)
-        # TODO: Use OpenCV to extract real metadata
-        metadata = VideoMetadata(
-            duration_seconds=120.0,
-            fps=30.0,
-            width=1920,
-            height=1080,
-            total_frames=3600,
-            has_audio=True
-        )
+        print(f"   💾 File saved: {file_path}")
+
+        # 4. Extract real metadata using OpenCV with proper resource management
+        import cv2
+        cap = None
+        try:
+            cap = cv2.VideoCapture(str(file_path))
+
+            # Validate that video file opened successfully
+            if not cap.isOpened():
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                raise HTTPException(400, "Video file is corrupted or invalid format")
+
+            actual_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+            actual_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            actual_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            actual_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+            # Validate video has valid dimensions and frames
+            if actual_frames == 0 or actual_width == 0 or actual_height == 0:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                raise HTTPException(400, "Video has invalid dimensions or no frames")
+
+            actual_duration = actual_frames / actual_fps if actual_fps > 0 else 0
+        finally:
+            if cap is not None:
+                cap.release()
         
-        # 5. Create DB record
+        metadata = VideoMetadata(
+            duration_seconds=actual_duration,
+            fps=actual_fps,
+            width=actual_width,
+            height=actual_height,
+            total_frames=actual_frames,
+            has_audio=True  # Assume true; proper check would require ffprobe
+        )
+        print(f"   📊 Metadata: {actual_frames} frames, {actual_fps:.1f} FPS, {actual_width}x{actual_height}")
+        
+        # 5. Create DB record with initial status UPLOADED (will change to PROCESSING immediately)
         video_data = {
             "id": video_id,
             "user_id": current_user["id"],
             "filename": file.filename,
             "original_path": str(file_path),
-            "status": VideoStatus.PROCESSING.value,
+            "status": "uploaded",  # Status inicial, cambiará a PROCESSING inmediatamente
             "metadata": metadata.model_dump(),
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
         
-        # Using connect/create logic. 
-        # Note: SurrealDB CREATE usually takes `table:id` or just `table`
-        # We manually assigned ID, so Create `video:vid_...`
         await db.create(f"video:{video_id}", video_data)
-        
-        # 6. Create progress record (Placeholder - should be done by processor init or here)
-        # Assuming processor handles init of progress record via ProgressManager
-        
-        # 7. Launch processing
+        print(f"   🗄️  Video record created in DB (status: uploaded)")
+
+        # Auto-start processing
+        from services.progress_manager import progress_manager
+        await progress_manager.register_video(video_id)
+        print(f"   📡 Registered in progress manager")
+
         background_tasks.add_task(video_processor.process_full_pipeline, video_id, str(file_path))
-        
+        print(f"   🚀 Background processing task launched")
+        print(f"   ✅ Upload complete! Video ID: {video_id}\n")
+
         return VideoUploadResponse(
             video_id=video_id,
             status=VideoStatus.PROCESSING,
-            message="Video uploaded successfully. Processing started."
+            message="Video uploaded successfully. Processing started automatically."
         )
         
     except Exception as e:
@@ -96,7 +130,6 @@ async def upload_video(
         if 'file_path' in locals() and os.path.exists(file_path):
              os.remove(file_path)
         raise HTTPException(500, f"Upload failed: {str(e)}")
-
 @router.get("/{video_id}/status", response_model=VideoResponse)
 async def get_video_status(
     video_id: str,
@@ -109,9 +142,16 @@ async def get_video_status(
         # Explicitly fetching `video:ID`
         result = await db.select(f"video:{video_id}")
         video = result if not isinstance(result, list) else (result[0] if result else None)
-        
+
         if not video:
             raise HTTPException(404, "Video not found")
+
+        # Validate required fields are present
+        required_fields = ["id", "filename", "status", "created_at"]
+        missing_fields = [f for f in required_fields if f not in video]
+        if missing_fields:
+            print(f"⚠️  Video record missing fields: {missing_fields}")
+            raise HTTPException(500, f"Invalid video record: missing fields {missing_fields}")
             
         # 2. Validate owner (assuming user_id is stored simply or as record link)
         if video.get("user_id") != current_user["id"]:
@@ -134,23 +174,100 @@ async def get_violations(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
-    # Verify ownership first (omitted for brevity, assume similar check as above)
-    
-    # 3. Query Violations (Placeholder mock)
-    # In real imp, query `verification` joined with `detection`
-    # For Setup Phase, return empty or dummy
-    
-    items = [] # Populate with ViolationCard objects
-    
-    return PaginatedResponse(
-        items=items,
-        total=0,
-        page=page,
-        page_size=page_size,
-        total_pages=0,
-        has_next=False,
-        has_prev=False
-    )
+    """
+    Get all GDPR violations found in a video.
+    Returns verification records with linked detection data.
+    """
+    try:
+        # 1. Verify video ownership
+        db_video_id = video_id if video_id.startswith("video:") else f"video:{video_id}"
+        video_result = await db.select(db_video_id)
+        video = video_result if not isinstance(video_result, list) else (video_result[0] if video_result else None)
+
+        if not video:
+            raise HTTPException(404, "Video not found")
+
+        if video.get("user_id") != current_user["id"]:
+            raise HTTPException(403, "Not authorized")
+
+        # 2. Query all verifications for this video (with detection data)
+        # Using SurrealDB query to fetch verifications where detection.video = video_id
+        query = f"""
+            SELECT * FROM gdpr_verification
+            WHERE detection.video = {db_video_id}
+            FETCH detection
+        """
+
+        verifications = await db.query(query)
+
+        # Extract results from query response
+        # SurrealDB returns [{'result': [...], 'status': 'OK', 'time': '...'}]
+        if isinstance(verifications, list) and len(verifications) > 0:
+            verification_records = verifications[0].get('result', [])
+        else:
+            verification_records = []
+
+        # 3. Map to ViolationCard objects
+        items = []
+        for v_rec in verification_records:
+            # Get linked detection data
+            det_data = v_rec.get('detection', {})
+
+            # Handle if detection is a string ID (fetch it)
+            if isinstance(det_data, str):
+                det_result = await db.select(det_data)
+                det_data = det_result if not isinstance(det_result, list) else (det_result[0] if det_result else {})
+
+            # Get capture image from detection captures
+            captures = det_data.get('captures', [])
+            first_capture = captures[0] if captures else {}
+
+            # Build capture image URL
+            track_id = det_data.get('track_id', 0)
+            capture_filename = first_capture.get('filename', 'capture_0.jpg')
+            capture_url = f"/api/v1/video/{video_id}/capture/{track_id}/{capture_filename}"
+
+            # Create ViolationCard
+            items.append(ViolationCard(
+                verification_id=v_rec.get('id', ''),
+                detection_id=det_data.get('id', ''),
+                track_id=track_id,
+                detection_type=DetectionType(det_data.get('detection_type', 'unknown')),
+                capture_image_url=capture_url,
+                is_violation=v_rec.get('is_violation', False),
+                severity=Severity(v_rec.get('severity', 'none')),
+                violated_articles=v_rec.get('violated_articles', []),
+                description=v_rec.get('description', ''),
+                recommended_action=v_rec.get('recommended_action', 'none'),
+                confidence=v_rec.get('confidence', 0.0),
+                first_frame=det_data.get('first_frame', 0),
+                last_frame=det_data.get('last_frame', 0),
+                frames_analyzed=v_rec.get('frames_analyzed', 1),
+                frames_with_violation=v_rec.get('frames_with_violation', 0)
+            ))
+
+        # 4. Pagination (simple in-memory for now)
+        total = len(items)
+        total_pages = (total + page_size - 1) // page_size
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_items = items[start_idx:end_idx]
+
+        return PaginatedResponse(
+            items=paginated_items,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages,
+            has_next=page < total_pages,
+            has_prev=page > 1
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching violations: {e}")
+        raise HTTPException(500, f"Error fetching violations: {str(e)}")
 
 @router.get("/{video_id}/capture/{track_id}/{filename}")
 async def get_capture(

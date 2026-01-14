@@ -383,8 +383,31 @@
 /* Error Actions */
 .error-actions {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 1rem;
   margin-top: 2rem;
+}
+
+.error-actions .btn-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.redirect-notice {
+  color: #ef4444;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 0.5rem;
+  animation: pulse-error 1s ease-in-out infinite;
+}
+
+@keyframes pulse-error {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 .btn-retry, .btn-back {
@@ -451,4 +474,88 @@
 @keyframes scaleIn {
   from { transform: scale(0); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+/* Live Updates Section */
+.live-updates-section {
+  margin-top: 2.5rem;
+  width: 100%;
+  max-width: 600px;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.live-updates-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--brand-cyan);
+  margin: 0 0 1rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.live-updates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.live-update-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border-left: 3px solid var(--brand-cyan);
+  animation: slideInRight 0.3s ease-out;
+}
+
+.live-update-item[data-type="error"] {
+  border-left-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.live-update-item[data-type="success"] {
+  border-left-color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.live-update-item[data-type="detection"] {
+  border-left-color: #f59e0b;
+}
+
+.live-update-item[data-type="verification"] {
+  border-left-color: #a855f7;
+}
+
+.live-update-item[data-type="phase"] {
+  border-left-color: #3b82f6;
+}
+
+.update-timestamp {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: 'Courier New', monospace;
+  flex-shrink: 0;
+  min-width: 70px;
+}
+
+.update-message {
+  font-size: 0.875rem;
+  color: var(--text-white);
+  flex: 1;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }

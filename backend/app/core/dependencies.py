@@ -68,16 +68,24 @@ async def get_current_user(
                 "better-auth.session_token",
                 "occultashield-session-token",
                 "session_token",
+                "occultashield.session_data",  # This is the actual cookie name from Better-Auth
             ]
-
-            print(f"DEBUG [get_current_user]: Available cookies: {list(request.cookies.keys())}")
 
             for cookie_name in cookie_names:
                 session_cookie = request.cookies.get(cookie_name)
                 if session_cookie:
-                    token = session_cookie
-                    print(f"DEBUG: Token from cookie '{cookie_name}': {token[:20] if len(token) > 20 else token}...")
-                    break
+                    # Try to parse as JSON in case it contains structured data
+                    import json
+                    try:
+                        cookie_data = json.loads(session_cookie)
+                        # Better-Auth might store token in various fields
+                        token = cookie_data.get('token') or cookie_data.get('session_token') or cookie_data.get('sessionToken')
+                        if token:
+                            break
+                    except (json.JSONDecodeError, TypeError):
+                        # Not JSON, use the raw value as token
+                        token = session_cookie
+                        break
 
         if not token:
              raise HTTPException(
@@ -97,8 +105,6 @@ async def get_current_user(
         elif isinstance(response, list):
             records = response
         
-        print(f"DEBUG: Session records found: {records}")
-        
         if not records:
              raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -108,11 +114,14 @@ async def get_current_user(
             
         session = records[0]
         user_val = session.get('userId')
-        
-        print(f"DEBUG: userId from session: {user_val}")
-        
+
         # 2. Extract User ID string
         user_id = str(user_val) if user_val else None
+
+        # Fix: SurrealDB python client might return RecordID string with brackets (e.g. user:⟨id⟩)
+        # We need to remove them to query correctly.
+        if user_id:
+             user_id = user_id.replace("⟨", "").replace("⟩", "")
         
         if not user_id:
              raise HTTPException(
@@ -135,23 +144,17 @@ async def get_current_user(
         # But specifically for parameter usage, let's try direct string match first.
         # However, if $id is passed as "user:...", type::thing('user', ...) might double wrap it.
         # The safest way is to use the ID as provided if it has a colon.
-        
-        print(f"DEBUG: Fetching user with query: {u_query}, vars: {u_vars}")
-        
+
         u_response = await db.query(u_query, u_vars)
-        
+
         u_records = []
         if isinstance(u_response, list) and len(u_response) > 0 and isinstance(u_response[0], dict) and 'result' in u_response[0]:
             u_records = u_response[0]['result']
         elif isinstance(u_response, list):
             u_records = u_response
-            
-        print(f"DEBUG: User records: {u_records}")
-        
+
         if u_records:
             return u_records[0]
-        
-        print("DEBUG: User not found despite valid session. Returning minimal user object from session data.")
         # Fallback: Create a minimal user object so the request handles standard fields if the record is missing
         return {
             "id": user_id,

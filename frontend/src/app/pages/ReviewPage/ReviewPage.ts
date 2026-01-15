@@ -1,9 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { ViolationCard } from '#components/ViolationCard/ViolationCard';
-import type { ModificationType, Violation } from '#interface/violation.interface';
+import type { ModificationType, Violation, UserDecision } from '#interface/violation.interface';
 import { VideoService } from '#services/video.service';
-import type { UserDecision } from '#interface/violation.interface';
 import { environment } from '#environments/environment';
 
 @Component({
@@ -15,7 +14,6 @@ import { environment } from '#environments/environment';
 export class ReviewPage implements OnInit {
 
   private readonly router = inject(Router);
-
   private readonly route = inject(ActivatedRoute);
   private readonly videoService = inject(VideoService);
 
@@ -38,33 +36,58 @@ export class ReviewPage implements OnInit {
           // Need to handle image URL.
           // If backend sends relative path or full URL. Usually relative in 'capture_image_url' like '/api/v1/...'
 
+          // Build image URL - SecureMediaService will handle auth via HttpClient
           let imgUrl = v.capture_image_url;
           if (imgUrl && !imgUrl.startsWith('http')) {
-            // Prepend API base if needed, or assume it's a static file served by backend
-            // If it is an endpoint like /api/v1/video/{id}/capture/..., we might need origin.
-            // Assuming backend sends a usable URL or proxy path.
+            // Prepend API base if needed
             imgUrl = `${environment.apiUrl}${imgUrl}`;
           }
+          // No token in URL - ViolationCard uses SecureMediaService with Authorization header
 
-          // Map backend 'recommended_action' to default selection
-          let defaultOption: ModificationType = 'no_modify';
-          if (v.recommended_action === 'blur') defaultOption = 'blur';
-          if (v.recommended_action === 'pixelate') defaultOption = 'pixelate';
-          if (v.recommended_action === 'mask') defaultOption = 'mask';
+          // Map backend 'recommended_action' to ModificationType
+          let recommendedAction: ModificationType = 'no_modify';
+          if (v.recommended_action === 'blur') recommendedAction = 'blur';
+          if (v.recommended_action === 'pixelate') recommendedAction = 'pixelate';
+          if (v.recommended_action === 'mask') recommendedAction = 'mask';
 
-          // If specific logic needed: defaults to blur if violation
-          if (v.is_violation && defaultOption === 'no_modify') defaultOption = 'blur';
+          // Determine default selection based on violation status
+          let defaultOption: ModificationType;
+          if (!v.is_violation || v.severity === 'none') {
+            // No risk identified - default to no_modify
+            defaultOption = 'no_modify';
+          } else if (recommendedAction !== 'no_modify') {
+            // Use AI recommendation if available
+            defaultOption = recommendedAction;
+          } else {
+            // Fallback to blur for violations without specific recommendation
+            defaultOption = 'blur';
+          }
+
+          // Build fine text - hide if no risk
+          const showFine = v.is_violation && v.severity !== 'none';
+          const fineText = showFine
+            ? (v.fine_text || v.violated_articles.join(', ') || "Potential GDPR Violation")
+            : '';
 
           return {
             id: v.verification_id, // Important: Use verification_id for decisions
             articleTitle: `Detected: ${v.detection_type}`,
-            articleSubtitle: `${v.severity} Severity`,
+            articleSubtitle: v.severity.toUpperCase() + ' SEVERITY',
             description: v.description,
-            fineText: v.fine_text || v.violated_articles.join(', ') || "Potential GDPR Violation",
+            fineText,
             imageUrl: imgUrl || 'assets/images/placeholder.png',
             selectedOption: defaultOption,
-            framesAnalyzed: v.frames_analyzed ?? 1,  // Temporal Consensus
-            confidence: v.confidence
+            framesAnalyzed: v.frames_analyzed ?? 1,
+            confidence: v.confidence,
+            recommendedAction,
+            isViolation: v.is_violation,
+            severity: v.severity,
+            // Structured data for improved UI
+            violatedArticles: v.violated_articles || [],
+            firstFrame: v.first_frame,
+            lastFrame: v.last_frame,
+            detectionType: v.detection_type,
+            durationSeconds: v.duration_seconds
           };
         });
 

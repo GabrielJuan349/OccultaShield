@@ -10,6 +10,12 @@
     </div>
 
     <div class="user-actions">
+      @if (authService.isAdmin()) {
+        <a routerLink="/admin" class="btn-admin">
+          <span class="material-icons-outlined">admin_panel_settings</span>
+          Admin Panel
+        </a>
+      }
       <span class="user-email">{{ authService.user()?.email }}</span>
       <button class="btn-logout" (click)="logout()">
         <span class="material-icons-outlined">logout</span>

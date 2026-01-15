@@ -4,6 +4,7 @@ import logging
 from typing import Optional, List, Dict, Any, Union
 from pathlib import Path
 import json
+import surrealdb as sr
 
 from services.progress_manager import progress_manager, ProcessingPhase
 from modules.detection.detector import VideoDetector
@@ -67,17 +68,19 @@ class VideoProcessor:
             
             # Save Detections to DB
             saved_detections_map = {} # track_id -> db_record_id
-            
-            # Ensure video_id format for DB linking (video:ID)
-            db_video_id = video_id if video_id.startswith("video:") else f"video:{video_id}"
+
+            # Create proper RecordID for video (SurrealDB requires record<video> type)
+            clean_video_id = video_id.replace("video:", "") if video_id.startswith("video:") else video_id
+            db_video_record = sr.RecordID("video", clean_video_id)  # For creating detection records (record<video>)
+            db_video_id = f"video:{clean_video_id}"  # String format for merge operations
 
             for track in detection_result.detections:
                  # Calculate duration in seconds based on frame range (assuming 30fps)
                  fps = 30.0  # Default FPS
                  duration_seconds = (track.last_frame - track.first_frame) / fps if track.last_frame > track.first_frame else 0.0
-                 
+
                  d_record = {
-                     "video_id": db_video_id,  # Schema uses 'video_id' not 'video'
+                     "video_id": db_video_record,  # Must be RecordID, not string
                      "track_id": track.track_id,
                      "detection_type": track.detection_type,
                      "first_frame": track.first_frame,
@@ -93,9 +96,7 @@ class VideoProcessor:
                  
                  # Create detection record with error handling
                  try:
-                     print(f"   💾 [DB] Saving detection track {track.track_id}...")
                      created = await db_conn.create("detection", d_record)
-                     print(f"   💾 [DB] Create result: {created}")
                      if created:
                          # Surreal returns list of created records, take first
                          rec = created[0] if isinstance(created, list) else created
@@ -105,7 +106,6 @@ class VideoProcessor:
                          else:
                              rec_id = str(rec)
                          saved_detections_map[track.track_id] = rec_id
-                         print(f"      ✅ Track {track.track_id} -> {rec_id}")
                      else:
                          # Handle case when DB creation returns falsy value
                          rec_id = f"fallback_{track.track_id}"
@@ -145,22 +145,41 @@ class VideoProcessor:
                         }
                     })
             
-            print(f"   Created {len(verification_requests)} verification requests")
             await progress_manager.change_phase(video_id, ProcessingPhase.VERIFYING, f"Analyzing {len(verification_requests)} objects...")
-            
-            print(f"   Processing verification requests...")
             v_results = await self.verifier.process_requests(video_id, verification_requests)
-            print(f"✅ [VERIFICATION COMPLETE] Processed {len(v_results)} results")
+            print(f"✅ [VERIFICATION] Processed {len(v_results)} results")
             
             total_violations = 0
             for res in v_results:
-                # detection_id here is the DB ID we passed
+                # detection_id here is the DB ID we passed - could be RecordID or string
                 det_db_id = res.get("detection_id")
                 is_violation = res.get("is_violation", False)
                 if is_violation: total_violations += 1
-                
+
+                # Convert detection_id to proper RecordID if it's a string
+                if isinstance(det_db_id, str):
+                    # Parse "detection:xyz" format
+                    if ":" in str(det_db_id):
+                        table, record_id = str(det_db_id).split(":", 1)
+                        # Handle RecordID format like "detection:xyz" or "RecordID(table_name=detection, record_id=xyz)"
+                        if "RecordID" in table:
+                            # It's already been stringified from a RecordID, extract parts
+                            import re
+                            match = re.search(r"table_name=(\w+), record_id=([^)]+)", str(det_db_id))
+                            if match:
+                                table = match.group(1)
+                                record_id = match.group(2).strip("'\"")
+                        det_record_id = sr.RecordID(table, record_id)
+                    else:
+                        det_record_id = sr.RecordID("detection", str(det_db_id))
+                elif isinstance(det_db_id, sr.RecordID):
+                    det_record_id = det_db_id
+                else:
+                    # Fallback - try to create a RecordID
+                    det_record_id = sr.RecordID("detection", str(det_db_id))
+
                 v_record = {
-                    "detection_id": det_db_id,  # Link to detection table - schema expects 'detection_id'
+                    "detection_id": det_record_id,  # Must be RecordID for record<detection> type
                     "capture_index": 0,  # Required by schema
                     "is_violation": is_violation,
                     "severity": res.get("severity", "none"),
@@ -175,11 +194,9 @@ class VideoProcessor:
                     "llm_raw_response": str(res)
                 }
                 try:
-                    print(f"   💾 [DB] Saving verification for detection {det_db_id}...")
-                    verif_result = await db_conn.create("gdpr_verification", v_record)
-                    print(f"   💾 [DB] Verification result: {verif_result}")
+                    await db_conn.create("gdpr_verification", v_record)
                 except Exception as verif_error:
-                    print(f"   ❌ [DB] Error saving verification: {verif_error}")
+                    logger.error(f"Error saving verification for {det_db_id}: {verif_error}")
             
             # Update video status to VERIFIED (mapped from waiting_for_review for DB schema)
             await db_conn.merge(db_video_id, {
@@ -191,38 +208,47 @@ class VideoProcessor:
             print(f"   Total detections: {len(detection_result.detections)}")
             print(f"   Total violations: {total_violations}")
 
-            # Check if there are any violations
-            if total_violations == 0:
-                # No violations - skip review and go directly to anonymization (just metadata stripping)
-                print(f"   ℹ️  No violations found - skipping review and going directly to anonymization.")
-                # Update status to EDITING (mapped from anonymizing for DB schema)
-                await db_conn.merge(db_video_id, {"status": "editing"}) # Schema allows: editing
-                
-                # --- 3. ANONYMIZATION ---
-                await progress_manager.change_phase(video_id, ProcessingPhase.ANONYMIZING, "Applying anonymization filters...")
+            # Check if there are any DETECTIONS (not just violations)
+            # We want human review whenever there are detections, even if AI says no violation
+            if len(detection_result.detections) == 0:
+                # No detections at all - safe to skip review (only metadata stripping needed)
+                print(f"   ℹ️  No detections found - skipping review and going directly to metadata stripping.")
+                await db_conn.merge(db_video_id, {"status": "editing"})
+
+                # --- 3. ANONYMIZATION (metadata stripping only) ---
+                await progress_manager.change_phase(video_id, ProcessingPhase.ANONYMIZING, "Applying metadata stripping...")
                 await self.apply_anonymization(video_id, [], "system")
                 print(f"\n✅ [PIPELINE COMPLETE] Video: {video_id}")
-                print(f"   Status: COMPLETED (no violations)")
+                print(f"   Status: COMPLETED (no detections)")
                 print(f"{'='*60}\n")
                 return
 
-            # Notify Analysis Complete - violations found
+            # There are detections - ALWAYS require human review
+            # Even if AI says no violations, human must confirm
+            review_message = (
+                f"Analysis complete. Found {len(detection_result.detections)} detections"
+                f" ({total_violations} potential violations). Waiting for human review."
+            )
+            print(f"   📋 {review_message}")
+
+            # Notify Analysis Complete - detections found, waiting for human review
             await progress_manager.change_phase(
                 video_id,
                 ProcessingPhase.WAITING_FOR_REVIEW,
-                f"Analysis complete. Found {total_violations} potential violations. Waiting for review."
+                review_message
             )
 
             # Send additional progress update to ensure frontend receives the message
             await progress_manager.update_progress(
                 video_id,
                 progress=100,
-                message=f"Analysis complete. Found {total_violations} violations requiring review."
+                message=review_message
             )
 
             print(f"\n✅ [PIPELINE COMPLETE] Video: {video_id}")
             print(f"   Status: WAITING_FOR_REVIEW")
-            print(f"   Total violations pending review: {total_violations}")
+            print(f"   Total detections: {len(detection_result.detections)}")
+            print(f"   Total violations: {total_violations}")
             print(f"{'='*60}\n")
 
         except asyncio.TimeoutError:
@@ -254,12 +280,9 @@ class VideoProcessor:
                 except Exception as merge_error:
                     logger.error(f"Failed to update error status in DB: {merge_error}")
         finally:
-            # CRITICAL: Always close DB connection
-            if db_conn is not None:
-                try:
-                    await db_conn.close()
-                except Exception as close_error:
-                    logger.error(f"Failed to close DB connection: {close_error}")
+            # NOTE: Do NOT close the shared connection - it's used by other endpoints
+            # The connection is managed by _db_instance singleton
+            pass
 
     async def apply_anonymization(self, video_id: str, decisions: List[Any], user_id: str = "unknown"):
         """
@@ -316,22 +339,37 @@ class VideoProcessor:
                 
                 # Fetch verification record to get detection link
                 # verification record ID format: "gdpr_verification:..."
-                # If ver_id comes from frontend without prefix, might need adjustment, but usually we send full ID.
+                # If ver_id comes from frontend without prefix, add it
                 try:
+                    # Ensure ver_id has table prefix
+                    if not str(ver_id).startswith('gdpr_verification:'):
+                        ver_id = f"gdpr_verification:{ver_id}"
+
+                    print(f"   📝 Processing decision: ver_id={ver_id}, action={action_type}")
+
                     # Fetch verification record
                     ver_rec = await db_conn.select(ver_id)
-                    if not ver_rec: continue
+                    if not ver_rec:
+                        print(f"   ⚠️ Verification record not found: {ver_id}")
+                        continue
                     ver_rec = ver_rec[0] if isinstance(ver_rec, list) else ver_rec
+
+                    # Get detection link (field is 'detection_id', not 'detection')
+                    det_id = ver_rec.get('detection_id')
+                    if not det_id:
+                        print(f"   ⚠️ No detection_id in verification: {ver_rec.keys()}")
+                        continue
                     
-                    # Get detection link
-                    det_id = ver_rec.get('detection')
-                    if not det_id: continue
-                    
-                    # Fetch detection record
-                    det_rec = await db_conn.select(det_id)
-                    if not det_rec: continue
+                    # Fetch detection record - det_id might be RecordID object
+                    det_id_str = str(det_id)
+                    print(f"   📝 Fetching detection: {det_id_str}")
+                    det_rec = await db_conn.select(det_id_str)
+                    if not det_rec:
+                        print(f"   ⚠️ Detection record not found: {det_id_str}")
+                        continue
                     det_rec = det_rec[0] if isinstance(det_rec, list) else det_rec
-                    
+                    print(f"   ✅ Found detection: track_id={det_rec.get('track_id')}")
+
                     # Reconstruct bbox history
                     hist = det_rec.get("bbox_history", [])
                     bboxes_map = {
@@ -355,10 +393,16 @@ class VideoProcessor:
                         "masks": masks_map,
                         "config": {"kernel_size": 31} # Default config
                     })
-                    
+                    print(f"   ✅ Added action: type={action_type}, track_id={det_rec.get('track_id')}, frames={len(bboxes_map)}")
+
                 except Exception as ex:
                     logger.warning(f"Error processing decision for {ver_id}: {ex}")
+                    print(f"   ❌ Error processing decision: {ex}")
                     continue
+
+            print(f"\n   📊 Total actions to apply: {len(actions)}")
+            for i, act in enumerate(actions):
+                print(f"      [{i+1}] {act['type']} on track {act['track_id']} ({len(act['bboxes'])} frames)")
 
             # 3. Running Anonymizer
             output_path = Path("storage/processed") / f"anonymized_{Path(input_path).name}"
@@ -400,12 +444,9 @@ class VideoProcessor:
                 except Exception as merge_error:
                     logger.error(f"Failed to update error status in DB: {merge_error}")
         finally:
-            # CRITICAL: Always close DB connection
-            if db_conn is not None:
-                try:
-                    await db_conn.close()
-                except Exception as close_error:
-                    logger.error(f"Failed to close DB connection: {close_error}")
+            # NOTE: Do NOT close the shared connection - it's used by other endpoints
+            # The connection is managed by _db_instance singleton
+            pass
 
 # Singleton instance
 video_processor = VideoProcessor()

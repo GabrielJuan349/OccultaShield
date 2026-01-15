@@ -2,6 +2,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { catchError, tap } from 'rxjs/operators';
 import { of } from 'rxjs';
+import { environment } from '#environments/environment';
 import type {
   AdminStats,
   AdminUser,
@@ -27,6 +28,8 @@ export type User = AdminUser;
 })
 export class AdminService {
   private http = inject(HttpClient);
+  // Admin API está en el servidor de auth (puerto 4201), NO en el backend de video (8980)
+  private readonly baseUrl = environment.authUrl; // e.g., http://host:4201/api
 
   // Signals
   stats = signal<AdminStats | null>(null);
@@ -45,7 +48,7 @@ export class AdminService {
 
   getStats() {
     this.loading.set(true);
-    return this.http.get<AdminStats>('/api/admin/stats').pipe(
+    return this.http.get<AdminStats>(`${this.baseUrl}/admin/stats`).pipe(
       tap(stats => {
         this.stats.set(stats);
         this.loading.set(false);
@@ -64,7 +67,7 @@ export class AdminService {
 
   getUsers() {
     this.loading.set(true);
-    return this.http.get<AdminUser[]>('/api/admin/users').pipe(
+    return this.http.get<AdminUser[]>(`${this.baseUrl}/admin/users`).pipe(
       tap(users => {
         this.users.set(users);
         this.loading.set(false);
@@ -78,7 +81,7 @@ export class AdminService {
   }
 
   approveUser(userId: string) {
-    return this.http.patch(`/api/admin/users/${userId}/approve`, {}).pipe(
+    return this.http.patch(`${this.baseUrl}/admin/users/${userId}/approve`, {}).pipe(
       tap(() => {
         this.users.update(users =>
           users.map(u =>
@@ -92,7 +95,7 @@ export class AdminService {
   }
 
   rejectUser(userId: string) {
-    return this.http.patch(`/api/admin/users/${userId}/reject`, {}).pipe(
+    return this.http.patch(`${this.baseUrl}/admin/users/${userId}/reject`, {}).pipe(
       tap(() => {
         this.users.update(users =>
           users.filter(u => u.id !== userId && u.id !== `user:${userId}`)
@@ -102,7 +105,7 @@ export class AdminService {
   }
 
   updateUserRole(userId: string, role: UserRole) {
-    return this.http.patch(`/api/admin/users/${userId}/role`, { role }).pipe(
+    return this.http.patch(`${this.baseUrl}/admin/users/${userId}/role`, { role }).pipe(
       tap(() => {
         this.users.update(users =>
           users.map(u =>
@@ -120,7 +123,7 @@ export class AdminService {
   // ==========================================================================
 
   getSettings() {
-    return this.http.get<AppSettings>('/api/admin/settings').pipe(
+    return this.http.get<AppSettings>(`${this.baseUrl}/admin/settings`).pipe(
       tap(settings => this.settings.set(settings)),
       catchError(err => {
         console.error('Error fetching settings', err);
@@ -130,7 +133,7 @@ export class AdminService {
   }
 
   toggleClosedBetaMode(enabled: boolean) {
-    return this.http.put('/api/admin/settings/closedBetaMode', { value: enabled }).pipe(
+    return this.http.put(`${this.baseUrl}/admin/settings/closedBetaMode`, { value: enabled }).pipe(
       tap(() => {
         this.settings.update(s => ({ ...s, closedBetaMode: enabled }));
       })
@@ -145,7 +148,7 @@ export class AdminService {
     const params: Record<string, string | number> = { limit };
     if (action) params['action'] = action;
 
-    return this.http.get<AuditLogEntry[]>('/api/admin/audit-log', { params }).pipe(
+    return this.http.get<AuditLogEntry[]>(`${this.baseUrl}/admin/audit-log`, { params }).pipe(
       tap(log => this.auditLog.set(log)),
       catchError(err => {
         console.error('Error fetching audit log', err);

@@ -1,10 +1,11 @@
-import { NgOptimizedImage } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output, signal, effect, inject, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { ModificationType, Violation } from '#interface/violation.interface';
+import { SecureMediaService } from '#services/secure-media.service';
 
 @Component({
   selector: 'app-violation-card',
-  imports: [NgOptimizedImage],
+  imports: [],
   host: {
     '(document:keydown.escape)': 'onEscapeKey()',
     '(document:keydown)': 'onKeyDown($event)',
@@ -13,52 +14,144 @@ import type { ModificationType, Violation } from '#interface/violation.interface
     '(window:focus)': 'onWindowFocus()'
   },
   template: `
-    <div class="card-grid group">
+    <div class="card-container" [class.no-risk]="!data().isViolation">
+      <!-- Header with detection type and severity badge -->
+      <div class="card-header">
+        <div class="detection-info">
+          <span class="detection-type">{{ data().articleTitle }}</span>
+          <span class="severity-badge" [attr.data-severity]="data().severity">
+            {{ data().articleSubtitle }}
+          </span>
+        </div>
+        @if (data().confidence) {
+          <div class="confidence-indicator">
+            <span class="material-symbols-outlined">psychology</span>
+            <span>{{ (data().confidence! * 100).toFixed(0) }}% confidence</span>
+          </div>
+        }
+      </div>
 
-      <div class="col-options">
-        <h3 class="section-title">Modification Options</h3>
-        <div class="options-list">
+      <div class="card-body">
+        <!-- Image Preview Column -->
+        <div class="image-section" (click)="openPreview()" (keydown.enter)="openPreview()" tabindex="0" role="button" aria-label="Click to preview image">
+          <img
+            [src]="secureImageUrl()"
+            alt="Detection Preview"
+            class="preview-img"
+          >
+          <div class="image-overlay">
+            <span class="material-symbols-outlined">zoom_in</span>
+            <span>Preview</span>
+          </div>
+          @if (data().framesAnalyzed && data().framesAnalyzed! > 1) {
+            <div class="frames-badge">
+              <span class="material-symbols-outlined">movie</span>
+              {{ data().framesAnalyzed }} frames
+            </div>
+          }
+        </div>
 
-          @for (opt of options; track opt.value) {
-            <button
-              class="option-btn"
-              [class.active]="currentSelection() === opt.value"
-              (click)="selectOption(opt.value)"
-            >
-              <span class="material-symbols-outlined icon">
-                {{ currentSelection() === opt.value ? 'radio_button_checked' : opt.icon }}
-              </span>
-              {{ opt.label }}
-            </button>
+        <!-- Info & Options Column -->
+        <div class="info-section">
+          <!-- Evidence Section: Frame Range & Confidence -->
+          <div class="evidence-section">
+            <h4 class="section-title">
+              <span class="material-symbols-outlined">analytics</span>
+              Evidence
+            </h4>
+            <div class="evidence-grid">
+              <!-- Frame Range -->
+              @if (data().firstFrame && data().lastFrame) {
+                <div class="evidence-item">
+                  <span class="material-symbols-outlined">movie</span>
+                  <div class="evidence-content">
+                    <span class="evidence-label">Frame Range</span>
+                    <span class="evidence-value">{{ data().firstFrame }} - {{ data().lastFrame }}</span>
+                  </div>
+                </div>
+              }
+              <!-- Frames Analyzed -->
+              @if (data().framesAnalyzed) {
+                <div class="evidence-item">
+                  <span class="material-symbols-outlined">photo_library</span>
+                  <div class="evidence-content">
+                    <span class="evidence-label">Frames Analyzed</span>
+                    <span class="evidence-value">{{ data().framesAnalyzed }}</span>
+                  </div>
+                </div>
+              }
+              <!-- Confidence Bar -->
+              @if (data().confidence) {
+                <div class="evidence-item confidence-item">
+                  <span class="material-symbols-outlined">psychology</span>
+                  <div class="evidence-content">
+                    <span class="evidence-label">AI Confidence</span>
+                    <div class="confidence-bar-container">
+                      <div class="confidence-bar" [style.width.%]="(data().confidence! * 100)" [attr.data-level]="getConfidenceLevel(data().confidence!)"></div>
+                      <span class="confidence-text">{{ (data().confidence! * 100).toFixed(0) }}%</span>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Compliance Section: Violated Articles -->
+          @if (data().violatedArticles && data().violatedArticles!.length > 0) {
+            <div class="compliance-section">
+              <h4 class="section-title">
+                <span class="material-symbols-outlined">policy</span>
+                Compliance Issues
+              </h4>
+              <div class="articles-chips">
+                @for (article of data().violatedArticles; track article) {
+                  <span class="article-chip">{{ article }}</span>
+                }
+              </div>
+            </div>
           }
 
+          <!-- AI Recommendation Badge -->
+          @if (data().recommendedAction && data().recommendedAction !== 'no_modify') {
+            <div class="ai-recommendation">
+              <span class="material-symbols-outlined">smart_toy</span>
+              <span>AI recommends: <strong>{{ getActionLabel(data().recommendedAction!) }}</strong></span>
+            </div>
+          }
+
+          <!-- Fine Box - only show if there's a fine -->
+          @if (data().fineText) {
+            <div class="fine-box">
+              <span class="material-symbols-outlined">gavel</span>
+              <div class="fine-content">
+                <span class="fine-label">Potential Fine</span>
+                <span class="fine-value">{{ data().fineText }}</span>
+              </div>
+            </div>
+          }
+
+          <!-- Modification Options -->
+          <div class="options-section">
+            <h4 class="options-title">Select Action</h4>
+            <div class="options-grid">
+              @for (opt of options; track opt.value) {
+                <button
+                  class="option-btn"
+                  [class.active]="currentSelection() === opt.value"
+                  [class.recommended]="data().recommendedAction === opt.value && opt.value !== 'no_modify'"
+                  (click)="selectOption(opt.value)"
+                >
+                  <span class="material-symbols-outlined">{{ opt.icon }}</span>
+                  <span class="option-label">{{ opt.label }}</span>
+                  @if (data().recommendedAction === opt.value && opt.value !== 'no_modify') {
+                    <span class="rec-badge">AI</span>
+                  }
+                </button>
+              }
+            </div>
+          </div>
         </div>
       </div>
-
-      <div class="col-info">
-        <h2 class="article-title">{{ data().articleTitle }}</h2>
-        <p class="article-subtitle">{{ data().articleSubtitle }}</p>
-        <p class="description">{{ data().description }}</p>
-
-        <div class="fine-box">
-          <h4 class="fine-label">Potential Fine</h4>
-          <p class="fine-value">{{ data().fineText }}</p>
-        </div>
-      </div>
-
-      <div class="col-image" (click)="openPreview()" (keydown.enter)="openPreview()" tabindex="0" role="button" aria-label="Click to preview image">
-        <img
-          [ngSrc]="data().imageUrl"
-          fill
-          alt="Violation Preview"
-          class="preview-img"
-        >
-        <div class="image-overlay">
-          <span class="material-symbols-outlined">zoom_in</span>
-          <span>Click to preview</span>
-        </div>
-      </div>
-
     </div>
 
     <!-- Modal de previsualización con protección contra capturas -->
@@ -75,7 +168,7 @@ import type { ModificationType, Violation } from '#interface/violation.interface
           </button>
           <div class="protected-image-container" [class.hidden-for-capture]="isHiddenForCapture()">
             <img
-              [src]="data().imageUrl"
+              [src]="secureImageUrl()"
               alt="Full size preview"
               class="modal-image"
               (contextmenu)="preventAction($event)"
@@ -103,6 +196,10 @@ import type { ModificationType, Violation } from '#interface/violation.interface
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ViolationCard {
+  // Services
+  private readonly secureMedia = inject(SecureMediaService);
+  private readonly destroyRef = inject(DestroyRef);
+
   // Inputs requeridos (Signal Inputs de Angular moderno)
   readonly data = input.required<Violation>();
 
@@ -118,13 +215,62 @@ export class ViolationCard {
   // Estado para ocultar imagen durante capturas
   protected readonly isHiddenForCapture = signal(false);
 
+  // URL segura de la imagen (blob URL)
+  protected readonly secureImageUrl = signal<string>('');
+
   // Configuración de botones para el HTML
   protected readonly options: readonly { label: string; value: ModificationType; icon: string }[] = [
-    { label: 'No Modify', value: 'no_modify', icon: 'radio_button_unchecked' },
+    { label: 'No Modify', value: 'no_modify', icon: 'block' },
     { label: 'Pixelate', value: 'pixelate', icon: 'grid_on' },
     { label: 'Mask', value: 'mask', icon: 'visibility_off' },
     { label: 'Blur', value: 'blur', icon: 'blur_on' }
   ] as const;
+
+  // Map for action labels
+  private readonly actionLabels: Record<ModificationType, string> = {
+    'no_modify': 'No Modify',
+    'pixelate': 'Pixelate',
+    'mask': 'Mask',
+    'blur': 'Blur'
+  };
+
+  constructor() {
+    // Sync currentSelection with input data when it changes
+    effect(() => {
+      const selectedOption = this.data().selectedOption;
+      if (selectedOption) {
+        this.currentSelection.set(selectedOption);
+      }
+    });
+
+    // Load image securely when data changes
+    effect(() => {
+      const url = this.data().imageUrl;
+      if (url && !url.startsWith('blob:') && !url.startsWith('assets/')) {
+        // Load via SecureMediaService (uses HttpClient with Authorization header)
+        this.secureMedia.loadImage(url).pipe(
+          takeUntilDestroyed(this.destroyRef)
+        ).subscribe(blobUrl => {
+          if (blobUrl) {
+            this.secureImageUrl.set(blobUrl);
+          }
+        });
+      } else if (url) {
+        // Fallback for placeholders or already-blob URLs
+        this.secureImageUrl.set(url);
+      }
+    });
+  }
+
+  getActionLabel(action: ModificationType): string {
+    return this.actionLabels[action] || action;
+  }
+
+  getConfidenceLevel(confidence: number): string {
+    if (confidence >= 0.9) return 'high';
+    if (confidence >= 0.7) return 'medium';
+    return 'low';
+  }
 
   selectOption(value: ModificationType): void {
     this.currentSelection.set(value);

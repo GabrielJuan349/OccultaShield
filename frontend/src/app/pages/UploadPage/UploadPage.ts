@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal, viewChild, computed, effect } from '@angular/core';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { of, tap, switchMap, map, catchError, filter, concat } from 'rxjs';
 import { HttpEventType } from '@angular/common/http';
 import { FileDropDirective } from '../../directives/file-drop';
@@ -74,7 +74,7 @@ interface ValidationResult {
 }
 
 @Component({
-  imports: [FileDropDirective],
+  imports: [FileDropDirective, RouterLink],
   templateUrl: './UploadPage.html',
   styleUrl: './UploadPage.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

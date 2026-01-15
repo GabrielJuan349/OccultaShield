@@ -64,6 +64,7 @@ export class AuthService {
 
   /**
    * Verifica si hay una sesión activa
+   * Usa localStorage para verificación rápida, luego refresca en background
    */
   async checkSession(): Promise<boolean> {
     if (!this.isBrowser) {
@@ -83,9 +84,40 @@ export class AuthService {
       return true;
     }
 
+    // NUEVO: Verificación rápida con localStorage
+    const savedToken = localStorage.getItem('session_token');
+    const savedRole = localStorage.getItem('user_role');
+
+    if (savedToken && savedRole) {
+      console.log('⚡ AuthService: Verificación rápida con localStorage - rol:', savedRole);
+
+      // Crear usuario temporal con rol para acceso inmediato
+      this._user.set({
+        id: 'pending',
+        email: 'loading...',
+        name: 'loading...',
+        role: savedRole,
+        emailVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as User);
+
+      this._session.set({
+        id: 'pending',
+        userId: 'pending',
+        token: savedToken,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      // Refrescar datos completos del servidor en background (no bloquea)
+      this.refreshUserFromServer();
+
+      return true;
+    }
+
     this._isLoading.set(true);
     this._error.set(null);
-    console.log('🔄 AuthService: Iniciando checkSession...');
+    console.log('🔄 AuthService: Iniciando checkSession (sin localStorage)...');
 
     // Create new promise for this check
     const checkPromise = (async () => {
@@ -167,13 +199,19 @@ export class AuthService {
       }
 
       if (result.data?.user) {
-        this._user.set(result.data.user as User);
+        const userData = result.data.user as User;
+        this._user.set(userData);
         // Better-Auth devuelve token, creamos objeto session
         if (result.data.token) {
           localStorage.setItem('session_token', result.data.token);
+          // Guardar rol para verificación rápida (localStorage)
+          const userRole = userData.role || 'user';
+          localStorage.setItem('user_role', userRole);
+          console.log('💾 Guardado en localStorage: token + role =', userRole);
+
           this._session.set({
             id: generateUUID(),
-            userId: result.data.user.id,
+            userId: userData.id,
             token: result.data.token,
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
           });
@@ -275,6 +313,7 @@ export class AuthService {
       this._session.set(null);
       this._isLoading.set(false);
       localStorage.removeItem('session_token');
+      localStorage.removeItem('user_role');
 
       // Redirigir y forzar recarga completa para limpiar todo el estado
       window.location.href = '/login';
@@ -307,10 +346,23 @@ export class AuthService {
   }
 
   /**
-   * Verifica si el usuario tiene un rol específico
+   * Verifica si el usuario tiene un rol específico (case-insensitive)
    */
   hasRole(role: string): boolean {
-    return this._user()?.role === role;
+    const userRole = this._user()?.role;
+    if (!userRole) {
+      // Fallback: verificar en localStorage para verificación rápida
+      if (this.isBrowser) {
+        const savedRole = localStorage.getItem('user_role');
+        if (savedRole) {
+          console.log('🔐 hasRole check (localStorage):', { savedRole, requiredRole: role });
+          return savedRole.toLowerCase() === role.toLowerCase();
+        }
+      }
+      return false;
+    }
+    console.log('🔐 hasRole check:', { userRole, requiredRole: role });
+    return userRole.toLowerCase() === role.toLowerCase();
   }
 
   /**
@@ -318,5 +370,25 @@ export class AuthService {
    */
   isAdmin(): boolean {
     return this.hasRole('admin');
+  }
+
+  /**
+   * Refresca los datos del usuario desde el servidor en background
+   */
+  private async refreshUserFromServer(): Promise<void> {
+    try {
+      const result = await getSession({ fetchOptions: { credentials: 'include' } });
+      if (result.data?.user) {
+        const userData = result.data.user as User;
+        this._user.set(userData);
+        // Actualizar rol en localStorage si cambió
+        if (this.isBrowser && userData.role) {
+          localStorage.setItem('user_role', userData.role);
+        }
+        console.log('🔄 Usuario refrescado desde servidor:', userData.email);
+      }
+    } catch (e) {
+      console.warn('⚠️ No se pudo refrescar usuario del servidor:', e);
+    }
   }
 }

@@ -18,8 +18,15 @@ class SurrealConn:
         self.url = os.getenv('SURREALDB_URL')
         self.host = os.getenv('SURREALDB_HOST', 'localhost')
         self.port = os.getenv('SURREALDB_PORT', '8000')
-        self.user = os.getenv('SURREALDB_USER', 'root')
-        self.password = os.getenv('SURREALDB_PASS', 'root')
+
+        # Credenciales obligatorias - sin valores por defecto por seguridad
+        self.user = os.getenv('SURREALDB_USER')
+        self.password = os.getenv('SURREALDB_PASS')
+        if not self.user or not self.password:
+            raise ValueError(
+                "❌ SURREALDB_USER and SURREALDB_PASS must be set in environment variables. "
+                "Please configure them in your .env file or environment."
+            )
 
         if not self.url:
             self.url = f"ws://{self.host}:{self.port}/rpc"
@@ -72,7 +79,7 @@ class SurrealConn:
 
         try:
             await self.db.use(namespace, target_db)
-            logger.debug(f"Using namespace: {namespace}, database: {target_db}")
+            print(f"✅ [DB] Using namespace: {namespace}, database: {target_db}")
         except Exception as e:
             logger.error(f"Error selecting namespace/database: {e}")
             # Connection might be broken, try reconnecting

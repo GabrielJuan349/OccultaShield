@@ -26,6 +26,18 @@ export const authGuard: CanActivateFn = async (route, state) => {
   const requiredRole = route.data['role'] as string | undefined;
   const guestOnly = route.data['guestOnly'] === true;
 
+  // Debug: mostrar estado de verificación
+  const savedRole = localStorage.getItem('user_role');
+  const savedToken = localStorage.getItem('session_token');
+  console.log('🔐 authGuard Check:', {
+    url: state.url,
+    requiredRole: requiredRole || 'none',
+    guestOnly,
+    savedRole,
+    hasToken: !!savedToken,
+    isAuthenticatedInMemory: authService.isAuthenticated()
+  });
+
   // --- GUEST ONLY MODE ---
   if (guestOnly) {
     // Ya autenticado? Redirigir a upload
@@ -84,15 +96,25 @@ export const authGuard: CanActivateFn = async (route, state) => {
 
   // Si no requiere rol específico, permitir
   if (!requiredRole) {
+    console.log('✅ authGuard: Sin rol requerido - acceso permitido');
     return true;
   }
 
-  // Verificar rol
-  if (authService.hasRole(requiredRole)) {
+  // Verificar rol (hasRole es case-insensitive)
+  const hasRequiredRole = authService.hasRole(requiredRole);
+  console.log('🔐 authGuard: Verificando rol:', {
+    userRole: user?.role,
+    requiredRole,
+    hasRequiredRole
+  });
+
+  if (hasRequiredRole) {
+    console.log('✅ authGuard: Rol correcto - acceso permitido a', state.url);
     return true;
   }
 
   // No tiene el rol requerido, redirigir a upload
+  console.log('❌ authGuard: Rol incorrecto - redirigiendo a /upload');
   router.navigate(['/upload'], { replaceUrl: true });
   return false;
 };

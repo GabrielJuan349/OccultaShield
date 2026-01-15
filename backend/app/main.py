@@ -36,18 +36,24 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # Localhost development
         "http://localhost:4200",
         "http://localhost:4201",
         "http://localhost:4000",
         "http://127.0.0.1:4200",
         "http://127.0.0.1:4201",
         "http://127.0.0.1:4000",
+        # External server - all common ports
+        "http://mise-ralph.uab.cat",
+        "https://mise-ralph.uab.cat",
+        "http://mise-ralph.uab.cat:80",
+        "http://mise-ralph.uab.cat:443",
         "http://mise-ralph.uab.cat:4200",
         "http://mise-ralph.uab.cat:4201",
-        "http://mise-ralph.uab.cat:8980"
+        "http://mise-ralph.uab.cat:8980",
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
 

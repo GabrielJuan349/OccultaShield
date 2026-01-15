@@ -60,9 +60,13 @@ class KorniaEffects:
         x1, y1, x2, y2 = bbox
         result = tensor.clone()
         roi = tensor[:, :, y1:y2, x1:x2]
-        
+
+        # Defense in depth: Skip if ROI has zero dimensions
+        if roi.shape[2] == 0 or roi.shape[3] == 0:
+            return tensor
+
         if kernel_size % 2 == 0: kernel_size += 1
-        
+
         blurred_roi = kornia.filters.gaussian_blur2d(roi, (kernel_size, kernel_size), (sigma, sigma))
         
         if mask is not None:
@@ -317,8 +321,20 @@ class VideoAnonymizer:
                 
                 box = bboxes_map.get(frame_idx)
                 if not box: continue
-                bbox = (int(box[0]), int(box[1]), int(box[2]), int(box[3]))
-                
+
+                # FIX: Validate bbox dimensions to prevent zero-size ROI errors
+                H, W = tensor.shape[2], tensor.shape[3]
+                x1 = max(0, min(int(box[0]), W))
+                y1 = max(0, min(int(box[1]), H))
+                x2 = max(0, min(int(box[2]), W))
+                y2 = max(0, min(int(box[3]), H))
+
+                # Skip invalid regions (zero or negative dimensions)
+                if x2 <= x1 or y2 <= y1:
+                    continue
+
+                bbox = (x1, y1, x2, y2)
+
                 if action_type == "blur":
                     blur_regions.append({
                         "bbox": bbox, "mask": self._create_mask_tensor(action, frame_idx, tensor.shape), 

@@ -26,13 +26,29 @@ async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction)
     try {
         const auth = await getAuth();
 
+        // DEBUG: Log raw incoming headers for diagnosis
+        console.log('🔍 [requireAdmin] Incoming request headers:', {
+            authorization: req.headers['authorization'] ? `Bearer ${req.headers['authorization'].substring(0, 20)}...` : 'NOT PRESENT',
+            cookie: req.headers['cookie'] ? `${req.headers['cookie'].substring(0, 100)}...` : 'NOT PRESENT',
+            origin: req.headers['origin'],
+            host: req.headers['host'],
+        });
+
         // Mejoramos la extracción de headers para Better-Auth
         const headers = new Headers();
         for (const [key, value] of Object.entries(req.headers)) {
             if (value) {
+                // Asegurar que las cookies y authorization se pasen íntegras
                 headers.set(key, Array.isArray(value) ? value.join(', ') : value);
             }
         }
+
+        // DEBUG: Log constructed Headers object
+        console.log('🔍 [requireAdmin] Headers passed to getSession:', {
+            authorization: headers.get('authorization') ? 'PRESENT' : 'NOT PRESENT',
+            cookie: headers.get('cookie') ? 'PRESENT' : 'NOT PRESENT',
+            allHeaderKeys: [...headers.keys()],
+        });
 
         // Better-Auth getSession puede recibir el objeto headers directamente
         const session = await auth.api.getSession({
@@ -48,10 +64,11 @@ async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction)
 
         if (!session?.user) {
             console.warn('⚠️ Admin Access Denied: No session found');
-            // Log all cookie names
+            // Log all cookie names for diagnosis
             const cookieHeader = req.headers.cookie || '';
             const cookieNames = cookieHeader.split(';').map(c => c.trim().split('=')[0]).filter(Boolean);
             console.log('🍪 Cookie names received:', cookieNames);
+            console.log('💡 Tip: If cookies are empty but Authorization is present, check if Better-Auth is configured to accept Bearer tokens.');
             res.status(401).json({ error: 'Not authenticated' });
             return;
         }

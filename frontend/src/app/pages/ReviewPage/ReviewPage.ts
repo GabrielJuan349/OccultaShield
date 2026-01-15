@@ -3,6 +3,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { ViolationCard } from '#components/ViolationCard/ViolationCard';
 import type { ModificationType, Violation } from '#interface/violation.interface';
 import { VideoService } from '#services/video.service';
+import { AuthService } from '#services/auth.service';
 import type { UserDecision } from '#interface/violation.interface';
 import { environment } from '#environments/environment';
 
@@ -15,9 +16,9 @@ import { environment } from '#environments/environment';
 export class ReviewPage implements OnInit {
 
   private readonly router = inject(Router);
-
   private readonly route = inject(ActivatedRoute);
   private readonly videoService = inject(VideoService);
+  private readonly authService = inject(AuthService);
 
   // Signal que contiene el array de vulneraciones
   protected readonly violations = signal<Violation[]>([]);
@@ -40,31 +41,54 @@ export class ReviewPage implements OnInit {
 
           let imgUrl = v.capture_image_url;
           if (imgUrl && !imgUrl.startsWith('http')) {
-            // Prepend API base if needed, or assume it's a static file served by backend
-            // If it is an endpoint like /api/v1/video/{id}/capture/..., we might need origin.
-            // Assuming backend sends a usable URL or proxy path.
+            // Prepend API base if needed
             imgUrl = `${environment.apiUrl}${imgUrl}`;
           }
+          // Add token as query param for authentication (img tags don't send Auth headers)
+          const token = this.authService.getToken();
+          if (imgUrl && token) {
+            const separator = imgUrl.includes('?') ? '&' : '?';
+            imgUrl = `${imgUrl}${separator}token=${encodeURIComponent(token)}`;
+          }
 
-          // Map backend 'recommended_action' to default selection
-          let defaultOption: ModificationType = 'no_modify';
-          if (v.recommended_action === 'blur') defaultOption = 'blur';
-          if (v.recommended_action === 'pixelate') defaultOption = 'pixelate';
-          if (v.recommended_action === 'mask') defaultOption = 'mask';
+          // Map backend 'recommended_action' to ModificationType
+          let recommendedAction: ModificationType = 'no_modify';
+          if (v.recommended_action === 'blur') recommendedAction = 'blur';
+          if (v.recommended_action === 'pixelate') recommendedAction = 'pixelate';
+          if (v.recommended_action === 'mask') recommendedAction = 'mask';
 
-          // If specific logic needed: defaults to blur if violation
-          if (v.is_violation && defaultOption === 'no_modify') defaultOption = 'blur';
+          // Determine default selection based on violation status
+          let defaultOption: ModificationType;
+          if (!v.is_violation || v.severity === 'none') {
+            // No risk identified - default to no_modify
+            defaultOption = 'no_modify';
+          } else if (recommendedAction !== 'no_modify') {
+            // Use AI recommendation if available
+            defaultOption = recommendedAction;
+          } else {
+            // Fallback to blur for violations without specific recommendation
+            defaultOption = 'blur';
+          }
+
+          // Build fine text - hide if no risk
+          const showFine = v.is_violation && v.severity !== 'none';
+          const fineText = showFine
+            ? (v.fine_text || v.violated_articles.join(', ') || "Potential GDPR Violation")
+            : '';
 
           return {
             id: v.verification_id, // Important: Use verification_id for decisions
             articleTitle: `Detected: ${v.detection_type}`,
-            articleSubtitle: `${v.severity} Severity`,
+            articleSubtitle: v.severity.toUpperCase() + ' SEVERITY',
             description: v.description,
-            fineText: v.fine_text || v.violated_articles.join(', ') || "Potential GDPR Violation",
+            fineText,
             imageUrl: imgUrl || 'assets/images/placeholder.png',
             selectedOption: defaultOption,
-            framesAnalyzed: v.frames_analyzed ?? 1,  // Temporal Consensus
-            confidence: v.confidence
+            framesAnalyzed: v.frames_analyzed ?? 1,
+            confidence: v.confidence,
+            recommendedAction,
+            isViolation: v.is_violation,
+            severity: v.severity
           };
         });
 

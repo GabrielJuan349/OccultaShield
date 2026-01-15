@@ -55,6 +55,9 @@ export interface Violation {
   selectedOption: ModificationType;
   framesAnalyzed?: number;
   confidence?: number;
+  recommendedAction?: ModificationType;
+  isViolation?: boolean;
+  severity?: SeverityLevel;
 }
 
 // === User Decision Types ===

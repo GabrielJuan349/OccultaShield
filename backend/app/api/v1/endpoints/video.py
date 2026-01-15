@@ -259,27 +259,15 @@ async def get_violations(
         all_det_query = "SELECT * FROM detection"
         all_det_result = await db.query(all_det_query)
 
-        print(f"[VIOLATIONS DEBUG] Raw query result type: {type(all_det_result)}, len: {len(all_det_result) if isinstance(all_det_result, list) else 'N/A'}")
-
         all_detections = []
         if isinstance(all_det_result, list) and len(all_det_result) > 0:
             first_item = all_det_result[0]
-            print(f"[VIOLATIONS DEBUG] First item type: {type(first_item)}, keys: {first_item.keys() if isinstance(first_item, dict) else 'N/A'}")
             if isinstance(first_item, dict) and 'result' in first_item:
                 all_detections = first_item.get('result', [])
             elif isinstance(first_item, dict):
-                # Maybe it's direct records without 'result' wrapper
                 all_detections = all_det_result
             else:
                 all_detections = all_det_result
-
-        print(f"[VIOLATIONS DEBUG] all_detections count: {len(all_detections)}")
-        if all_detections:
-            # Only print essential fields, not the huge bbox_history/mask data
-            first_det = all_detections[0] if isinstance(all_detections[0], dict) else {}
-            first_video_id = first_det.get('video_id')
-            print(f"[VIOLATIONS DEBUG] First detection: id={first_det.get('id')}, video_id={first_video_id}, track_id={first_det.get('track_id')}")
-            print(f"[VIOLATIONS DEBUG] First detection video_id type: {type(first_video_id)}")
 
         # Filter detections that match this video_id (check string representation)
         detection_records = []
@@ -292,19 +280,12 @@ async def get_violations(
             if video_id in det_video_str:
                 detection_records.append(det)
 
-        print(f"[VIOLATIONS] video_id: {video_id}, found {len(detection_records)} detections (from {len(all_detections)} total)")
-
-        # 3. First, get ALL verifications to debug
+        # 3. Get ALL verifications and build lookup map
         all_verif_query = "SELECT * FROM gdpr_verification"
         all_verif_result = await db.query(all_verif_query)
         all_verifications = []
         if isinstance(all_verif_result, list) and len(all_verif_result) > 0:
             all_verifications = all_verif_result[0].get('result', []) if isinstance(all_verif_result[0], dict) and 'result' in all_verif_result[0] else all_verif_result
-
-        print(f"[VIOLATIONS DEBUG] Total verifications in DB: {len(all_verifications)}")
-        if all_verifications:
-            first_v = all_verifications[0] if isinstance(all_verifications[0], dict) else {}
-            print(f"[VIOLATIONS DEBUG] First verification: id={first_v.get('id')}, detection_id={first_v.get('detection_id')}, type={type(first_v.get('detection_id'))}")
 
         # Build a map of detection_id -> verifications for faster lookup
         verif_by_detection = {}
@@ -317,9 +298,7 @@ async def get_violations(
                 verif_by_detection[v_det_str] = []
             verif_by_detection[v_det_str].append(v)
 
-        print(f"[VIOLATIONS DEBUG] Verification map keys: {list(verif_by_detection.keys())[:5]}")
-
-        # 3. For each detection, get its verification from the map
+        # 4. For each detection, get its verification from the map
         verification_records = []
         for det in detection_records:
             det_id = det.get('id')
@@ -329,14 +308,12 @@ async def get_violations(
             det_id_str = str(det_id)
             v_records = verif_by_detection.get(det_id_str, [])
 
-            print(f"[VIOLATIONS DEBUG] Detection {det_id_str} has {len(v_records)} verifications")
-
             for v_rec in v_records:
                 # Attach the detection data to the verification record
                 v_rec['detection_id'] = det
                 verification_records.append(v_rec)
 
-        print(f"[VIOLATIONS DEBUG] Total verifications: {len(verification_records)}")
+        print(f"[VIOLATIONS] Returning {len(verification_records)} violations for video {video_id}")
 
         # 4. Map to ViolationCard objects
         items = []

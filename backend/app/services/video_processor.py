@@ -339,22 +339,37 @@ class VideoProcessor:
                 
                 # Fetch verification record to get detection link
                 # verification record ID format: "gdpr_verification:..."
-                # If ver_id comes from frontend without prefix, might need adjustment, but usually we send full ID.
+                # If ver_id comes from frontend without prefix, add it
                 try:
+                    # Ensure ver_id has table prefix
+                    if not str(ver_id).startswith('gdpr_verification:'):
+                        ver_id = f"gdpr_verification:{ver_id}"
+
+                    print(f"   📝 Processing decision: ver_id={ver_id}, action={action_type}")
+
                     # Fetch verification record
                     ver_rec = await db_conn.select(ver_id)
-                    if not ver_rec: continue
+                    if not ver_rec:
+                        print(f"   ⚠️ Verification record not found: {ver_id}")
+                        continue
                     ver_rec = ver_rec[0] if isinstance(ver_rec, list) else ver_rec
+
+                    # Get detection link (field is 'detection_id', not 'detection')
+                    det_id = ver_rec.get('detection_id')
+                    if not det_id:
+                        print(f"   ⚠️ No detection_id in verification: {ver_rec.keys()}")
+                        continue
                     
-                    # Get detection link
-                    det_id = ver_rec.get('detection')
-                    if not det_id: continue
-                    
-                    # Fetch detection record
-                    det_rec = await db_conn.select(det_id)
-                    if not det_rec: continue
+                    # Fetch detection record - det_id might be RecordID object
+                    det_id_str = str(det_id)
+                    print(f"   📝 Fetching detection: {det_id_str}")
+                    det_rec = await db_conn.select(det_id_str)
+                    if not det_rec:
+                        print(f"   ⚠️ Detection record not found: {det_id_str}")
+                        continue
                     det_rec = det_rec[0] if isinstance(det_rec, list) else det_rec
-                    
+                    print(f"   ✅ Found detection: track_id={det_rec.get('track_id')}")
+
                     # Reconstruct bbox history
                     hist = det_rec.get("bbox_history", [])
                     bboxes_map = {
@@ -378,10 +393,16 @@ class VideoProcessor:
                         "masks": masks_map,
                         "config": {"kernel_size": 31} # Default config
                     })
-                    
+                    print(f"   ✅ Added action: type={action_type}, track_id={det_rec.get('track_id')}, frames={len(bboxes_map)}")
+
                 except Exception as ex:
                     logger.warning(f"Error processing decision for {ver_id}: {ex}")
+                    print(f"   ❌ Error processing decision: {ex}")
                     continue
+
+            print(f"\n   📊 Total actions to apply: {len(actions)}")
+            for i, act in enumerate(actions):
+                print(f"      [{i+1}] {act['type']} on track {act['track_id']} ({len(act['bboxes'])} frames)")
 
             # 3. Running Anonymizer
             output_path = Path("storage/processed") / f"anonymized_{Path(input_path).name}"

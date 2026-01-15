@@ -1,6 +1,6 @@
 # Terms of Service & Acceptable Use Policy
 
-**Last Updated:** [Date]
+**Last Updated:** [January 16, 2026]
 **Version:** 3.1 (Total Shield: Operational, Ethical, Civil & International)
 
 ## 1. Acceptance and Contractual Nature

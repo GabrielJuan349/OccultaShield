@@ -238,7 +238,8 @@ class ProgressManager:
         self,
         video_id: str,
         total_vulnerabilities: int,
-        total_violations: int
+        total_violations: int,
+        redirect_url: Optional[str] = None
     ):
         """Marca el procesamiento como completado."""
         state = self._states.get(video_id)
@@ -250,12 +251,15 @@ class ProgressManager:
         
         elapsed = (datetime.now() - state.started_at).total_seconds() if state.started_at else 0
         
+        # Default redirect to download page
+        final_redirect = redirect_url or f"/download/{video_id}"
+        
         event = CompleteEvent(
             video_id=video_id,
             total_vulnerabilities=total_vulnerabilities,
             total_violations=total_violations,
             processing_time_seconds=elapsed,
-            redirect_url=f"/review?video_id={video_id}",
+            redirect_url=final_redirect,
             message=f"Processing complete! Found {total_violations} violations."
         )
         

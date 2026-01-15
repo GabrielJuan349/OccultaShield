@@ -250,7 +250,14 @@ class VideoAnonymizer:
             "-metadata", f"description={description}",
             "-metadata", f"comment={comment}",
             "-metadata", f"encoder={software}",    # Standard field for software/encoder
-            "-c", "copy",                          # Stream copy (no re-encoding)
+            "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
+            "-movflags", "+faststart",
+            "-c:v", "libx264", 
+            "-pix_fmt", "yuv420p", # Ensure compatibility with all players
+            "-preset", "fast",
+            "-crf", "23",          # Quality preset
+            #"-c:a", "aac",         # AAC audio if present
+            "-an", # para asegurar que no escriba pista de audio basura
             temp_path
         ]
         

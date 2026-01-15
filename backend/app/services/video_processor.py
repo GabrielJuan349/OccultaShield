@@ -44,7 +44,7 @@ class VideoProcessor:
             print(f"{'='*60}")
 
             logger.info(f"Starting pipeline for {video_id}")
-            db_conn = await _db_instance.getting_db("test")
+            db_conn = await _db_instance.getting_db()  # Uses default from .env
 
             # --- 0. INIT ---
             await progress_manager.register_video(video_id)
@@ -72,35 +72,50 @@ class VideoProcessor:
             db_video_id = video_id if video_id.startswith("video:") else f"video:{video_id}"
 
             for track in detection_result.detections:
+                 # Calculate duration in seconds based on frame range (assuming 30fps)
+                 fps = 30.0  # Default FPS
+                 duration_seconds = (track.last_frame - track.first_frame) / fps if track.last_frame > track.first_frame else 0.0
+                 
                  d_record = {
-                     "video": db_video_id,
+                     "video_id": db_video_id,  # Schema uses 'video_id' not 'video'
                      "track_id": track.track_id,
                      "detection_type": track.detection_type,
                      "first_frame": track.first_frame,
                      "last_frame": track.last_frame,
                      "avg_confidence": track.avg_confidence,
+                     "max_confidence": track.avg_confidence,  # Use avg as max for now
+                     "duration_seconds": duration_seconds,  # Required by DB schema
+                     "storage_path": "",  # Required by DB schema - empty for now
                      # Store full history for later edition
                      "bbox_history": [b.to_dict() for b in track.bbox_history],
                      "captures": [c.to_dict() for c in track.captures],
                  }
                  
-                 # Create detection record
-                 created = await db_conn.create("detection", d_record)
-                 if created:
-                     # Surreal returns list of created records, take first
-                     rec = created[0] if isinstance(created, list) else created
-                     # rec can be a dict with 'id' key or a string ID directly
-                     if isinstance(rec, dict):
-                         rec_id = rec.get('id', rec.get('ID', str(rec)))
+                 # Create detection record with error handling
+                 try:
+                     print(f"   💾 [DB] Saving detection track {track.track_id}...")
+                     created = await db_conn.create("detection", d_record)
+                     print(f"   💾 [DB] Create result: {created}")
+                     if created:
+                         # Surreal returns list of created records, take first
+                         rec = created[0] if isinstance(created, list) else created
+                         # rec can be a dict with 'id' key or a string ID directly
+                         if isinstance(rec, dict):
+                             rec_id = rec.get('id', rec.get('ID', str(rec)))
+                         else:
+                             rec_id = str(rec)
+                         saved_detections_map[track.track_id] = rec_id
+                         print(f"      ✅ Track {track.track_id} -> {rec_id}")
                      else:
-                         rec_id = str(rec)
-                     saved_detections_map[track.track_id] = rec_id
-                     print(f"      Track {track.track_id} -> {rec_id}")
-                 else:
-                     # Handle case when DB creation returns falsy value
-                     rec_id = f"fallback_{track.track_id}"
-                     logger.error(f"Failed to create detection for track {track.track_id}")
-                     saved_detections_map[track.track_id] = rec_id
+                         # Handle case when DB creation returns falsy value
+                         rec_id = f"fallback_{track.track_id}"
+                         logger.error(f"Failed to create detection for track {track.track_id} - create returned: {created}")
+                         print(f"      ❌ Track {track.track_id} FAILED - create returned: {created}")
+                         saved_detections_map[track.track_id] = rec_id
+                 except Exception as db_error:
+                     logger.error(f"DB exception saving track {track.track_id}: {db_error}")
+                     print(f"      ❌ Track {track.track_id} DB EXCEPTION: {db_error}")
+                     saved_detections_map[track.track_id] = f"error_{track.track_id}"
             print(f"   Saved {len(saved_detections_map)} detections to DB")
 
             # --- 2. VERIFICATION PHASE (Temporal Consensus Mode) ---
@@ -145,23 +160,30 @@ class VideoProcessor:
                 if is_violation: total_violations += 1
                 
                 v_record = {
-                    "detection": det_db_id,  # Link to detection table
+                    "detection_id": det_db_id,  # Link to detection table - schema expects 'detection_id'
+                    "capture_index": 0,  # Required by schema
                     "is_violation": is_violation,
                     "severity": res.get("severity", "none"),
                     "description": res.get("reasoning", ""),
                     "violated_articles": res.get("violated_articles", []),
+                    "detected_personal_data": [],  # Required by schema
+                    "legal_basis_required": "",  # Required by schema
                     "confidence": res.get("confidence", 0.0),
-                    "max_confidence": res.get("max_confidence", 0.0),
+                    "processing_time_ms": 0,  # Required by schema
+                    "llm_model": "gemma-3-4b",
                     "recommended_action": res.get("recommended_action", "none"),
-                    "frames_analyzed": res.get("frames_analyzed", 1),  # Temporal Consensus
-                    "frames_with_violation": res.get("frames_with_violation", 0),
                     "llm_raw_response": str(res)
                 }
-                await db_conn.create("gdpr_verification", v_record)
+                try:
+                    print(f"   💾 [DB] Saving verification for detection {det_db_id}...")
+                    verif_result = await db_conn.create("gdpr_verification", v_record)
+                    print(f"   💾 [DB] Verification result: {verif_result}")
+                except Exception as verif_error:
+                    print(f"   ❌ [DB] Error saving verification: {verif_error}")
             
-            # Update video status to WAITING_FOR_REVIEW
+            # Update video status to VERIFIED (mapped from waiting_for_review for DB schema)
             await db_conn.merge(db_video_id, {
-                "status": "waiting_for_review",
+                "status": "verified",  # Schema allows: pending, processing, detected, verified, editing, completed, error
                 "analysis_completed_at": str(asyncio.get_event_loop().time())
             })
 
@@ -172,9 +194,12 @@ class VideoProcessor:
             # Check if there are any violations
             if total_violations == 0:
                 # No violations - skip review and go directly to anonymization (just metadata stripping)
-                print(f"   ℹ️  No violations found - skipping review phase")
-                await db_conn.merge(db_video_id, {"status": "anonymizing"})
-                await progress_manager.change_phase(video_id, ProcessingPhase.ANONYMIZING, "No violations found. Finalizing video...")
+                print(f"   ℹ️  No violations found - skipping review and going directly to anonymization.")
+                # Update status to EDITING (mapped from anonymizing for DB schema)
+                await db_conn.merge(db_video_id, {"status": "editing"}) # Schema allows: editing
+                
+                # --- 3. ANONYMIZATION ---
+                await progress_manager.change_phase(video_id, ProcessingPhase.ANONYMIZING, "Applying anonymization filters...")
                 await self.apply_anonymization(video_id, [], "system")
                 print(f"\n✅ [PIPELINE COMPLETE] Video: {video_id}")
                 print(f"   Status: COMPLETED (no violations)")
@@ -246,8 +271,20 @@ class VideoProcessor:
         db_conn = None
         try:
             logger.info(f"Starting anonymization for {video_id} (User: {user_id})")
-            db_conn = await _db_instance.getting_db("test")
+            print(f"\n{'='*60}")
+            print(f"🎨 [ANONYMIZATION START] Video: {video_id}")
+            print(f"   User: {user_id}")
+            print(f"   Decisions: {len(decisions)}")
+            print(f"{'='*60}")
+            
+            db_conn = await _db_instance.getting_db()  # Uses default from .env
             db_video_id = video_id if video_id.startswith("video:") else f"video:{video_id}"
+
+            # Ensure video is registered in progress_manager for SSE events
+            state = await progress_manager.get_state(video_id)
+            if not state:
+                print(f"   📝 Registering video in progress_manager...")
+                await progress_manager.register_video(video_id)
 
             # 1. Fetch Video Info
             videos = await db_conn.select(db_video_id)
@@ -348,8 +385,9 @@ class VideoProcessor:
             
             await progress_manager.complete(
                 video_id,
-                total_vulnerabilities=len(decisions), # Approx
-                total_violations=len(actions)
+                total_vulnerabilities=len(decisions),
+                total_violations=len(actions),
+                redirect_url=f"/download/{video_id}"
             )
             
         except Exception as e:

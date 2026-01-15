@@ -1,11 +1,11 @@
 import { Component, signal, computed, ChangeDetectionStrategy, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { NgOptimizedImage } from '@angular/common';
-import { form, Field, required, email, minLength, submit, validate } from '@angular/forms/signals';
+import { form, FormField, required, email, minLength, submit, validate } from '@angular/forms/signals';
 import { AuthService } from '#services/auth.service';
 
 @Component({
-  imports: [RouterLink, Field, NgOptimizedImage],
+  imports: [RouterLink, FormField, NgOptimizedImage],
   templateUrl: './LoginRegister.html',
   styleUrls: ['./LoginRegister.css'],
   changeDetection: ChangeDetectionStrategy.OnPush

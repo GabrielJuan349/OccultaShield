@@ -12,6 +12,7 @@ echo -e "${BLUE}=== OccultaShield Setup & Initialization ===${NC}"
 echo -e "${BLUE}[1/9] System Update & Upgrade...${NC}"
 echo "Running sudo apt update && sudo apt upgrade -y..."
 sudo apt update && sudo apt upgrade -y
+sudo apt install -y ffmpeg
 
 # --- Git Configuration ---
 echo -e "${BLUE}[2/9] Configuring Git...${NC}"

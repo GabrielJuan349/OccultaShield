@@ -58,6 +58,16 @@ class ParallelProcessor:
             
             frame_results = await asyncio.gather(*frame_tasks)
             
+            # --- DEBUG: Show individual agent outputs ---
+            print(f"      [DEBUG AGENTS] Track {track_id} outputs:")
+            for i, res in enumerate(frame_results):
+                status = "VIOLATION" if res.get("is_violation") else "OK"
+                det_type = res.get("detection_type", "unknown")
+                conf = res.get("confidence", 0)
+                reason = res.get("reasoning", "No reason")
+                print(f"        Frame {i}: {status} ({det_type}, conf={conf:.2f}) -> {reason[:60]}...")
+            # --------------------------------------------
+            
             # Aggregate via ConsensusAgent (Temporal Consensus)
             consensus_result = self.consensus_agent.aggregate(list(frame_results))
             consensus_result["frames_analyzed"] = len(frame_results)

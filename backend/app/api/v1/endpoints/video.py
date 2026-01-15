@@ -9,6 +9,40 @@ from pathlib import Path
 from datetime import datetime
 
 from core.dependencies import get_current_user, get_db
+
+
+def normalize_user_id(user_id) -> str:
+    """
+    Normaliza un user_id para comparaciones consistentes.
+    Maneja formatos: RecordID objects, "user:⟨UUID⟩", "user:UUID", o solo "UUID"
+    Retorna siempre el formato "user:UUID" sin corchetes angulares.
+    """
+    user_str = str(user_id).replace("⟨", "").replace("⟩", "")
+    if not user_str.startswith("user:"):
+        return f"user:{user_str}"
+    return user_str
+
+
+def normalize_video_id(video_id: str) -> str:
+    """
+    Normaliza un video_id para queries de SurrealDB.
+    Retorna el formato "video:`ID`" con backticks para evitar interpretación de guiones como resta.
+    """
+    # Remover prefijo si ya existe
+    vid = video_id.replace("video:", "").replace("`", "")
+    return f"video:`{vid}`"
+
+
+def extract_uuid_from_user_id(user_id) -> str:
+    """
+    Extrae solo el UUID de un user_id en cualquier formato.
+    """
+    user_str = str(user_id).replace("⟨", "").replace("⟩", "")
+    if user_str.startswith("user:"):
+        return user_str[5:]  # Remover "user:"
+    return user_str
+
+
 from models.video import (
     VideoResponse, VideoUploadResponse, VideoStatus, VideoMetadata, VideoAnalysisConfig,
     ViolationCard, PaginatedResponse, UserDecisionBatch, DetectionType, Severity
@@ -95,34 +129,67 @@ async def upload_video(
         )
         print(f"   📊 Metadata: {actual_frames} frames, {actual_fps:.1f} FPS, {actual_width}x{actual_height}")
         
-        # 5. Create DB record with initial status UPLOADED (will change to PROCESSING immediately)
-        video_data = {
-            "id": video_id,
-            "user_id": current_user["id"],
-            "filename": file.filename,
-            "original_path": str(file_path),
-            "status": "uploaded",  # Status inicial, cambiará a PROCESSING inmediatamente
-            "metadata": metadata.model_dump(),
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
-        }
-        
-        await db.create(f"video:{video_id}", video_data)
-        print(f"   🗄️  Video record created in DB (status: uploaded)")
+        # 5. Create DB record with initial status PENDING
+        # Schema permite: ['pending', 'processing', 'detected', 'verified', 'editing', 'completed', 'error']
+        # Usar query raw para manejar correctamente record<user>
+        user_id_raw = current_user["id"]  # Ej: "user:⟨019bb260-300d-7802-ad8d-f95a9690416b⟩"
 
-        # Auto-start processing
+        # Extraer solo el UUID del user_id para construir el record reference
+        # El formato puede ser "user:⟨UUID⟩" o "user:UUID"
+        if "⟨" in user_id_raw:
+            user_uuid = user_id_raw.split("⟨")[1].rstrip("⟩")
+        else:
+            user_uuid = user_id_raw.replace("user:", "")
+
+        print(f"   🔍 [UPLOAD] Creando video en DB: video:{video_id}")
+        print(f"   🔍 [UPLOAD] User UUID extraído: {user_uuid}")
+
+        # Usar query raw para insertar con el tipo record<user> correcto
+        import json
+        metadata_json = json.dumps(metadata.model_dump())
+        escaped_filename = file.filename.replace("'", "\\'")
+        escaped_path = str(file_path).replace("'", "\\'")
+
+        # Usar backticks para escapar los IDs con guiones (SurrealDB los interpreta como resta)
+        query = f"""
+            CREATE video:`{video_id}` SET
+                user_id = user:`{user_uuid}`,
+                filename = '{escaped_filename}',
+                original_path = '{escaped_path}',
+                status = 'pending',
+                metadata = {metadata_json},
+                error_message = '',
+                processed_path = '',
+                processing_started_at = time::now(),
+                processing_completed_at = time::now()
+        """
+
+        print(f"   🔍 [UPLOAD] Query: {query[:200]}...")
+        try:
+            create_result = await db.query(query)
+            print(f"   🔍 [UPLOAD] Create result: {create_result}")
+            print(f"   🗄️  Video record created in DB (status: pending)")
+        except Exception as e:
+            print(f"   ❌ [UPLOAD] Error en query: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+        # Verificar inmediatamente que se creó (usar backticks)
+        verify_result = await db.select(f"video:`{video_id}`")
+        print(f"   🔍 [UPLOAD] Verification select result: {verify_result}")
+
+        # Register video in progress manager (but don't start processing yet)
         from services.progress_manager import progress_manager
         await progress_manager.register_video(video_id)
         print(f"   📡 Registered in progress manager")
-
-        background_tasks.add_task(video_processor.process_full_pipeline, video_id, str(file_path))
-        print(f"   🚀 Background processing task launched")
+        print(f"   ⏸️  Waiting for frontend SSE connection to auto-start processing")
         print(f"   ✅ Upload complete! Video ID: {video_id}\n")
 
         return VideoUploadResponse(
             video_id=video_id,
-            status=VideoStatus.PROCESSING,
-            message="Video uploaded successfully. Processing started automatically."
+            status=VideoStatus.UPLOADED,
+            message="Video uploaded successfully. Processing will start automatically when you connect to SSE."
         )
         
     except Exception as e:
@@ -130,6 +197,8 @@ async def upload_video(
         if 'file_path' in locals() and os.path.exists(file_path):
              os.remove(file_path)
         raise HTTPException(500, f"Upload failed: {str(e)}")
+
+
 @router.get("/{video_id}/status", response_model=VideoResponse)
 async def get_video_status(
     video_id: str,
@@ -139,8 +208,8 @@ async def get_video_status(
     # 1. Get video
     try:
         # Select returns a list or single object depending on if ID is specific
-        # Explicitly fetching `video:ID`
-        result = await db.select(f"video:{video_id}")
+        # Usar backticks para evitar interpretación de guiones como resta
+        result = await db.select(f"video:`{video_id}`")
         video = result if not isinstance(result, list) else (result[0] if result else None)
 
         if not video:
@@ -153,10 +222,8 @@ async def get_video_status(
             print(f"⚠️  Video record missing fields: {missing_fields}")
             raise HTTPException(500, f"Invalid video record: missing fields {missing_fields}")
             
-        # 2. Validate owner (assuming user_id is stored simply or as record link)
-        if video.get("user_id") != current_user["id"]:
-            # Depending on how link is stored `user:ID` vs `ID`
-            # For robustness, check string containment or exact match
+        # 2. Validate owner (normalize both IDs for consistent comparison)
+        if normalize_user_id(video.get("user_id")) != normalize_user_id(current_user["id"]):
             raise HTTPException(403, "Not owner of this video")
             
         return video
@@ -179,26 +246,30 @@ async def get_violations(
     Returns verification records with linked detection data.
     """
     try:
-        # 1. Verify video ownership
-        db_video_id = video_id if video_id.startswith("video:") else f"video:{video_id}"
+        # 1. Verify video ownership (use normalized IDs with backticks)
+        db_video_id = normalize_video_id(video_id)
         video_result = await db.select(db_video_id)
         video = video_result if not isinstance(video_result, list) else (video_result[0] if video_result else None)
 
         if not video:
             raise HTTPException(404, "Video not found")
 
-        if video.get("user_id") != current_user["id"]:
+        if normalize_user_id(video.get("user_id")) != normalize_user_id(current_user["id"]):
             raise HTTPException(403, "Not authorized")
 
         # 2. Query all verifications for this video (with detection data)
-        # Using SurrealDB query to fetch verifications where detection.video = video_id
+        # Note: Field is 'detection_id' (record link to detection table)
+        # Detection schema uses 'video_id' field (not 'video')
+        simple_video_id = f"video:{video_id}"  # Format matches what's stored in detection.video_id
         query = f"""
             SELECT * FROM gdpr_verification
-            WHERE detection.video = {db_video_id}
-            FETCH detection
+            WHERE detection_id.video_id = "{simple_video_id}"
+            FETCH detection_id
         """
 
+        print(f"🔍 [VIOLATIONS] Query: {query}")
         verifications = await db.query(query)
+        print(f"🔍 [VIOLATIONS] Raw result: {verifications}")
 
         # Extract results from query response
         # SurrealDB returns [{'result': [...], 'status': 'OK', 'time': '...'}]
@@ -210,12 +281,13 @@ async def get_violations(
         # 3. Map to ViolationCard objects
         items = []
         for v_rec in verification_records:
-            # Get linked detection data
-            det_data = v_rec.get('detection', {})
+            # Get linked detection data (field is 'detection_id', fetched via FETCH detection_id)
+            det_data = v_rec.get('detection_id', {})
 
-            # Handle if detection is a string ID (fetch it)
-            if isinstance(det_data, str):
-                det_result = await db.select(det_data)
+            # Handle if detection is a string ID or RecordID (fetch it manually)
+            if isinstance(det_data, str) or (det_data and not isinstance(det_data, dict)):
+                det_id_str = str(det_data)
+                det_result = await db.select(det_id_str)
                 det_data = det_result if not isinstance(det_result, list) else (det_result[0] if det_result else {})
 
             # Get capture image from detection captures
@@ -227,23 +299,39 @@ async def get_violations(
             capture_filename = first_capture.get('filename', 'capture_0.jpg')
             capture_url = f"/api/v1/video/{video_id}/capture/{track_id}/{capture_filename}"
 
-            # Create ViolationCard
+            # Calculate duration from frames if available
+            first_frame = det_data.get('first_frame', 0)
+            last_frame = det_data.get('last_frame', 0)
+            duration_seconds = det_data.get('duration_seconds', 0.0)
+
+            # Generate fine_text based on severity
+            severity_val = v_rec.get('severity', 'none')
+            fine_texts = {
+                'critical': 'Multa potencial: hasta 20M€ o 4% facturación global',
+                'high': 'Multa potencial: hasta 10M€ o 2% facturación global',
+                'medium': 'Advertencia formal con posible sanción',
+                'low': 'Recomendación de corrección',
+                'none': 'Sin riesgo identificado'
+            }
+            fine_text = fine_texts.get(severity_val, 'No determinado')
+
+            # Create ViolationCard with all required fields
             items.append(ViolationCard(
-                verification_id=v_rec.get('id', ''),
-                detection_id=det_data.get('id', ''),
+                verification_id=str(v_rec.get('id', '')),
+                detection_id=str(det_data.get('id', '')),
                 track_id=track_id,
-                detection_type=DetectionType(det_data.get('detection_type', 'unknown')),
+                detection_type=DetectionType(det_data.get('detection_type', 'face')),
                 capture_image_url=capture_url,
                 is_violation=v_rec.get('is_violation', False),
-                severity=Severity(v_rec.get('severity', 'none')),
+                severity=Severity(severity_val),
                 violated_articles=v_rec.get('violated_articles', []),
                 description=v_rec.get('description', ''),
-                recommended_action=v_rec.get('recommended_action', 'none'),
+                fine_text=fine_text,
+                recommended_action=v_rec.get('recommended_action', 'blur'),
+                duration_seconds=duration_seconds,
                 confidence=v_rec.get('confidence', 0.0),
-                first_frame=det_data.get('first_frame', 0),
-                last_frame=det_data.get('last_frame', 0),
-                frames_analyzed=v_rec.get('frames_analyzed', 1),
-                frames_with_violation=v_rec.get('frames_with_violation', 0)
+                first_frame=first_frame,
+                last_frame=last_frame
             ))
 
         # 4. Pagination (simple in-memory for now)
@@ -292,11 +380,22 @@ async def submit_decisions(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
-    # Logic to save decisions and trigger edition
+    """
+    Submit user decisions for violations and trigger anonymization.
+    """
+    print(f"\n📝 [DECISIONS] Received decisions for video: {video_id}")
+    print(f"   Decisions count: {len(batch.decisions)}")
     
-    # Trigger Anonymization
+    # Update video status to 'editing' (schema allowed) BEFORE starting background task
+    # This prevents the SSE endpoint from restarting the full pipeline
+    db_video_id = f"video:`{video_id}`"
+    await db.update(db_video_id, {"status": "editing"})
+    print(f"   ✅ Updated video status to 'editing' (anonymizing phase)")
+    
+    # Trigger Anonymization in background
     user_display_name = current_user.get("name") or current_user.get("id", "unknown")
     background_tasks.add_task(video_processor.apply_anonymization, video_id, batch.decisions, user_display_name)
+    print(f"   🚀 Started anonymization task in background")
     
     return {
         "status": "editing",
@@ -310,15 +409,35 @@ async def download_video(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
-    # Get video path
-    processed_path = PROCESSED_DIR / f"anonymized_{video_id}.mp4"
-    if not processed_path.exists():
-        raise HTTPException(404, "Processed video not available")
+    # Get video info from DB to find the correct path
+    simple_video_id = f"video:{video_id}"
+    result = await db.select(simple_video_id)
+    
+    if not result:
+        raise HTTPException(404, "Video not found")
+        
+    video_record = result[0] if isinstance(result, list) else result
+    db_path = video_record.get("processed_path")
+    
+    # Validation logic
+    if not db_path:
+        # Fallback to default naming if DB path is missing but file exists
+        fallback_path = PROCESSED_DIR / f"anonymized_{video_id}.mp4"
+        if fallback_path.exists():
+            final_path = fallback_path
+        else:
+            raise HTTPException(404, "Processed video path not found in DB")
+    else:
+        final_path = Path(db_path)
+    
+    if not final_path.exists():
+        print(f"❌ Video file not found at: {final_path}")
+        raise HTTPException(404, "Processed video file deleted or missing")
         
     return FileResponse(
-        processed_path, 
+        final_path, 
         media_type="video/mp4", 
-        filename=f"anonymized_{video_id}.mp4"
+        filename=final_path.name
     )
 
 @router.delete("/{video_id}")
@@ -327,9 +446,9 @@ async def delete_video(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
-    # Delete from DB and Storage
+    # Delete from DB and Storage (usar backticks)
     try:
-        await db.delete(f"video:{video_id}")
+        await db.delete(f"video:`{video_id}`")
         # Clean storage
         # Placeholder for directory cleanup logic
         

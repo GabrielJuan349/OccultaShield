@@ -117,13 +117,7 @@ class UserDecisionCreate(BaseModel):
     notes: Optional[str] = None
 
 class UserDecisionBatch(BaseModel):
-    decisions: List[UserDecisionCreate]
-
-    @field_validator('decisions')
-    def validate_decisions_not_empty(cls, v):
-        if not v:
-            raise ValueError('Decisions list cannot be empty')
-        return v
+    decisions: List[UserDecisionCreate] = []  # Allow empty list for no-violations case
 
 # --- Response Models ---
 

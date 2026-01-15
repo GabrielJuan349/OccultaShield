@@ -27,7 +27,7 @@
         <form (submit)="onLoginSubmit($event)" class="login-form">
           <div class="input-group">
             <label for="email">Email address</label>
-            <input id="email" type="email" [field]="loginForm.email" placeholder="name@company.com"
+            <input id="email" type="email" [formField]="loginForm.email" placeholder="name@company.com"
               autocomplete="email">
             @if (loginForm.email().touched() && loginForm.email().invalid()) {
             <ul class="error-list">
@@ -40,7 +40,7 @@
           <div class="input-group">
             <label for="password">Password</label>
             <div class="password-wrapper">
-              <input [type]="showPassword() ? 'text' : 'password'" id="password" [field]="loginForm.password"
+              <input [type]="showPassword() ? 'text' : 'password'" id="password" [formField]="loginForm.password"
                 placeholder="••••••••" autocomplete="current-password">
               <button type="button" class="toggle-visibility" (click)="togglePasswordVisibility()">
                 <!-- Reuse existing SVG logic -->
@@ -59,7 +59,7 @@
 
           <div class="actions-row">
             <label class="custom-checkbox">
-              <input type="checkbox" [field]="loginForm.rememberMe">
+              <input type="checkbox" [formField]="loginForm.rememberMe">
               <span class="checkmark"></span>
               <span class="label-text">Remember me</span>
             </label>
@@ -112,7 +112,7 @@
           <!-- Name -->
           <div class="input-group">
             <label for="reg-name">Full Name</label>
-            <input id="reg-name" type="text" [field]="registerForm.nameSurname" placeholder="John Doe"
+            <input id="reg-name" type="text" [formField]="registerForm.nameSurname" placeholder="John Doe"
               autocomplete="name">
             @if (registerForm.nameSurname().touched() && registerForm.nameSurname().invalid()) {
             <ul class="error-list">@for (error of registerForm.nameSurname().errors(); track error) { <li
@@ -123,7 +123,7 @@
           <!-- Email -->
           <div class="input-group">
             <label for="reg-email">Email address</label>
-            <input id="reg-email" type="email" [field]="registerForm.email" placeholder="name@company.com"
+            <input id="reg-email" type="email" [formField]="registerForm.email" placeholder="name@company.com"
               autocomplete="email">
             @if (registerForm.email().touched() && registerForm.email().invalid()) {
             <ul class="error-list">@for (error of registerForm.email().errors(); track error) { <li class="error-text">
@@ -156,7 +156,7 @@
           <!-- Password with Strength Meter -->
           <div class="input-group">
             <label for="reg-pass">Password</label>
-            <input [type]="showPassword() ? 'text' : 'password'" id="reg-pass" [field]="registerForm.password"
+            <input [type]="showPassword() ? 'text' : 'password'" id="reg-pass" [formField]="registerForm.password"
               placeholder="••••••••" autocomplete="new-password">
 
             <!-- Password Strength Meter -->
@@ -182,7 +182,7 @@
           <div class="input-group">
             <label for="reg-confirm-pass">Confirm Password</label>
             <input [type]="showPassword() ? 'text' : 'password'" id="reg-confirm-pass"
-              [field]="registerForm.confirmPassword" placeholder="••••••••" autocomplete="new-password">
+              [formField]="registerForm.confirmPassword" placeholder="••••••••" autocomplete="new-password">
             @if (registerForm.confirmPassword().touched() && registerForm.confirmPassword().invalid()) {
             <ul class="error-list">@for (error of registerForm.confirmPassword().errors(); track error) { <li
                 class="error-text">{{ error.message }}</li> }</ul>
@@ -192,7 +192,7 @@
           <!-- Privacy Check -->
           <div class="actions-row">
             <label class="custom-checkbox">
-              <input type="checkbox" [field]="registerForm.privacyCheck">
+              <input type="checkbox" [formField]="registerForm.privacyCheck">
               <span class="checkmark"></span>
               <span class="label-text">I accept the Privacy Policy</span>
             </label>

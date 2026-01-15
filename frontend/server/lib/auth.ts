@@ -4,18 +4,19 @@
  */
 import { betterAuth } from 'better-auth';
 import { surrealdbAdapter } from 'surreal-better-auth';
-/*import {
+import { bearer } from 'better-auth/plugins';
+/* import {
   twoFactor,           // ✅ 2FA con TOTP
   organization,        // ✅ Organizaciones y equipos
   admin,              // ✅ Panel de administración
-  bearer,             // ✅ Autenticación con Bearer tokens
   multiSession,       // ✅ Múltiples sesiones simultáneas
   oneTap,             // ✅ Google One Tap
   magicLink,          // ✅ Magic links (sin contraseña)
   phoneNumber,        // ✅ Autenticación con teléfono
   username,           // ✅ Login con username en vez de email
-  anonymous,          // ✅ Usuarios anónimos
-} from "better-auth/plugins";*/
+  anonymous,
+} from "better-auth/plugins";
+*/
 
 import { getDb } from './db';
 import { ENV } from './env';
@@ -147,6 +148,11 @@ async function createAuth() {
       'http://mise-ralph.uab.cat:8980',
       ENV.BASE_URL,
     ].filter(Boolean) as string[],
+
+    // Plugins
+    plugins: [
+      bearer(),  // Enable Bearer token authentication via Authorization header
+    ],
   });
 }
 

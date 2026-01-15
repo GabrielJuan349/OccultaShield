@@ -105,8 +105,12 @@ processed/
 *.log
 docker_build_error.log
 
+# Media files
 **/*.webm
 **/*.mp4
 **/*.mov
 **/*.avi
 **/*.mkv
+
+# Plan files
+**/plans

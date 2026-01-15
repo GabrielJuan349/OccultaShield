@@ -124,23 +124,33 @@ class HybridDetectorManager:
 
         for det in detections:
             try:
-                face_result = FaceDetectorResult(det)
-                if face_result.score.numel() == 0:
+                # FIX: Kornia YuNet returns 15 values, FaceDetectorResult expects 14
+                if det.shape[-1] == 15:
+                    det = det[..., :14]
+                if det.numel() == 0:
                     continue
 
-                top_left = face_result.top_left.int().tolist()
-                bottom_right = face_result.bottom_right.int().tolist()
-                scores = face_result.score.tolist()
+                # Manual parsing: x, y, w, h are indices 0,1,2,3. Score is 13.
+                x1_list = det[:, 0].int().tolist()
+                y1_list = det[:, 1].int().tolist()
+                w_list = det[:, 2].int().tolist()
+                h_list = det[:, 3].int().tolist()
+                scores_list = det[:, 13].tolist()
 
-                for score, tl, br in zip(scores, top_left, bottom_right):
+                for i, score in enumerate(scores_list):
                     if score >= self.face_confidence:
-                        x1, y1 = float(tl[0]), float(tl[1])
-                        x2, y2 = float(br[0]), float(br[1])
+                        x1 = float(x1_list[i])
+                        y1 = float(y1_list[i])
+                        x2 = float(x1 + w_list[i])
+                        y2 = float(y1 + h_list[i])
+                        
                         bbox = BoundingBox(x1, y1, x2, y2, float(score), frame_num)
-                        if bbox.area >= MIN_DETECTION_AREA:
+                        
+                        # Use 200 threshold as decided previously
+                        if bbox.area >= 200:
                             results.append(("face", bbox))
             except Exception as e:
-                logger.debug(f"Error processing face detection: {e}")
+                logger.error(f"Error processing face detection: {e}", exc_info=True)
         return results
     
     def detect_faces_opencv(self, frame: np.ndarray, frame_num: int) -> List[Tuple[str, BoundingBox]]:
@@ -238,33 +248,70 @@ class HybridDetectorManager:
         # === PARALLEL FACE DETECTION ===
         total_faces = 0
         if self.face_detector is not None:
-            # Convertir todos los frames a tensores y concatenar para batch
-            tensors = [self._numpy_to_tensor(f) for f in frames]
-            batch_tensor = torch.cat(tensors, dim=0)
-            
-            with torch.no_grad():
-                detections = self.face_detector(batch_tensor)
-            
-            for frame_idx, det in enumerate(detections):
-                frame_num = frame_nums[frame_idx]
-                try:
-                    face_result = FaceDetectorResult(det)
-                    if face_result.score.numel() == 0:
-                        continue
+            try:
+                # Convertir todos los frames a tensores y concatenar para batch
+                tensors = [self._numpy_to_tensor(f) for f in frames]
+                batch_tensor = torch.cat(tensors, dim=0)
+
+                # INFO level for first batch to confirm detection is running
+                if frame_nums[0] <= self.batch_size:
+                    logger.info(f"[FACE] ✓ Kornia detector active - Processing batch tensor shape: {batch_tensor.shape}")
+                else:
+                    logger.debug(f"[FACE] Processing batch of {len(frames)} frames, tensor shape: {batch_tensor.shape}")
+
+                with torch.no_grad():
+                    detections = self.face_detector(batch_tensor)
+
+                logger.debug(f"[FACE] Kornia returned {len(detections)} detection results")
+
+                for frame_idx, det in enumerate(detections):
+                    frame_num = frame_nums[frame_idx]
+                    try:
+                        # FIX: Kornia YuNet returns 15 values, FaceDetectorResult expects 14
+                        if det.shape[-1] == 15:
+                            det = det[..., :14]
+                        if det.numel() == 0:
+                            continue
                     
-                    top_left = face_result.top_left.int().tolist()
-                    bottom_right = face_result.bottom_right.int().tolist()
-                    scores = face_result.score.tolist()
-                    
-                    for score, tl, br in zip(scores, top_left, bottom_right):
-                        if score >= self.face_confidence:
-                            bbox = BoundingBox(float(tl[0]), float(tl[1]), float(br[0]), float(br[1]), float(score), frame_num)
-                            if bbox.area >= MIN_DETECTION_AREA:
-                                all_detections[frame_num].append(("face", bbox))
-                                total_faces += 1
-                except Exception:
-                    pass
-        else:
+                        # Manual parsing of YuNet output (N, 14/15)
+                        # 0:x, 1:y, 2:w, 3:h, 13:score
+                        x1_list = det[:, 0].int().tolist()
+                        y1_list = det[:, 1].int().tolist()
+                        w_list = det[:, 2].int().tolist()
+                        h_list = det[:, 3].int().tolist()
+                        scores_list = det[:, 13].tolist()
+                        
+                        for i, score in enumerate(scores_list):
+                            if score >= self.face_confidence:
+                                x1 = float(x1_list[i])
+                                y1 = float(y1_list[i])
+                                x2 = float(x1 + w_list[i])
+                                y2 = float(y1 + h_list[i])
+                                
+                                bbox = BoundingBox(x1, y1, x2, y2, float(score), frame_num)
+                                if bbox.area >= 200: # Consistent threshold
+                                    all_detections[frame_num].append(("face", bbox))
+                                    total_faces += 1
+                                else:
+                                    logger.debug(f"[FACE] Rejected face: area {bbox.area:.0f}px² < 200px² threshold")
+                            else:
+                                logger.debug(f"[FACE] Rejected face: confidence {score:.2f} < {self.face_confidence}")
+                    except Exception as e:
+                        logger.error(f"[FACE] Error processing face result for frame {frame_num}: {e}", exc_info=True)
+
+                # Log summary for first batch
+                if frame_nums[0] <= self.batch_size:
+                    logger.info(f"[FACE] First batch result: {total_faces} faces accepted")
+
+            except Exception as e:
+                logger.error(f"[FACE] Batch face detection failed: {e}", exc_info=True)
+        elif self.face_detector is None and KORNIA_FACE_AVAILABLE:
+            # Kornia is installed but detector failed to initialize
+            if frame_nums[0] <= self.batch_size:
+                logger.warning("[FACE] ⚠️ Kornia available but face_detector is None - check initialization logs")
+            # Fall through to OpenCV fallback below
+
+        if self.face_detector is None:
             # Fallback to OpenCV (sequential)
             for frame, frame_num in zip(frames, frame_nums):
                 faces = self.detect_faces_opencv(frame, frame_num)

@@ -58,6 +58,12 @@ export interface Violation {
   recommendedAction?: ModificationType;
   isViolation?: boolean;
   severity?: SeverityLevel;
+  // Structured data for improved UI
+  violatedArticles?: string[];
+  firstFrame?: number;
+  lastFrame?: number;
+  detectionType?: string;
+  durationSeconds?: number;
 }
 
 // === User Decision Types ===

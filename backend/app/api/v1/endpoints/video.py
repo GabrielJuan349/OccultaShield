@@ -332,9 +332,14 @@ async def get_violations(
             first_capture = captures[0] if captures else {}
 
             # Build capture image URL
+            # Extract filename from image_path (Capture model uses 'image_path', not 'filename')
             track_id = det_data.get('track_id', 0)
-            capture_filename = first_capture.get('filename', 'capture_0.jpg')
-            capture_url = f"/api/v1/video/{video_id}/capture/{track_id}/{capture_filename}"
+            image_path = first_capture.get('image_path', '')
+            if image_path:
+                capture_filename = Path(image_path).name
+            else:
+                capture_filename = 'capture_0.jpg'  # Fallback
+            capture_url = f"/video/{video_id}/capture/{track_id}/{capture_filename}"
 
             # Calculate duration from frames if available
             first_frame = det_data.get('first_frame', 0)

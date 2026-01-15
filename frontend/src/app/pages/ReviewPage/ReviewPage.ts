@@ -1,10 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { ViolationCard } from '#components/ViolationCard/ViolationCard';
-import type { ModificationType, Violation } from '#interface/violation.interface';
+import type { ModificationType, Violation, UserDecision } from '#interface/violation.interface';
 import { VideoService } from '#services/video.service';
-import { AuthService } from '#services/auth.service';
-import type { UserDecision } from '#interface/violation.interface';
 import { environment } from '#environments/environment';
 
 @Component({
@@ -18,7 +16,6 @@ export class ReviewPage implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly videoService = inject(VideoService);
-  private readonly authService = inject(AuthService);
 
   // Signal que contiene el array de vulneraciones
   protected readonly violations = signal<Violation[]>([]);
@@ -39,17 +36,13 @@ export class ReviewPage implements OnInit {
           // Need to handle image URL.
           // If backend sends relative path or full URL. Usually relative in 'capture_image_url' like '/api/v1/...'
 
+          // Build image URL - SecureMediaService will handle auth via HttpClient
           let imgUrl = v.capture_image_url;
           if (imgUrl && !imgUrl.startsWith('http')) {
             // Prepend API base if needed
             imgUrl = `${environment.apiUrl}${imgUrl}`;
           }
-          // Add token as query param for authentication (img tags don't send Auth headers)
-          const token = this.authService.getToken();
-          if (imgUrl && token) {
-            const separator = imgUrl.includes('?') ? '&' : '?';
-            imgUrl = `${imgUrl}${separator}token=${encodeURIComponent(token)}`;
-          }
+          // No token in URL - ViolationCard uses SecureMediaService with Authorization header
 
           // Map backend 'recommended_action' to ModificationType
           let recommendedAction: ModificationType = 'no_modify';
@@ -88,7 +81,13 @@ export class ReviewPage implements OnInit {
             confidence: v.confidence,
             recommendedAction,
             isViolation: v.is_violation,
-            severity: v.severity
+            severity: v.severity,
+            // Structured data for improved UI
+            violatedArticles: v.violated_articles || [],
+            firstFrame: v.first_frame,
+            lastFrame: v.last_frame,
+            detectionType: v.detection_type,
+            durationSeconds: v.duration_seconds
           };
         });
 

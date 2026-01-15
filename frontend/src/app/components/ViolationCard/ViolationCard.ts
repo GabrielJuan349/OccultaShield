@@ -1,10 +1,11 @@
-import { NgOptimizedImage } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input, output, signal, effect } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output, signal, effect, inject, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { ModificationType, Violation } from '#interface/violation.interface';
+import { SecureMediaService } from '#services/secure-media.service';
 
 @Component({
   selector: 'app-violation-card',
-  imports: [NgOptimizedImage],
+  imports: [],
   host: {
     '(document:keydown.escape)': 'onEscapeKey()',
     '(document:keydown)': 'onKeyDown($event)',
@@ -34,8 +35,7 @@ import type { ModificationType, Violation } from '#interface/violation.interface
         <!-- Image Preview Column -->
         <div class="image-section" (click)="openPreview()" (keydown.enter)="openPreview()" tabindex="0" role="button" aria-label="Click to preview image">
           <img
-            [ngSrc]="data().imageUrl"
-            fill
+            [src]="secureImageUrl()"
             alt="Detection Preview"
             class="preview-img"
           >
@@ -53,8 +53,63 @@ import type { ModificationType, Violation } from '#interface/violation.interface
 
         <!-- Info & Options Column -->
         <div class="info-section">
-          <!-- Description -->
-          <p class="description">{{ data().description }}</p>
+          <!-- Evidence Section: Frame Range & Confidence -->
+          <div class="evidence-section">
+            <h4 class="section-title">
+              <span class="material-symbols-outlined">analytics</span>
+              Evidence
+            </h4>
+            <div class="evidence-grid">
+              <!-- Frame Range -->
+              @if (data().firstFrame && data().lastFrame) {
+                <div class="evidence-item">
+                  <span class="material-symbols-outlined">movie</span>
+                  <div class="evidence-content">
+                    <span class="evidence-label">Frame Range</span>
+                    <span class="evidence-value">{{ data().firstFrame }} - {{ data().lastFrame }}</span>
+                  </div>
+                </div>
+              }
+              <!-- Frames Analyzed -->
+              @if (data().framesAnalyzed) {
+                <div class="evidence-item">
+                  <span class="material-symbols-outlined">photo_library</span>
+                  <div class="evidence-content">
+                    <span class="evidence-label">Frames Analyzed</span>
+                    <span class="evidence-value">{{ data().framesAnalyzed }}</span>
+                  </div>
+                </div>
+              }
+              <!-- Confidence Bar -->
+              @if (data().confidence) {
+                <div class="evidence-item confidence-item">
+                  <span class="material-symbols-outlined">psychology</span>
+                  <div class="evidence-content">
+                    <span class="evidence-label">AI Confidence</span>
+                    <div class="confidence-bar-container">
+                      <div class="confidence-bar" [style.width.%]="(data().confidence! * 100)" [attr.data-level]="getConfidenceLevel(data().confidence!)"></div>
+                      <span class="confidence-text">{{ (data().confidence! * 100).toFixed(0) }}%</span>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Compliance Section: Violated Articles -->
+          @if (data().violatedArticles && data().violatedArticles!.length > 0) {
+            <div class="compliance-section">
+              <h4 class="section-title">
+                <span class="material-symbols-outlined">policy</span>
+                Compliance Issues
+              </h4>
+              <div class="articles-chips">
+                @for (article of data().violatedArticles; track article) {
+                  <span class="article-chip">{{ article }}</span>
+                }
+              </div>
+            </div>
+          }
 
           <!-- AI Recommendation Badge -->
           @if (data().recommendedAction && data().recommendedAction !== 'no_modify') {
@@ -113,7 +168,7 @@ import type { ModificationType, Violation } from '#interface/violation.interface
           </button>
           <div class="protected-image-container" [class.hidden-for-capture]="isHiddenForCapture()">
             <img
-              [src]="data().imageUrl"
+              [src]="secureImageUrl()"
               alt="Full size preview"
               class="modal-image"
               (contextmenu)="preventAction($event)"
@@ -141,6 +196,10 @@ import type { ModificationType, Violation } from '#interface/violation.interface
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ViolationCard {
+  // Services
+  private readonly secureMedia = inject(SecureMediaService);
+  private readonly destroyRef = inject(DestroyRef);
+
   // Inputs requeridos (Signal Inputs de Angular moderno)
   readonly data = input.required<Violation>();
 
@@ -155,6 +214,9 @@ export class ViolationCard {
 
   // Estado para ocultar imagen durante capturas
   protected readonly isHiddenForCapture = signal(false);
+
+  // URL segura de la imagen (blob URL)
+  protected readonly secureImageUrl = signal<string>('');
 
   // Configuración de botones para el HTML
   protected readonly options: readonly { label: string; value: ModificationType; icon: string }[] = [
@@ -180,10 +242,34 @@ export class ViolationCard {
         this.currentSelection.set(selectedOption);
       }
     });
+
+    // Load image securely when data changes
+    effect(() => {
+      const url = this.data().imageUrl;
+      if (url && !url.startsWith('blob:') && !url.startsWith('assets/')) {
+        // Load via SecureMediaService (uses HttpClient with Authorization header)
+        this.secureMedia.loadImage(url).pipe(
+          takeUntilDestroyed(this.destroyRef)
+        ).subscribe(blobUrl => {
+          if (blobUrl) {
+            this.secureImageUrl.set(blobUrl);
+          }
+        });
+      } else if (url) {
+        // Fallback for placeholders or already-blob URLs
+        this.secureImageUrl.set(url);
+      }
+    });
   }
 
   getActionLabel(action: ModificationType): string {
     return this.actionLabels[action] || action;
+  }
+
+  getConfidenceLevel(confidence: number): string {
+    if (confidence >= 0.9) return 'high';
+    if (confidence >= 0.7) return 'medium';
+    return 'low';
   }
 
   selectOption(value: ModificationType): void {

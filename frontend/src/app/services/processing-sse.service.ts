@@ -22,8 +22,8 @@ import type {
   SSEEventUnion
 } from '#interface/processing-events.interface';
 import type { ViolationCard } from '#interface/violation.interface';
-import { AuthService } from './auth.service';
 import { VideoService } from './video.service';
+import { AuthService } from './auth.service';
 import { environment } from '#environments/environment';
 
 @Injectable({
@@ -32,8 +32,8 @@ import { environment } from '#environments/environment';
 export class ProcessingSSEService {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly router = inject(Router);
-  private readonly authService = inject(AuthService);
   private readonly videoService = inject(VideoService);
+  private readonly authService = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
   // === Control del stream SSE ===
@@ -225,59 +225,130 @@ export class ProcessingSSEService {
   // === Métodos privados ===
 
   /**
-   * Crea un Observable que encapsula el EventSource SSE
+   * Crea un Observable que usa fetch con ReadableStream para SSE
+   * Permite usar Authorization header en vez de token en URL
    */
   private createSSEObservable(videoId: string): Observable<SSEEventUnion> {
     return new Observable<SSEEventUnion>(subscriber => {
       const apiUrl = environment.apiUrl.replace('/video', '');
       const baseUrl = `${apiUrl}/process`;
-      const token = this.authService.getToken();
-      const url = `${baseUrl}/${videoId}/progress${token ? `?token=${token}` : ''}`;
+      const url = `${baseUrl}/${videoId}/progress`;
 
       console.log(`%c[SSE] 🌐 URL: ${url}`, 'color: #9C27B0');
 
-      const eventSource = new EventSource(url);
+      // AbortController para cancelar la conexión
+      const abortController = new AbortController();
 
-      // Handler de conexión abierta
-      eventSource.onopen = () => {
-        console.log('%c[SSE] ✅ Conexión establecida', 'color: #4CAF50; font-weight: bold');
-        subscriber.next({ type: 'connected' });
+      // Usar fetch con Authorization header
+      const token = this.authService.getToken();
+      const headers: HeadersInit = {
+        'Accept': 'text/event-stream',
+        'Cache-Control': 'no-cache',
       };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-      // Handler de errores
-      eventSource.onerror = (error) => {
-        console.error('%c[SSE] ❌ Error en conexión', 'color: #f44336', error);
-        subscriber.next({ type: 'disconnected' });
-      };
+      fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include', // También envía cookies como backup
+        signal: abortController.signal,
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          if (!response.body) {
+            throw new Error('ReadableStream not supported');
+          }
 
-      // Handlers de eventos específicos
-      const eventTypes = [
-        'initial_state',
-        'phase_change',
-        'progress',
-        'detection',
-        'verification',
-        'complete',
-        'error',
-        'heartbeat'
-      ] as const;
+          console.log('%c[SSE] ✅ Conexión establecida', 'color: #4CAF50; font-weight: bold');
+          subscriber.next({ type: 'connected' });
 
-      eventTypes.forEach(eventType => {
-        eventSource.addEventListener(eventType, (event: MessageEvent) => {
-          try {
-            if (!event.data || event.data === 'undefined') return;
-            const data = JSON.parse(event.data);
-            subscriber.next({ type: eventType, data } as SSEEventUnion);
-          } catch (e) {
-            console.warn(`[SSE] Warning parsing ${eventType} data:`, event.data);
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          const processStream = async () => {
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                  console.log('%c[SSE] 📭 Stream cerrado por servidor', 'color: #FF9800');
+                  break;
+                }
+
+                const chunk = decoder.decode(value, { stream: true });
+                buffer += chunk;
+
+                // Debug: log raw chunks
+                console.log('%c[SSE] 📦 Raw chunk received:', 'color: #9C27B0', JSON.stringify(chunk));
+
+                // Normalizar line endings (\r\n -> \n)
+                buffer = buffer.replace(/\r\n/g, '\n');
+
+                // Procesar eventos SSE (formato: "event: type\ndata: json\n\n")
+                const events = buffer.split('\n\n');
+                buffer = events.pop() || ''; // Último elemento incompleto vuelve al buffer
+
+                console.log(`%c[SSE] 📋 Events to process: ${events.length}, buffer remaining: ${buffer.length} chars`, 'color: #607D8B');
+
+                for (const eventBlock of events) {
+                  if (!eventBlock.trim()) continue;
+
+                  console.log('%c[SSE] 🔍 Processing event block:', 'color: #00BCD4', JSON.stringify(eventBlock));
+
+                  const lines = eventBlock.split('\n');
+                  let eventType = 'message';
+                  let eventData = '';
+
+                  for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine.startsWith('event:')) {
+                      eventType = trimmedLine.slice(6).trim();
+                    } else if (trimmedLine.startsWith('data:')) {
+                      // Concatenar data (SSE puede tener múltiples líneas data:)
+                      const dataContent = trimmedLine.slice(5).trim();
+                      eventData = eventData ? eventData + dataContent : dataContent;
+                    }
+                    // Ignorar líneas que empiezan con ':' (comentarios) o 'id:' o 'retry:'
+                  }
+
+                  console.log(`%c[SSE] 📤 Parsed: type=${eventType}, data length=${eventData.length}`, 'color: #4CAF50');
+
+                  if (eventData && eventData !== 'undefined') {
+                    try {
+                      const data = JSON.parse(eventData);
+                      console.log('%c[SSE] ✅ Emitting event:', 'color: #4CAF50; font-weight: bold', eventType, data);
+                      subscriber.next({ type: eventType, data } as SSEEventUnion);
+                    } catch (e) {
+                      console.warn(`%c[SSE] ⚠️ JSON parse error for ${eventType}:`, 'color: #FF9800', eventData, e);
+                    }
+                  }
+                }
+              }
+            } catch (err) {
+              if ((err as Error).name !== 'AbortError') {
+                console.error('%c[SSE] ❌ Error leyendo stream', 'color: #f44336', err);
+                subscriber.next({ type: 'disconnected' });
+              }
+            }
+          };
+
+          processStream();
+        })
+        .catch(err => {
+          if (err.name !== 'AbortError') {
+            console.error('%c[SSE] ❌ Error en conexión', 'color: #f44336', err);
+            subscriber.next({ type: 'disconnected' });
           }
         });
-      });
 
       // Cleanup cuando se desuscribe
       return () => {
-        console.log('%c[SSE] 🔌 Cerrando EventSource', 'color: #FF5722');
-        eventSource.close();
+        console.log('%c[SSE] 🔌 Cerrando conexión fetch', 'color: #FF5722');
+        abortController.abort();
       };
     }).pipe(
       // Procesar cada evento y actualizar estado
@@ -295,6 +366,8 @@ export class ProcessingSSEService {
    * Procesa cada evento SSE y actualiza el estado
    */
   private handleSSEEvent(event: SSEEventUnion): void {
+    console.log('%c[SSE-HANDLER] 🎯 Received event:', 'color: #E91E63; font-weight: bold', event.type, event);
+
     switch (event.type) {
       case 'connected':
         // No marcamos isConnected aquí - esperamos initial_state

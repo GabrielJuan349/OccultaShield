@@ -54,9 +54,9 @@ export class VideoService {
     );
   }
 
-  getViolations(videoId: string, page: number = 1): Observable<PaginatedResponse<ViolationCard>> {
+  getViolations(videoId: string): Observable<PaginatedResponse<ViolationCard>> {
     return this.http.get<PaginatedResponse<ViolationCard>>(
-      `${this.apiUrl}/${videoId}/violations?page=${page}`
+      `${this.apiUrl}/${videoId}/violations`
     ).pipe(
       catchError(this.handleError('getViolations'))
     );

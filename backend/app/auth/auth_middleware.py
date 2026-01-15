@@ -42,17 +42,23 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 "better-auth.session_token",    # Formato por defecto
                 "occultashield-session-token",  # Formato con guiones
                 "session_token",                 # Sin prefijo
+                "occultashield.session_data",    # Better-Auth actual cookie name
             ]
-
-            # Debug: Mostrar todas las cookies disponibles
-            print(f"DEBUG: Available cookies: {list(request.cookies.keys())}")
 
             for cookie_name in cookie_names:
                 session_cookie = request.cookies.get(cookie_name)
                 if session_cookie:
-                    token = session_cookie
-                    print(f"DEBUG: Token encontrado en cookie '{cookie_name}': {token[:20] if len(token) > 20 else token}...")
-                    break
+                    # Try to parse as JSON in case it contains structured data
+                    try:
+                        cookie_data = json.loads(session_cookie)
+                        # Better-Auth might store token in various fields
+                        token = cookie_data.get('token') or cookie_data.get('session_token') or cookie_data.get('sessionToken')
+                        if token:
+                            break
+                    except (json.JSONDecodeError, TypeError):
+                        # Not JSON, use the raw value as token
+                        token = session_cookie
+                        break
 
         if not token:
             return JSONResponse(
@@ -98,7 +104,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 cached_time, is_valid = self._token_cache[token]
                 # Si el caché es reciente y válido, usarlo
                 if current_time - cached_time < self._cache_ttl:
-                    print(f"DEBUG: Token verificado desde caché (edad: {current_time - cached_time:.1f}s)")
                     return is_valid
                 else:
                     # Caché expirado, eliminar
@@ -110,15 +115,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
             
             query = "SELECT * FROM session WHERE token = $session_token AND expiresAt > time::now();"
             vars = {"session_token": token}
-            print(f"DEBUG: Verifying token from DB: {token[:10]}...")
             response = await self.conn_manager.db.query(query, vars)
-            print(f"DEBUG: SurrealDB Auth Response: {response}")
-            
-            if not response: 
-                print("DEBUG: No response from DB")
+
+            if not response:
                 self._token_cache[token] = (current_time, False)
                 return False
-                
+
             # Handle different response formats
             # Case 1: Wrapped response [{'result': [...], 'status': 'OK'}]
             if isinstance(response, list) and len(response) > 0 and isinstance(response[0], dict) and 'result' in response[0]:
@@ -127,12 +129,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
             elif isinstance(response, list):
                 records = response
             else:
-                print(f"DEBUG: Unexpected response type: {type(response)}")
                 self._token_cache[token] = (current_time, False)
                 return False
-                
+
             is_valid = len(records) > 0
-            print(f"DEBUG: Records found: {len(records)}, is_valid: {is_valid}")
             
             # 3. Actualizar caché
             self._token_cache[token] = (current_time, is_valid)
@@ -155,4 +155,3 @@ class AuthMiddleware(BaseHTTPMiddleware):
         ]
         for token in expired_tokens:
             del self._token_cache[token]
-        print(f"DEBUG: Cache cleanup - removed {len(expired_tokens)} expired tokens")

@@ -63,6 +63,56 @@ If no sensitive content is detected, return:
 }
 """
 
+# =============================================================================
+# PROMPT: DESCRIPCIÓN VISUAL OBJETIVA (EL "TESTIGO")
+# =============================================================================
+VISUAL_DESCRIPTION_PROMPT = """
+You are a VISUAL WITNESS. Your job is to DESCRIBE what you see, NOT to make legal judgments.
+
+Analyze this image of a person and provide an OBJECTIVE VISUAL DESCRIPTION.
+
+Respond with a JSON object containing:
+{
+  "visual_summary": "Detailed description of the person: clothing, posture, apparent activity, and environment",
+  "tags": ["list", "of", "relevant", "keywords"],
+  "environment": "Description of the setting/background (e.g., beach, hospital, office, street, protest)",
+  "clothing_level": "formal|casual|athletic|swimwear|medical|minimal|uniform|religious",
+  "visible_biometrics": {
+    "face_visible": true/false,
+    "tattoos_visible": true/false,
+    "scars_visible": true/false,
+    "distinctive_marks": "description if any"
+  },
+  "context_indicators": ["list", "of", "contextual", "clues"],
+  "age_group": "child|teenager|adult|elderly|unknown",
+  "confidence": 0.0 to 1.0
+}
+
+IMPORTANT GUIDELINES:
+- Be OBJECTIVE and FACTUAL - describe ONLY what you can see
+- DO NOT judge if this is a "violation" or not - that's not your job
+- Include relevant tags like: "swimsuit", "hospital_gown", "uniform", "child", "protest_sign", "religious_symbol", "beach", "medical_setting", "office"
+- For environment, be specific: "indoor_hospital", "outdoor_beach", "indoor_office", "street_protest"
+- For context_indicators, list anything that helps understand the situation
+
+Example response:
+{
+  "visual_summary": "Adult male in swimming trunks walking on sandy beach, carrying a towel",
+  "tags": ["adult", "male", "swimwear", "beach", "outdoor", "recreational"],
+  "environment": "outdoor_beach",
+  "clothing_level": "swimwear",
+  "visible_biometrics": {
+    "face_visible": true,
+    "tattoos_visible": false,
+    "scars_visible": false,
+    "distinctive_marks": "none"
+  },
+  "context_indicators": ["recreational_activity", "public_space", "leisure"],
+  "age_group": "adult",
+  "confidence": 0.9
+}
+"""
+
 class GemmaClient:
     """
     Cliente LLM mejorado con:
@@ -170,56 +220,187 @@ class GemmaClient:
 
     async def analyze_image(self, image_path: str, context: List[Dict[str, Any]], detection_type: str) -> Dict[str, Any]:
         """
-        Analiza una imagen para determinar si hay violación GDPR.
+        Analiza una imagen. Para "person" actúa como TESTIGO (solo describe).
+        Para otros tipos (face, license_plate, etc.) devuelve decisión directa.
+
+        Args:
+            image_path: Ruta a la imagen a analizar
+            context: Contexto GDPR de Neo4j (no usado para persona - el Juez lo usará)
+            detection_type: Tipo de detección (person, face, license_plate, etc.)
+
+        Returns:
+            Para "person": Descripción visual objetiva (sin is_violation)
+            Para otros: Decisión de violación directa
         """
         # Si el tipo es "unknown" o "hand", intentar clasificar con LLM
         if detection_type in ("unknown", "hand", "hand_crop"):
             classification = await self.classify_sensitive_content(image_path)
             if classification["detected_type"] != "none":
                 detection_type = classification["detected_type"]
-                logging.info(f"LLM classified {image_path} as {detection_type}")
-        
+                logger.info(f"LLM classified {image_path} as {detection_type}")
+
+        # =================================================================
+        # PARA "PERSON": Actuar como TESTIGO (solo descripción visual)
+        # La decisión legal la tomará el ConsensusAgent (el "Juez")
+        # =================================================================
+        if detection_type == "person":
+            logger.info(f"🔍 [TESTIGO] Generando descripción visual para: {image_path}")
+            visual_description = await self._describe_person_visually(image_path)
+            visual_description["detection_type"] = "person"
+            visual_description["mode"] = "witness"  # Marca que es descripción, no decisión
+            return visual_description
+
+        # =================================================================
+        # PARA OTROS TIPOS: Decisión directa (face, license_plate, etc.)
+        # Estos son siempre violaciones claras sin ambigüedad contextual
+        # =================================================================
         return self._determine_violation(detection_type, context)
+
+    async def _describe_person_visually(self, image_path: str) -> Dict[str, Any]:
+        """
+        MODO TESTIGO: Genera una descripción visual OBJETIVA de una persona.
+        NO emite juicios legales. Solo describe lo que ve.
+        """
+        if self.model is None:
+            self._load_model()
+
+        if self.model == "mock":
+            return self._mock_visual_description(image_path)
+
+        try:
+            from PIL import Image
+            image = Image.open(image_path).convert("RGB")
+
+            inputs = self.processor(
+                text=VISUAL_DESCRIPTION_PROMPT,
+                images=image,
+                return_tensors="pt"
+            ).to(self.device)
+
+            outputs = self.model.generate(**inputs, max_new_tokens=500, do_sample=False)
+            response = self.processor.decode(outputs[0], skip_special_tokens=True)
+
+            # Extraer JSON de la respuesta
+            json_start = response.find("{")
+            json_end = response.rfind("}") + 1
+            if json_start != -1 and json_end > json_start:
+                result = json.loads(response[json_start:json_end])
+                logger.info(f"🔍 [TESTIGO] Descripción: {result.get('visual_summary', 'N/A')[:100]}...")
+                return result
+
+            return self._fallback_visual_description()
+
+        except Exception as e:
+            logger.error(f"Error en descripción visual: {e}")
+            return self._fallback_visual_description()
+
+    def _mock_visual_description(self, image_path: str) -> Dict[str, Any]:
+        """Mock para pruebas cuando el modelo LLM no está disponible."""
+        path_lower = image_path.lower()
+
+        # Detectar contexto por nombre de archivo (solo para demo/testing)
+        if any(kw in path_lower for kw in ["beach", "playa", "swim", "bikini", "bañador"]):
+            return {
+                "visual_summary": "Persona en traje de baño en ambiente de playa",
+                "tags": ["swimwear", "beach", "outdoor", "recreational", "adult"],
+                "environment": "outdoor_beach",
+                "clothing_level": "swimwear",
+                "visible_biometrics": {"face_visible": True, "tattoos_visible": False, "scars_visible": False, "distinctive_marks": "none"},
+                "context_indicators": ["recreational_activity", "public_space", "leisure"],
+                "age_group": "adult",
+                "confidence": 0.85
+            }
+        elif any(kw in path_lower for kw in ["hospital", "medical", "doctor", "patient", "clinic"]):
+            return {
+                "visual_summary": "Persona en bata médica en entorno hospitalario",
+                "tags": ["hospital_gown", "medical_setting", "indoor", "healthcare", "patient"],
+                "environment": "indoor_hospital",
+                "clothing_level": "medical",
+                "visible_biometrics": {"face_visible": True, "tattoos_visible": False, "scars_visible": False, "distinctive_marks": "none"},
+                "context_indicators": ["medical_context", "healthcare", "vulnerable_situation"],
+                "age_group": "adult",
+                "confidence": 0.85
+            }
+        elif any(kw in path_lower for kw in ["protest", "manifestacion", "demonstration"]):
+            return {
+                "visual_summary": "Persona participando en manifestación pública",
+                "tags": ["protest", "outdoor", "political", "crowd", "demonstration"],
+                "environment": "street_protest",
+                "clothing_level": "casual",
+                "visible_biometrics": {"face_visible": True, "tattoos_visible": False, "scars_visible": False, "distinctive_marks": "none"},
+                "context_indicators": ["political_activity", "public_gathering", "expression_of_opinion"],
+                "age_group": "adult",
+                "confidence": 0.80
+            }
+        elif any(kw in path_lower for kw in ["child", "niño", "kid", "menor", "school"]):
+            return {
+                "visual_summary": "Menor de edad en entorno cotidiano",
+                "tags": ["child", "minor", "casual", "everyday"],
+                "environment": "general_public_space",
+                "clothing_level": "casual",
+                "visible_biometrics": {"face_visible": True, "tattoos_visible": False, "scars_visible": False, "distinctive_marks": "none"},
+                "context_indicators": ["minor_present", "protection_required"],
+                "age_group": "child",
+                "confidence": 0.85
+            }
+
+        # Default: persona en contexto normal
+        return {
+            "visual_summary": "Persona adulta en ropa casual en espacio público",
+            "tags": ["adult", "casual", "outdoor", "public_space"],
+            "environment": "general_public_space",
+            "clothing_level": "casual",
+            "visible_biometrics": {"face_visible": True, "tattoos_visible": False, "scars_visible": False, "distinctive_marks": "none"},
+            "context_indicators": ["everyday_activity", "public_space"],
+            "age_group": "adult",
+            "confidence": 0.75
+        }
+
+    def _fallback_visual_description(self) -> Dict[str, Any]:
+        """Descripción por defecto cuando falla el análisis."""
+        return {
+            "visual_summary": "Persona detectada - descripción no disponible",
+            "tags": ["person", "unknown_context"],
+            "environment": "unknown",
+            "clothing_level": "unknown",
+            "visible_biometrics": {"face_visible": False, "tattoos_visible": False, "scars_visible": False, "distinctive_marks": "unknown"},
+            "context_indicators": ["analysis_failed"],
+            "age_group": "unknown",
+            "confidence": 0.3
+        }
 
     def _determine_violation(self, detection_type: str, context: List[Dict]) -> Dict[str, Any]:
         """
         Determina si hay violación basándose en el tipo de detección (reglas GDPR).
+        NOTA: Este método YA NO se usa para "person" - solo para face, license_plate, etc.
         """
         always_violation = {"face", "fingerprint", "id_document", "credit_card", "hand_biometric"}
         likely_violation = {"license_plate", "signature"}
-        context_dependent = {"person"}
-        
+
         is_violation = False
         severity = "none"
         confidence = 0.0
         reasoning = ""
         recommended_action = "none"
-        
+
         if detection_type in always_violation:
             is_violation = True
             severity = "high"
             confidence = 0.95
             recommended_action = "blur" if detection_type in ("id_document", "face", "hand_biometric") else "pixelate"
             reasoning = f"Detección de {detection_type}: Dato biométrico/sensible según Art. 9 GDPR."
-            
+
         elif detection_type in likely_violation:
             is_violation = True
             severity = "high"
             confidence = 0.90
             recommended_action = "pixelate" if detection_type == "license_plate" else "blur"
             reasoning = f"Detección de {detection_type}: Identificador personal."
-            
-        elif detection_type in context_dependent:
-            is_violation = True
-            severity = "medium"
-            confidence = 0.75
-            reasoning = f"Detección de {detection_type}: Imagen personal."
-            recommended_action = "blur"
         else:
             is_violation = False
             confidence = 0.5
             reasoning = f"Tipo '{detection_type}' no clasificado como dato sensible GDPR."
-        
+
         return {
             "is_violation": is_violation,
             "severity": severity,

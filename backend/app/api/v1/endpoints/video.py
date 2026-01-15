@@ -236,14 +236,12 @@ async def get_video_status(
 @router.get("/{video_id}/violations", response_model=PaginatedResponse)
 async def get_violations(
     video_id: str,
-    page: int = 1,
-    page_size: int = 20,
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
     """
     Get all GDPR violations found in a video.
-    Returns verification records with linked detection data.
+    Returns ALL verification records with linked detection data (no pagination).
     """
     try:
         # 1. Verify video ownership (use normalized IDs with backticks)
@@ -257,28 +255,90 @@ async def get_violations(
         if normalize_user_id(video.get("user_id")) != normalize_user_id(current_user["id"]):
             raise HTTPException(403, "Not authorized")
 
-        # 2. Query all verifications for this video (with detection data)
-        # Note: Field is 'detection_id' (record link to detection table)
-        # Detection schema uses 'video_id' field (not 'video')
-        simple_video_id = f"video:{video_id}"  # Format matches what's stored in detection.video_id
-        query = f"""
-            SELECT * FROM gdpr_verification
-            WHERE detection_id.video_id = "{simple_video_id}"
-            FETCH detection_id
-        """
+        # 2. Get ALL detections and filter in Python (RecordID comparison in SurrealDB is problematic)
+        all_det_query = "SELECT * FROM detection"
+        all_det_result = await db.query(all_det_query)
 
-        print(f"🔍 [VIOLATIONS] Query: {query}")
-        verifications = await db.query(query)
-        print(f"🔍 [VIOLATIONS] Raw result: {verifications}")
+        print(f"[VIOLATIONS DEBUG] Raw query result type: {type(all_det_result)}, len: {len(all_det_result) if isinstance(all_det_result, list) else 'N/A'}")
 
-        # Extract results from query response
-        # SurrealDB returns [{'result': [...], 'status': 'OK', 'time': '...'}]
-        if isinstance(verifications, list) and len(verifications) > 0:
-            verification_records = verifications[0].get('result', [])
-        else:
-            verification_records = []
+        all_detections = []
+        if isinstance(all_det_result, list) and len(all_det_result) > 0:
+            first_item = all_det_result[0]
+            print(f"[VIOLATIONS DEBUG] First item type: {type(first_item)}, keys: {first_item.keys() if isinstance(first_item, dict) else 'N/A'}")
+            if isinstance(first_item, dict) and 'result' in first_item:
+                all_detections = first_item.get('result', [])
+            elif isinstance(first_item, dict):
+                # Maybe it's direct records without 'result' wrapper
+                all_detections = all_det_result
+            else:
+                all_detections = all_det_result
 
-        # 3. Map to ViolationCard objects
+        print(f"[VIOLATIONS DEBUG] all_detections count: {len(all_detections)}")
+        if all_detections:
+            # Only print essential fields, not the huge bbox_history/mask data
+            first_det = all_detections[0] if isinstance(all_detections[0], dict) else {}
+            first_video_id = first_det.get('video_id')
+            print(f"[VIOLATIONS DEBUG] First detection: id={first_det.get('id')}, video_id={first_video_id}, track_id={first_det.get('track_id')}")
+            print(f"[VIOLATIONS DEBUG] First detection video_id type: {type(first_video_id)}")
+
+        # Filter detections that match this video_id (check string representation)
+        detection_records = []
+        for det in all_detections:
+            if not isinstance(det, dict):
+                continue
+            det_video_id = det.get('video_id')
+            # Convert to string and check if it contains our video_id
+            det_video_str = str(det_video_id)
+            if video_id in det_video_str:
+                detection_records.append(det)
+
+        print(f"[VIOLATIONS] video_id: {video_id}, found {len(detection_records)} detections (from {len(all_detections)} total)")
+
+        # 3. First, get ALL verifications to debug
+        all_verif_query = "SELECT * FROM gdpr_verification"
+        all_verif_result = await db.query(all_verif_query)
+        all_verifications = []
+        if isinstance(all_verif_result, list) and len(all_verif_result) > 0:
+            all_verifications = all_verif_result[0].get('result', []) if isinstance(all_verif_result[0], dict) and 'result' in all_verif_result[0] else all_verif_result
+
+        print(f"[VIOLATIONS DEBUG] Total verifications in DB: {len(all_verifications)}")
+        if all_verifications:
+            first_v = all_verifications[0] if isinstance(all_verifications[0], dict) else {}
+            print(f"[VIOLATIONS DEBUG] First verification: id={first_v.get('id')}, detection_id={first_v.get('detection_id')}, type={type(first_v.get('detection_id'))}")
+
+        # Build a map of detection_id -> verifications for faster lookup
+        verif_by_detection = {}
+        for v in all_verifications:
+            if not isinstance(v, dict):
+                continue
+            v_det_id = v.get('detection_id')
+            v_det_str = str(v_det_id)
+            if v_det_str not in verif_by_detection:
+                verif_by_detection[v_det_str] = []
+            verif_by_detection[v_det_str].append(v)
+
+        print(f"[VIOLATIONS DEBUG] Verification map keys: {list(verif_by_detection.keys())[:5]}")
+
+        # 3. For each detection, get its verification from the map
+        verification_records = []
+        for det in detection_records:
+            det_id = det.get('id')
+            if not det_id:
+                continue
+
+            det_id_str = str(det_id)
+            v_records = verif_by_detection.get(det_id_str, [])
+
+            print(f"[VIOLATIONS DEBUG] Detection {det_id_str} has {len(v_records)} verifications")
+
+            for v_rec in v_records:
+                # Attach the detection data to the verification record
+                v_rec['detection_id'] = det
+                verification_records.append(v_rec)
+
+        print(f"[VIOLATIONS DEBUG] Total verifications: {len(verification_records)}")
+
+        # 4. Map to ViolationCard objects
         items = []
         for v_rec in verification_records:
             # Get linked detection data (field is 'detection_id', fetched via FETCH detection_id)
@@ -334,21 +394,18 @@ async def get_violations(
                 last_frame=last_frame
             ))
 
-        # 4. Pagination (simple in-memory for now)
+        # Return all items (no pagination - frontend handles scroll)
         total = len(items)
-        total_pages = (total + page_size - 1) // page_size
-        start_idx = (page - 1) * page_size
-        end_idx = start_idx + page_size
-        paginated_items = items[start_idx:end_idx]
+        print(f"[VIOLATIONS] Returning {total} violations to frontend")
 
         return PaginatedResponse(
-            items=paginated_items,
+            items=items,
             total=total,
-            page=page,
-            page_size=page_size,
-            total_pages=total_pages,
-            has_next=page < total_pages,
-            has_prev=page > 1
+            page=1,
+            page_size=total,
+            total_pages=1,
+            has_next=False,
+            has_prev=False
         )
 
     except HTTPException:
@@ -362,9 +419,28 @@ async def get_capture(
     video_id: str,
     track_id: int,
     filename: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
 ):
-    # Security check omitted
+    # Security check: Verify ownership
+    try:
+        # Check video ownership first
+        simple_video_id = f"video:`{video_id}`"
+        # We need to fetch the video to check the user
+        result = await db.select(f"video:`{video_id}`") # Use backticks for safety
+        if not result:
+             raise HTTPException(404, "Video not found")
+             
+        video = result[0] if isinstance(result, list) else result
+        
+        if normalize_user_id(video.get("user_id")) != normalize_user_id(current_user["id"]):
+            raise HTTPException(403, "Not authorized to view captures for this video")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error checking capture ownership: {e}")
+        raise HTTPException(500, "Error verifying capture access")
     
     file_path = CAPTURES_DIR / video_id / f"track_{track_id}" / filename
     if not file_path.exists():
@@ -386,6 +462,22 @@ async def submit_decisions(
     print(f"\n📝 [DECISIONS] Received decisions for video: {video_id}")
     print(f"   Decisions count: {len(batch.decisions)}")
     
+    # Security: Verify ownership BEFORE updating
+    try:
+        result = await db.select(f"video:`{video_id}`")
+        if not result:
+            raise HTTPException(404, "Video not found")
+        
+        video = result[0] if isinstance(result, list) else result
+        
+        if normalize_user_id(video.get("user_id")) != normalize_user_id(current_user["id"]):
+            raise HTTPException(403, "Not authorized to submit decisions for this video")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Error verifying ownership: {e}")
+
     # Update video status to 'editing' (schema allowed) BEFORE starting background task
     # This prevents the SSE endpoint from restarting the full pipeline
     db_video_id = f"video:`{video_id}`"
@@ -410,13 +502,18 @@ async def download_video(
     db = Depends(get_db)
 ):
     # Get video info from DB to find the correct path
-    simple_video_id = f"video:{video_id}"
+    simple_video_id = f"video:`{video_id}`" # Use backticks
     result = await db.select(simple_video_id)
     
     if not result:
         raise HTTPException(404, "Video not found")
         
     video_record = result[0] if isinstance(result, list) else result
+    
+    # Security: Verify ownership
+    if normalize_user_id(video_record.get("user_id")) != normalize_user_id(current_user["id"]):
+        raise HTTPException(403, "Not authorized to download this video")
+
     db_path = video_record.get("processed_path")
     
     # Validation logic
@@ -448,6 +545,16 @@ async def delete_video(
 ):
     # Delete from DB and Storage (usar backticks)
     try:
+        # Security: Check ownership first
+        result = await db.select(f"video:`{video_id}`")
+        if not result:
+            raise HTTPException(404, "Video not found")
+            
+        video = result[0] if isinstance(result, list) else result
+        
+        if normalize_user_id(video.get("user_id")) != normalize_user_id(current_user["id"]):
+            raise HTTPException(403, "Not authorized to delete this video")
+            
         await db.delete(f"video:`{video_id}`")
         # Clean storage
         # Placeholder for directory cleanup logic

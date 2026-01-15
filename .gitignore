@@ -104,3 +104,9 @@ processed/
 # Docker logs
 *.log
 docker_build_error.log
+
+**/*.webm
+**/*.mp4
+**/*.mov
+**/*.avi
+**/*.mkv

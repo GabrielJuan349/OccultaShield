@@ -110,6 +110,10 @@ export class LoginRegister {
       const { email, password } = this.loginCredentials();
       const success = await this.authService.login(email, password);
       if (success) {
+        const user = this.authService.user();
+        console.log('✅ Login exitoso:', user?.email, 'Rol:', user?.role);
+
+        // Siempre redirigir a /upload - admins pueden acceder al panel desde el botón en el header
         this.router.navigate(['/upload']);
       } else {
         console.error('Login failed:', this.authService.error());

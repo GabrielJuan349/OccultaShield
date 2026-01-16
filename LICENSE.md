@@ -40,3 +40,6 @@ This License is governed by the laws of **Spain**. Any dispute shall be subject 
 
 ### 11. Export Control and International Sanctions
 The User represents that they are not located in a country subject to EU, UN, or US government embargo, and that they will not export, re-export, or transfer the Software to any prohibited jurisdiction or entity (including for military end-use) in violation of applicable export control laws.
+
+### 11. Export Control and International Sanctions
+The User represents that they are not located in a country subject to EU, UN, or US government embargo, and that they will not export, re-export, or transfer the Software to any prohibited jurisdiction or entity (including for military end-use) in violation of applicable export control laws.

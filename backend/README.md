@@ -2,7 +2,7 @@
 
 # 🛡️ OccultaShield Backend
 
-### Motor de Anonimización de Video Impulsado por IA y Grafos Legales
+### AI-Powered Video Anonymization Engine with Legal Graphs
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -10,100 +10,100 @@
 [![SurrealDB](https://img.shields.io/badge/SurrealDB-2.0-FF00A0?style=for-the-badge)](https://surrealdb.com/)
 [![Neo4j](https://img.shields.io/badge/Neo4j-5.x-008CC1?style=for-the-badge&logo=neo4j)](https://neo4j.com/)
 
-**Tecnología de privacidad quirúrgica que combina YOLOv11, Kornia (YuNet), Rastreo Kalman y Grafos de Conocimiento (GraphRAG)**
+**Surgical privacy technology combining YOLOv11, Kornia (YuNet), Kalman Tracking, and Knowledge Graphs (GraphRAG)**
 
 </div>
 
 ---
 
-## 📖 Descripción Detallada
+## 📖 Detailed Description
 
-El backend de OccultaShield es el núcleo de procesamiento intensivo del sistema. Diseñado para ejecutarse en servidores con aceleración GPU, este módulo orquesta un pipeline complejo de visión artificial y razonamiento legal.
+The OccultaShield backend is the intensive processing core of the system. Designed to run on servers with GPU acceleration, this module orchestrates a complex pipeline of computer vision and legal reasoning.
 
-### Capacidades del Motor:
-1.  **Detección Híbrida Inteligente**: 
-    *   Utiliza **YOLOv11-seg** (Instance Segmentation) para obtener contornos precisos de peatones y vehículos, evitando las "cajas negras" rectangulares que ocultan información irrelevante.
-    *   Integra **Kornia FaceDetector (YuNet)** para la detección de rostros de alta fidelidad, capaz de detectar caras de hasta 10x10 píxeles en multitudes densas.
-2.  **Rastreo Temporal (MOT)**:
-    *   Implementa algoritmos de **SORT/DeepSORT** con filtros de Kalman para mantener la coherencia de identidad (ID) de cada sujeto a lo largo del video, evitando que las máscaras "parpadeen".
-3.  **Verificación Legal (Brain)**:
-    *   No se limita a ocultar; **pregunta**. Un motor RAG (Retrieval-Augmented Generation) consulta una base de datos vectorial en Neo4j con el reglamento RGPD para justificar si una detección es una infracción.
-4.  **Edición Tensorial en GPU**:
-    *   El renderizado final no usa ffmpeg clásico para los efectos. Utiliza **operaciones tensoriales directas** sobre la VRAM (vía Kornia), aplicando desenfoques Gaussianos o pixelados criptográficamente seguros.
-
----
-
-## 🛠️ Stack Tecnológico Actualizado
-
-*   **FastAPI**: API REST asíncrona de alto rendimiento con soporte nativo para `asyncio`.
-*   **Gestor de Paquetes**: `uv` (Rust-based) para una gestión de dependencias instantánea.
-*   **Visión**: `ultralytics` (YOLO) + `kornia` (PyTorch Vision).
-*   **Datos**: `SurrealDB` (Logs, Auth, Metadata) + `Neo4j` (Graph Knowledge).
-*   **LLM**: Integración con Ollama/HuggingFace para el razonamiento legal (módulo `verification`).
+### Engine Capabilities:
+1.  **Intelligent Hybrid Detection**: 
+    *   Uses **YOLOv11-seg** (Instance Segmentation) to obtain precise contours of pedestrians and vehicles, avoiding rectangular "black boxes" that hide irrelevant information.
+    *   Integrates **Kornia FaceDetector (YuNet)** for high-fidelity face detection, capable of detecting faces as small as 10x10 pixels in dense crowds.
+2.  **Temporal Tracking (MOT)**:
+    *   Implements **SORT/DeepSORT** algorithms with Kalman filters to maintain identity coherence (ID) for each subject throughout the video, preventing masks from "flickering".
+3.  **Legal Verification (Brain)**:
+    *   It doesn't just hide; it **asks**. A RAG (Retrieval-Augmented Generation) engine queries a vector database in Neo4j with GDPR regulations to justify whether a detection is a violation.
+4.  **GPU Tensor Editing**:
+    *   Final rendering doesn't use classic ffmpeg for effects. It uses **direct tensor operations** on VRAM (via Kornia), applying Gaussian blurs or cryptographically secure pixelation.
 
 ---
 
-## 🚀 Guía de Instalación y Ejecución
+## 🛠️ Updated Technology Stack
 
-### 1. Requisitos del Sistema
-*   **OS**: Linux (Ubuntu 22.04+ recomendado).
-*   **Python**: 3.11 o superior.
-*   **GPU**: NVIDIA Pascal o superior (con drivers 535+ y CUDA 12) para rendimiento óptimo.
+*   **FastAPI**: High-performance asynchronous REST API with native `asyncio` support.
+*   **Package Manager**: `uv` (Rust-based) for instant dependency management.
+*   **Vision**: `ultralytics` (YOLO) + `kornia` (PyTorch Vision).
+*   **Data**: `SurrealDB` (Logs, Auth, Metadata) + `Neo4j` (Graph Knowledge).
+*   **LLM**: Integration with Ollama/HuggingFace for legal reasoning (`verification` module).
 
-### 2. Instalación con `uv`
+---
+
+## 🚀 Installation and Execution Guide
+
+### 1. System Requirements
+*   **OS**: Linux (Ubuntu 22.04+ recommended).
+*   **Python**: 3.11 or higher.
+*   **GPU**: NVIDIA Pascal or higher (with drivers 535+ and CUDA 12) for optimal performance.
+
+### 2. Installation with `uv`
 ```bash
 cd backend
-# Crear entorno virtual e instalar dependencias (incluyendo torch y kornia)
+# Create virtual environment and install dependencies (including torch and kornia)
 uv sync
 ```
 
-### 3. Configuración del Entorno (`.env`)
-Es crítico configurar correctamente las variables de entorno para la conexión con los modelos y bases de datos.
+### 3. Environment Configuration (`.env`)
+It is critical to properly configure environment variables for connecting to models and databases.
 
 ```bash
 cd app
 cp .env.example .env
 nano .env
 ```
-**Variables Clave:**
-*   `DETECTION_MODEL_PATH`: Ruta al modelo YOLO (ej: `yolo11n-seg.pt`).
-*   `NEO4J_URI` / `NEO4J_PASSWORD`: Credenciales del Grafo Legal.
-*   `SURREALDB_URL`: URL de conexión a SurrealDB (normalmente `ws://localhost:8000/rpc`).
+**Key Variables:**
+*   `DETECTION_MODEL_PATH`: Path to YOLO model (e.g., `yolo11n-seg.pt`).
+*   `NEO4J_URI` / `NEO4J_PASSWORD`: Legal Graph credentials.
+*   `SURREALDB_URL`: SurrealDB connection URL (usually `ws://localhost:8000/rpc`).
 
-### 4. Inicialización de Datos
-Antes de procesar, carga el conocimiento legal inicial:
+### 4. Data Initialization
+Before processing, load the initial legal knowledge:
 ```bash
-# Activa el entorno
+# Activate the environment
 source .venv/bin/activate
-# Ingesta el PDF del RGPD en Neo4j
+# Ingest the GDPR PDF into Neo4j
 python app/modules/verification/ingest_gdpr.py path/to/gdpr.pdf
 ```
 
-### 5. Iniciar el Servidor
+### 5. Start the Server
 ```bash
-# Modo desarrollo con recarga en caliente
+# Development mode with hot reload
 cd app
 uvicorn main:app --host 0.0.0.0 --port 8980 --reload
 ```
 *   **Swagger API Docs**: `http://localhost:8980/docs`
-*   **Endpoint Health**: `http://localhost:8980/api/v1/health`
+*   **Health Endpoint**: `http://localhost:8980/api/v1/health`
 
 ---
 
-## 📂 Organización de Módulos (Architecture Map)
+## 📂 Module Organization (Architecture Map)
 
 *   `app/modules/detection/`: 
-    *   `detector.py`: Orquestador híbrido (YOLO + Kornia).
-    *   `tracker.py`: Lógica de Kalman Filter.
+    *   `detector.py`: Hybrid orchestrator (YOLO + Kornia).
+    *   `tracker.py`: Kalman Filter logic.
 *   `app/modules/verification/`:
-    *   `rag_engine.py`: Interfaz con Neo4j y LLM.
-    *   `legal_brain.py`: Lógica de decisión de compliance.
+    *   `rag_engine.py`: Interface with Neo4j and LLM.
+    *   `legal_brain.py`: Compliance decision logic.
 *   `app/modules/edition/`:
-    *   `video_editor.py`: Renderizador basado en tensores (Kornia).
-*   `app/api/v1/`: Rutas REST y Websockets (SSE).
+    *   `video_editor.py`: Tensor-based renderer (Kornia).
+*   `app/api/v1/`: REST Routes and Websockets (SSE).
 
 ---
 
-## ⚠️ Notas de Rendimiento
-*   **Kornia**: El sistema intentará usar CUDA automáticamente. Si ves logs de "Falling back to CPU", verifica tu instalación de PyTorch.
-*   **Modelos**: La primera ejecución descargará varios GB de pesos (YOLO, Embeddings, YuNet). Asegúrate de tener buena conexión.
+## ⚠️ Performance Notes
+*   **Kornia**: The system will automatically try to use CUDA. If you see "Falling back to CPU" logs, verify your PyTorch installation.
+*   **Models**: The first run will download several GB of weights (YOLO, Embeddings, YuNet). Ensure you have a good connection.

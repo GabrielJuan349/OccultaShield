@@ -1,36 +1,116 @@
 # 🔒 GDPR Knowledge Graph Setup
 
-Configuración rápida del Knowledge Graph GDPR para OccultaShield.
+Quick setup of the GDPR Knowledge Graph for OccultaShield's **"TESTIGO VS JUEZ"** verification system.
 
-## ⚡ Quick Start (Todo en uno)
+---
+
+## ⚡ Quick Start (All in one)
 
 ```bash
-cd /home/gjuan/OccultaShield/backend/app
+cd backend/app
 ./setup_gdpr.sh
 ```
 
-Este script:
-1. ✅ Verifica que UV y Neo4j estén disponibles
-2. ✅ Ofrece iniciar Neo4j con Docker si no está corriendo
-3. ✅ Configura el archivo `.env` automáticamente
-4. ✅ Ejecuta la ingesta mejorada usando el entorno UV (no necesita pip install)
-5. ✅ Carga datos desde:
-   - JSON locales (artículos, conceptos, mappings)
-   - **GitHub GDPRtEXT** (oficial, descarga automática)
-   - **Kaggle datasets** (opcional, si tienes API configurada)
+This script:
+1. ✅ Verifies UV and Neo4j availability
+2. ✅ Offers to start Neo4j with Docker if not running
+3. ✅ Automatically configures the `.env` file
+4. ✅ Runs enhanced ingestion using the UV environment
+5. ✅ Loads data from multiple sources
 
-## 📦 Dependencias
+---
 
-**Ya incluidas en pyproject.toml:**
-- ✅ `neo4j` - Driver para Neo4j
-- ✅ `sentence-transformers` - Embeddings semánticos
-- ✅ `kaggle` - API de Kaggle (opcional)
-- ✅ `python-dotenv` - Variables de entorno
+## 🧠 Verification Architecture
 
-**No necesitas instalar nada manualmente**, UV ya tiene todo.
+OccultaShield uses a **"TESTIGO VS JUEZ"** (Witness vs Judge) architecture for GDPR compliance verification:
 
-## 🐳 Solo Neo4j (si no lo tienes)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    VERIFICATION SYSTEM                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ┌─────────────────────────────────────────────────────────┐  │
+│   │                    SUB-AGENTS (TESTIGOS)                 │  │
+│   │                                                          │  │
+│   │   ┌──────────────┐        ┌──────────────┐              │  │
+│   │   │ GemmaClient  │        │ GraphClient  │              │  │
+│   │   │              │        │              │              │  │
+│   │   │ Visual       │        │ Neo4j Query  │              │  │
+│   │   │ Description  │        │ Legal Context│              │  │
+│   │   │ (LLM)        │        │ (Knowledge)  │              │  │
+│   │   └──────────────┘        └──────────────┘              │  │
+│   │                                                          │  │
+│   └─────────────────────────────────────────────────────────┘  │
+│                              │                                  │
+│                              ▼                                  │
+│   ┌─────────────────────────────────────────────────────────┐  │
+│   │                 CONSENSUS AGENT (JUEZ)                   │  │
+│   │                                                          │  │
+│   │   • Consolidates visual descriptions from all frames     │  │
+│   │   • Analyzes vulnerability context (tags, environment)   │  │
+│   │   • Queries Neo4j for applicable GDPR articles           │  │
+│   │   • Emits legal verdict with reasoning                   │  │
+│   │                                                          │  │
+│   └─────────────────────────────────────────────────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
+---
+
+## 📊 Context Classification
+
+### Vulnerable Contexts (GDPR Violation)
+
+| Context | Description | Severity |
+|---------|-------------|----------|
+| `medical` | Hospital, medical equipment, gowns | High |
+| `minor` | Children detected | High |
+| `religious` | Religious symbols, locations | Medium |
+| `political` | Protests, political gatherings | Medium |
+| `intimate` | Private/intimate settings | High |
+| `ethnic` | Ethnic indicators | Medium |
+
+### Normal Contexts (No Body Violation)
+
+| Context | Description | Face Only |
+|---------|-------------|-----------|
+| `public_space` | Streets, parks, beaches | Yes |
+| `workplace` | Offices, factories | Yes |
+| `commercial` | Shops, malls | Yes |
+| `recreational` | Sports, leisure | Yes |
+| `transport` | Vehicles, stations | Yes |
+
+**Rule**: In normal contexts, only faces are censored (separate track). Body censorship is not required.
+
+---
+
+## 📦 Data Sources
+
+### 1. Local JSON (Always Loaded)
+```
+scripts/gdpr_ingestion/json_data/
+├── gdpr_articles.json         # 99 GDPR articles
+├── gdpr_concepts.json         # Concepts, rights, fines
+└── detection_gdpr_mapping.json # Detection → Article mappings
+```
+
+### 2. GitHub GDPRtEXT (Automatic)
+- **URL**: https://github.com/coolharsh55/GDPRtEXT
+- **Content**: Official GDPR texts, explanatory recitals
+- **Downloaded automatically** during ingestion
+
+### 3. Kaggle Datasets (Optional)
+If Kaggle API is configured:
+- GDPR Articles dataset
+- GDPR-JSON dataset
+- Additional metadata enrichment
+
+---
+
+## 🐳 Neo4j Setup
+
+### Option 1: Docker (Recommended)
 ```bash
 docker run -d \
   --name neo4j-gdpr \
@@ -39,114 +119,40 @@ docker run -d \
   neo4j:latest
 ```
 
-**UI Web:** http://localhost:7474
-**Credenciales:** neo4j / Occultashield_neo4j
+### Option 2: Neo4j Desktop
+1. Download from https://neo4j.com/download/
+2. Create new project
+3. Set password to `Occultashield_neo4j`
 
-## 🔑 Kaggle Setup (Opcional)
+**Access:**
+- Web UI: http://localhost:7474
+- Bolt: bolt://localhost:7687
+- Credentials: `neo4j / Occultashield_neo4j`
 
-Para incluir datasets de Kaggle (opcional, pero recomendado):
+---
 
-```bash
-# 1. Obtener token de https://www.kaggle.com/settings → API → Create Token
-# 2. Ya existe en el proyecto! Verifica que esté en:
-#    backend/app/.kaggle/kaggle.json
-
-# Si no existe, créalo:
-mkdir -p .kaggle
-# Luego copia tu kaggle.json allí
-chmod 600 .kaggle/kaggle.json
-```
-
-**Prioridad de búsqueda:**
-1. 🥇 `backend/app/.kaggle/kaggle.json` (local al proyecto)
-2. 🥈 `~/.kaggle/kaggle.json` (home del usuario)
-
-Sin Kaggle el sistema funciona igual, solo con datos locales + GDPRtEXT.
-
-## 🎯 Fuentes de Datos
-
-### 1. JSON Locales (Siempre)
-- `scripts/gdpr_ingestion/json_data/gdpr_articles.json` - 99 artículos GDPR
-- `scripts/gdpr_ingestion/json_data/gdpr_concepts.json` - Conceptos, derechos, multas
-- `scripts/gdpr_ingestion/json_data/detection_gdpr_mapping.json` - Mapeo detecciones → artículos
-
-### 2. GitHub GDPRtEXT (Siempre)
-Repositorio oficial: https://github.com/coolharsh55/GDPRtEXT
-- Textos completos del RGPD en JSON
-- Recitals explicativos
-- Descarga automática durante ingesta
-
-### 3. Kaggle Datasets (Opcional)
-Si tienes Kaggle configurado:
-- GDPR Articles dataset
-- GDPR-JSON dataset
-- Enriquece con más metadatos
-
-## 📊 Verificación
-
-Después de la ingesta, verifica en Neo4j:
+## 🔑 Kaggle Setup (Optional)
 
 ```bash
-# Abrir Neo4j Browser
-open http://localhost:7474
+# 1. Get API token from https://www.kaggle.com/settings → API → Create Token
+# 2. Place kaggle.json in project:
 
-# Queries de prueba
-MATCH (a:Article) RETURN count(a)
-# Debe retornar ~99 artículos
-
-MATCH (d:DetectionType)-[:VIOLATES]->(a:Article)
-RETURN d.type, collect(a.number) as articles
-# Ver qué artículos viola cada tipo de detección
-
-MATCH (a:Article)
-WHERE a.embedding IS NOT NULL
-RETURN count(a)
-# Verificar embeddings para búsqueda semántica
-
-# Buscar artículo 6 (base legal)
-MATCH (a:Article {number: 6})
-RETURN a.title, a.content
+mkdir -p backend/app/.kaggle
+# Copy your kaggle.json there
+chmod 600 backend/app/.kaggle/kaggle.json
 ```
 
-## 🚀 Uso en el Backend
+**Search Priority:**
+1. 🥇 `backend/app/.kaggle/kaggle.json` (project-local)
+2. 🥈 `~/.kaggle/kaggle.json` (user home)
 
-El módulo de verificación usa automáticamente el Knowledge Graph:
+Without Kaggle, the system works with local data + GDPRtEXT.
 
-```python
-# modules/verification/graph_client.py
-context = await graph_client.get_context_for_detection("face")
-# Retorna artículos GDPR relevantes para detección de rostros
+---
 
-# modules/verification/gemma_client.py
-analysis = await gemma_client.analyze_image(
-    image_path=image_path,
-    context=context,  # Contexto GDPR del knowledge graph
-    detection_type="face"
-)
-# Analiza con IA usando contexto GDPR
-```
+## 📖 Knowledge Graph Structure
 
-## 🔄 Flujo Completo
-
-```
-1. Usuario sube video con rostros
-   ↓
-2. Detector encuentra rostros (YOLOv10)
-   ↓
-3. SubAgent consulta Knowledge Graph:
-   graph_client.get_context_for_detection("face")
-   → Retorna: Artículos 6, 9, 10, 13, etc.
-   ↓
-4. Gemma analiza imagen con contexto GDPR
-   ↓
-5. ConsensusAgent agrega resultados
-   ↓
-6. Sistema reporta violaciones al usuario
-```
-
-## 📖 Estructura del Knowledge Graph
-
-```
+```cypher
 (Chapter)-[:CONTAINS]->(Article)
 (Article)-[:HAS_PARAGRAPH]->(Paragraph)
 (Article)-[:DEFINES]->(Concept)
@@ -158,43 +164,180 @@ analysis = await gemma_client.analyze_image(
 (Fine)-[:APPLIES_TO]->(Article)
 ```
 
+### DetectionType → Article Mappings
+
+| Detection Type | GDPR Articles |
+|----------------|---------------|
+| `face` | 6, 9 |
+| `fingerprint` | 6, 9 |
+| `license_plate` | 6, 17 |
+| `person` | 6, 13 |
+| `id_document` | 6, 9, 32 |
+| `credit_card` | 6, 32 |
+| `signature` | 6 |
+
+---
+
+## 🚀 Usage in Backend
+
+### GraphClient (with Caching)
+
+```python
+from modules.verification.graph_client import GraphClient
+
+graph_client = GraphClient()
+
+# Get GDPR context for a detection type (cached for 5 minutes)
+context = await graph_client.get_context_for_detection("face")
+# Returns: Articles 6, 9 with full text
+
+# Semantic search with embeddings
+results = await graph_client.semantic_search(
+    query="biometric data processing",
+    limit=5
+)
+```
+
+### GemmaClient (Visual Description)
+
+```python
+from modules.verification.gemma_client import GemmaClient
+
+gemma_client = GemmaClient()
+
+# Visual description (TESTIGO role)
+description = await gemma_client.describe_image(image_path)
+# Returns: tags, environment, clothing_level, visible_biometrics
+
+# Sensitive content classification
+classification = await gemma_client.classify_sensitive_content(image_path)
+# Detects: fingerprint, id_document, credit_card, signature
+```
+
+### ConsensusAgent (Legal Verdict)
+
+```python
+from modules.verification.consensus_agent import ConsensusAgent
+
+consensus = ConsensusAgent()
+
+# Analyze all frames for a track
+verdict = await consensus.evaluate_track(
+    track_id="person_001",
+    frame_results=frame_descriptions,  # From SubAgents
+    detection_type="person"
+)
+
+# verdict contains:
+# - is_violation: bool
+# - severity: "high" | "medium" | "none"
+# - violated_articles: ["6", "9"]
+# - vulnerability_type: "medical" | null
+# - reasoning: "Human-readable explanation"
+# - recommended_action: "blur" | "none"
+```
+
+---
+
+## 🔄 Complete Flow
+
+```
+1. User uploads video with people
+   ↓
+2. HybridDetectorManager detects persons, faces, plates
+   ↓
+3. ObjectTracker assigns track_ids with Kalman Filter
+   ↓
+4. ParallelProcessor groups frames by track_id
+   ↓
+5. SubAgents analyze each frame:
+   ├── GemmaClient → Visual description (tags, environment)
+   └── GraphClient → Legal context from Neo4j
+   ↓
+6. ConsensusAgent (JUEZ) evaluates:
+   ├── Consolidate all frame descriptions
+   ├── Analyze vulnerability context
+   ├── Query Neo4j for applicable articles
+   └── Emit verdict: violation / no_violation
+   ↓
+7. Results stored in SurrealDB
+   ↓
+8. Human reviews and confirms
+   ↓
+9. VideoAnonymizer applies effects
+```
+
+---
+
+## 📊 Verification Queries
+
+### After Ingestion
+```cypher
+-- Count all entities
+MATCH (a:Article) RETURN count(a) as articles
+-- Should return ~99
+
+-- Verify detection mappings
+MATCH (d:DetectionType)-[:VIOLATES]->(a:Article)
+RETURN d.type, collect(a.number) as articles
+
+-- Check embeddings exist
+MATCH (a:Article)
+WHERE a.embedding IS NOT NULL
+RETURN count(a) as articles_with_embeddings
+
+-- Article 6 (legal basis)
+MATCH (a:Article {number: 6})
+RETURN a.title, a.content
+```
+
+---
+
 ## 🐛 Troubleshooting
 
 ### "Neo4j not detected"
 ```bash
-# Iniciar con Docker
-docker start neo4j-gdpr  # Si ya existe
-# O crear nuevo
+docker start neo4j-gdpr  # If exists
+# Or create new:
 docker run -d --name neo4j-gdpr -p 7474:7474 -p 7687:7687 \
   -e NEO4J_AUTH=neo4j/Occultashield_neo4j neo4j:latest
 ```
 
 ### "Could not download GDPRtEXT"
-- Verifica conexión a Internet
-- GitHub puede estar temporalmente no disponible
-- El script continuará con datos locales
+- Check Internet connection
+- GitHub may be temporarily unavailable
+- The script continues with local data only
 
 ### "UV not found"
 ```bash
-# Instalar UV
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### Backend no usa el Knowledge Graph
+### "Graph context empty"
 ```bash
-# Verificar que Neo4j está en .env
+# Verify Neo4j is in .env
 cat .env | grep NEO4J
 
-# Debe contener:
+# Should contain:
 # NEO4J_URI=bolt://localhost:7687
 # NEO4J_PASSWORD=Occultashield_neo4j
 
-# Reiniciar backend
-# CTRL+C y volver a iniciar con:
-uv run uvicorn main:app --host 0.0.0.0 --port 8980 --reload
+# Restart backend
+uv run uvicorn main:app --host 0.0.0.0 --port 8900 --reload
 ```
 
-## 📝 Logs de Ejemplo
+### "Embeddings not working"
+```bash
+# Ensure sentence-transformers is installed
+uv run python -c "from sentence_transformers import SentenceTransformer; print('OK')"
+
+# Re-run ingestion to regenerate embeddings
+./setup_gdpr.sh
+```
+
+---
+
+## 📝 Example Logs
 
 ```
 ╔═══════════════════════════════════════════════════════════╗
@@ -208,64 +351,21 @@ uv run uvicorn main:app --host 0.0.0.0 --port 8980 --reload
 🔍 Checking Neo4j...
 ✅ Neo4j is running on port 7687
 
-🔍 Checking environment configuration...
-✅ .env file found
-✅ Neo4j configuration present
-
-🔍 Checking optional Kaggle API...
-✅ Kaggle API available in UV environment
-✅ Kaggle credentials configured
-
-═══════════════════════════════════════════════════════════
-📋 Configuration Summary
-═══════════════════════════════════════════════════════════
-
-Data sources that will be loaded:
-  ✅ Local JSON files (articles, concepts, mappings)
-  ✅ GitHub GDPRtEXT repository (official GDPR texts)
-  ✅ Kaggle datasets (optional enhancement)
-
-Knowledge graph will include:
-  • 99 GDPR Articles with full text
-  • Chapters, Paragraphs, Recitals
-  • Concepts, Data Types, Rights
-  • Detection → Article mappings
-  • Fine tiers and amounts
-  • Semantic embeddings for search
-  • Fulltext indices
-
-═══════════════════════════════════════════════════════════
-
-Ready to run Enhanced GDPR Ingestion? (y/n) y
-
-🚀 Running Enhanced GDPR Ingestion with UV...
-
 🚀 Starting Enhanced GDPR Knowledge Graph Ingestion...
 ======================================================================
 
 📦 PHASE 1: Loading core GDPR data...
-🧹 Cleaning existing database...
 ✅ Database cleaned
-🔒 Creating constraints...
 ✅ Constraints and indices created
-📜 Loading local GDPR data...
-✅ Local data loaded
+✅ Local data loaded: 99 articles
 
 🌐 PHASE 2: Loading external GDPR sources...
-📥 Downloading GDPRtEXT repository data...
-   Processing GDPRtEXT articles...
 ✅ GDPRtEXT data loaded
-📥 Downloading Kaggle GDPR datasets...
-   ✅ Downloaded: gdpr_articles
-   ✅ Downloaded: gdpr_json
-   Processing Kaggle files...
+✅ Kaggle datasets loaded
 
 ✨ PHASE 3: Enriching knowledge graph...
-🔗 Creating relationships...
 ✅ Relationships created
-🧮 Generating embeddings...
-✅ Embeddings generated
-🔍 Creating fulltext indices...
+✅ Embeddings generated (all-MiniLM-L6-v2)
 ✅ Fulltext indices created
 
 ======================================================================
@@ -280,34 +380,11 @@ Ready to run Enhanced GDPR Ingestion? (y/n) y
   🌐 External Sources:  3
 ======================================================================
 ✅ ENHANCED INGESTION COMPLETED
-
-💡 Knowledge graph ready for GDPR compliance verification!
-
-═══════════════════════════════════════════════════════════
-
-✅ GDPR Knowledge Graph Setup Complete!
-
-🎉 Next steps:
-
-1. Verify the data in Neo4j Browser:
-   http://localhost:7474
-   User: neo4j
-   Password: Occultashield_neo4j
-
-2. Test queries:
-   MATCH (a:Article) RETURN count(a)  # Should return ~99
-   MATCH (d:DetectionType)-[:VIOLATES]->(a:Article) RETURN d.type, a.number
-
-3. Start the backend server (if not running):
-   uv run uvicorn main:app --host 0.0.0.0 --port 8980 --reload
-
-4. Test video processing:
-   Upload a video with faces to verify GDPR compliance checking
-
-═══════════════════════════════════════════════════════════
 ```
 
-## 🎓 Referencias
+---
+
+## 🎓 References
 
 - **GDPRtEXT**: https://github.com/coolharsh55/GDPRtEXT
 - **GDPR Official**: https://gdpr-info.eu/

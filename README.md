@@ -1,33 +1,50 @@
 <div align="center">
+  <img src="Logo_OccultaShield.webp" alt="OccultaShield Logo" width="200"/>
+  <h1>OccultaShield</h1>
+  
+  <p>
+    <strong>GDPR & AI Act Compliance Tool for Video Anonymization</strong>
+  </p>
 
-# 🛡️ OccultaShield
-
-### Plataforma Integral de Anonimización de Video & Cumplimiento RGPD
-
-[![Licence](https://img.shields.io/github/license/Ileriayo/markdown-badges?style=for-the-badge)](./LICENSE)
-[![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)]()
-[![Backend](https://img.shields.io/badge/Backend-FastAPI_+_Kornia-009688?style=for-the-badge)](./backend)
-[![Frontend](https://img.shields.io/badge/Frontend-Angular_21_+_Bun-DD0031?style=for-the-badge)](./frontend)
-
-*Protege la privacidad. Cumple la ley. Automatiza la burocracia.*
-
+  <a href="./LICENSE.md">
+    <img src="https://img.shields.io/badge/License-Source--Available_(Non--Commercial)-red?style=for-the-badge&logo=scale" alt="License: Source Available">
+  </a>
+  <a href="./TERMS.md">
+    <img src="https://img.shields.io/badge/Legal-Strict_Liability_Terms-blue?style=for-the-badge&logo=readthedocs" alt="Terms of Service">
+  </a>
+  <a href="#">
+    <img src="https://img.shields.io/badge/AI_Act-Human_Oversight_Required-orange?style=for-the-badge" alt="AI Act Compliance">
+  </a>
 </div>
 
 ---
 
-## 📖 Visión General del Proyecto
+### ⚠️ IMPORTANT LEGAL NOTICE
 
-**OccultaShield** es una solución de seguridad y privacidad *end-to-end* diseñada para resolver el conflicto entre la videovigilancia y el Reglamento General de Protección de Datos (RGPD) de la UE. A diferencia de los sistemas tradicionales que aplican máscaras estáticas o difuminados indiscriminados, OccultaShield utiliza un **enfoque contextual**: entiende qué está pasando en la escena antes de decidir qué ocultar.
+**This software is NOT "Open Source" under standard OSI definitions.**
 
-El sistema se compone de dos grandes monolitos orquestados:
-1.  **Core de IA (Backend)**: Un motor de procesamiento asíncrono que combina visión por computador clásica (OpenCV), Deep Learning moderno (YOLOv11, YuNet) y Grafos de Conocimiento (Neo4j) para tomar decisiones legales en tiempo real.
-2.  **Plataforma de Gestión (Frontend)**: Una interfaz web reactiva de última generación (Angular Zoneless) que permite a los responsables de datos (DPO) revisar, auditar y gestionar las solicitudes de acceso a video.
+**OccultaShield** is released under the **[OccultaShield Source-Available License](./LICENSE.md)**.
+* ✅ **Permitted:** Personal use, educational use, non-profit research, and internal testing.
+* ❌ **Prohibited:** Any commercial use, SaaS deployment, or business integration without a commercial license.
+* ⚖️ **Responsibility:** The user acts as the **"Deployer"** under the **EU AI Act**. You assume full liability for compliance with local laws (GDPR, LOPD-GDD, etc.).
+
+**[Read the Full Terms of Service & Acceptable Use Policy](./TERMS.md)** before proceeding.
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+## 📖 About the Project
 
-La arquitectura sigue un patrón de **Microservicios Modulares** dentro de un monorepo, comunicados vía REST y SSE (Server-Sent Events) para feedback en tiempo real.
+**OccultaShield** is an *end-to-end* security and privacy solution designed to resolve the conflict between video surveillance and the EU's General Data Protection Regulation (GDPR). Unlike traditional systems that apply static masks or indiscriminate blurring, OccultaShield uses a **contextual approach**: it understands what is happening in the scene before deciding what to hide.
+
+The system consists of two main orchestrated monoliths:
+1.  **AI Core (Backend)**: An asynchronous processing engine that combines classical computer vision (OpenCV), modern Deep Learning (YOLOv11, YuNet), and Knowledge Graphs (Neo4j) to make legal decisions in real-time.
+2.  **Management Platform (Frontend)**: A cutting-edge reactive web interface (Angular Zoneless) that allows Data Protection Officers (DPOs) to review, audit, and manage video access requests.
+
+---
+
+## 🏗️ System Architecture
+
+The architecture follows a **Modular Microservices** pattern within a monorepo, communicating via REST and SSE (Server-Sent Events) for real-time feedback.
 
 ```mermaid
 graph TD
@@ -36,72 +53,72 @@ graph TD
     Frontend -->|SSE Stream| Backend
     
     subgraph "Backend Intelligence"
-        Backend -->|Detección| Detection[YOLOv11 + YuNet]
-        Backend -->|Lógica Legal| GraphRAG[Neo4j + LLM]
-        Backend -->|Edición GPU| Kornia[Kornia Tensor Ops]
+        Backend -->|Detection| Detection[YOLOv11 + YuNet]
+        Backend -->|Legal Logic| GraphRAG[Neo4j + LLM]
+        Backend -->|GPU Editing| Kornia[Kornia Tensor Ops]
     end
     
     subgraph "Data Layer"
-        Backend -->|Logs & Métricas| SurrealDB[(SurrealDB)]
-        Detection -->|Tracking Cache| Redis[Memoria Volátil]
-        GraphRAG -->|Knowlege Graph| Neo4j[(Neo4j)]
+        Backend -->|Logs & Metrics| SurrealDB[(SurrealDB)]
+        Detection -->|Tracking Cache| Redis[Volatile Memory]
+        GraphRAG -->|Knowledge Graph| Neo4j[(Neo4j)]
     end
 ```
 
-### Flujo de Datos Principal
-1.  **Ingesta**: El video se sube y se pre-procesa (validación de códecs).
-2.  **Detección Híbrida**: Se ejecutan modelos de segmentación (cuerpos) y detección facial especializada (YuNet) en paralelo.
-3.  **Verificación Legal (GraphRAG)**: Cada detección se cruza con un grafo de conocimiento del RGPD. ¿Es un menor? ¿Es una figura pública? ¿Hay consentimiento implícito?
-4.  **Renderizado Tensorial**: Las máscaras de privacidad se generan y aplican directamente en la VRAM de la GPU usando Kornia, garantizando reversibilidad cero.
+### Main Data Flow
+1.  **Ingestion**: The video is uploaded and pre-processed (codec validation).
+2.  **Hybrid Detection**: Segmentation models (bodies) and specialized facial detection (YuNet) run in parallel.
+3.  **Legal Verification (GraphRAG)**: Each detection is cross-referenced with a GDPR knowledge graph. Is it a minor? Is it a public figure? Is there implicit consent?
+4.  **Tensor Rendering**: Privacy masks are generated and applied directly to the GPU VRAM using Kornia, ensuring zero reversibility.
 
 ---
 
-## 🚀 Componentes del Repositorio
+## 🚀 Repository Components
 
-### 📂 [Backend (Motor de IA)](./backend)
-El cerebro del sistema.
-*   **Gestión de Paquetes**: `uv` (reemplazo moderno de pip).
-*   **IA de Visión**: YOLOv11-seg para siluetas, Kornia FaceDetector (YuNet 640/320) para rostros.
-*   **Base de Datos**: SurrealDB (Multimodal) para logs de auditoría y metadatos de video.
+### 📂 [Backend (AI Engine)](./backend)
+The brain of the system.
+*   **Package Management**: `uv` (modern pip replacement).
+*   **Vision AI**: YOLOv11-seg for silhouettes, Kornia FaceDetector (YuNet 640/320) for faces.
+*   **Database**: SurrealDB (Multimodal) for audit logs and video metadata.
 
 ### 📂 [Frontend (Dashboard)](./frontend)
-La cara visible para el usuario.
-*   **Runtime**: Bun (Performance extremo en desarrollo y SSR).
-*   **Framework**: Angular v21 con arquitectura **Zoneless** (Signals puros).
-*   **Seguridad**: Better-Auth para autenticación robusta y marcas de agua dinámicas.
+The user-facing interface.
+*   **Runtime**: Bun (Extreme performance in development and SSR).
+*   **Framework**: Angular v21 with **Zoneless** architecture (pure Signals).
+*   **Security**: Better-Auth for robust authentication and dynamic watermarks.
 
 ---
 
-## ⚡ Inicio Rápido (Quick Start)
+## ⚡ Quick Start
 
-### Prerrequisitos Globales
-*   [Docker](https://www.docker.com/) (Recomendado para DBs)
-*   [Bun](https://bun.sh) v1.1+
+### Global Prerequisites
+*   [Docker](https://www.docker.com/) (Recommended for DBs)
+*   [Bun](https://bun.sh) v1.3+
 *   [uv](https://github.com/astral-sh/uv)
-*   Drivers NVIDIA (Opcional, pero recomendado para producción)
+*   NVIDIA Drivers (Optional, but recommended for production)
 
-### 1. Infraestructura de Datos
-Levanta las bases de datos necesarias:
+### 1. Data Infrastructure
+Start the required databases:
 ```bash
-# SurrealDB en memoria (puerto 8000)
+# SurrealDB in memory (port 8000)
 surreal start --user root --pass root memory --bind 0.0.0.0:8000
 
-# Neo4j (puerto 7474/7687)
+# Neo4j (port 7474/7687)
 docker run -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/password -e NEO4J_PLUGINS='["apoc", "graph-data-science"]' neo4j:latest
 ```
 
-### 2. Ejecutar OccultaShield
-Sigue las instrucciones detalladas en `backend/README.md` y `frontend/README.md` para iniciar cada servicio.
+### 2. Run OccultaShield
+Follow the detailed instructions in `backend/README.md` and `frontend/README.md` to start each service.
 
 ---
 
-## 🔒 Seguridad y Compliance
-Este proyecto ha sido diseñado siguiendo los principios de **Privacy by Design**:
-*   **Minimización de Datos**: Solo se procesan los frames necesarios.
-*   **Auditoría Inmutable**: Todas las acciones de los administradores quedan registradas en SurrealDB.
-*   **Soberanía del Dato**: Todo el procesamiento es local u *on-premise*, sin envío de videos a nubes de terceros.
+## 🔒 Security and Compliance
+This project has been designed following **Privacy by Design** principles:
+*   **Data Minimization**: Only necessary frames are processed.
+*   **Immutable Audit**: All administrator actions are recorded in SurrealDB.
+*   **Data Sovereignty**: All processing is local or *on-premise*, with no video transmission to third-party clouds.
 
 ---
 
-## 🤝 Contribución
-Proyecto privado. Contactar con el equipo de desarrollo para acceso a ramas experimentales (`feature/*`).
+## 🤝 Contributing
+Private project. Contact the development team for access to experimental branches (`feature/*`).

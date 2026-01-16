@@ -1,11 +1,27 @@
 /**
- * SurrealDB Connection Configuration
- * Establece y exporta la conexión a SurrealDB usando el driver oficial
- * Compatible con surreal-better-auth adapter
+ * SurrealDB Connection Manager for OccultaShield Auth Server.
+ *
+ * Provides a singleton connection to SurrealDB with helper functions
+ * for working with RecordIds and data conversion. Compatible with
+ * surreal-better-auth adapter.
+ *
+ * Features:
+ * - Singleton pattern for connection reuse
+ * - RecordId parsing and creation utilities
+ * - Data conversion helpers for Better-Auth compatibility
+ *
+ * @example
+ * ```typescript
+ * const db = await getDb();
+ * const result = await db.query('SELECT * FROM user');
+ * await closeDb();
+ * ```
  */
 import Surreal, { RecordId, StringRecordId } from 'surrealdb';
 import { ENV } from './env';
-console.log('Contenido completo de ENV:', JSON.stringify(ENV, null, 2));
+import { logger } from './logger';
+
+logger.debug('⚙️ Environment config loaded', { env: ENV });
 
 
 
@@ -50,13 +66,13 @@ export async function getDb(): Promise<Surreal> {
         database: ENV.SURREAL_DB,
       });
 
-      console.log(`✅ Connected to SurrealDB at ${ENV.SURREAL_URL}`);
-      console.log(`   Namespace: ${ENV.SURREAL_NAMESPACE}, Database: ${ENV.SURREAL_DB}`);
+      logger.info(`✅ Connected to SurrealDB at ${ENV.SURREAL_URL}`);
+      logger.info(`   Namespace: ${ENV.SURREAL_NAMESPACE}, Database: ${ENV.SURREAL_DB}`);
 
       db = instance;
       return instance;
     } catch (error) {
-      console.error('❌ Failed to connect to SurrealDB:', error);
+      logger.error('❌ Failed to connect to SurrealDB', { error: (error as Error).message });
       connectionPromise = null;
       throw error;
     }
@@ -73,7 +89,7 @@ export async function closeDb(): Promise<void> {
     await db.close();
     db = null;
     connectionPromise = null;
-    console.log('🔌 SurrealDB connection closed');
+    logger.info('🔌 SurrealDB connection closed');
   }
 }
 

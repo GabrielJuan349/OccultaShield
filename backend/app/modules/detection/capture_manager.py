@@ -1,10 +1,29 @@
+"""Capture Manager for Detected Object Image Extraction.
+
+This module handles the intelligent capture of detected objects during
+video processing. It implements temporal consensus by distributing captures
+uniformly across a track's duration for visual diversity.
+
+Features:
+    - Stability-based capture decisions
+    - Dual image output (clean crop + annotated bbox)
+    - Configurable capture quotas based on track duration
+    - Color-coded bounding boxes by detection type
+
+Example:
+    >>> manager = CaptureManager(stability_threshold=0.5)
+    >>> result = manager.consider_frame(track_id=1, frame_img=frame, ...)
+    >>> if result:
+    ...     clean_path, bbox_path = result
+"""
+
 import cv2
 import numpy as np
 from pathlib import Path
 from typing import Optional, Tuple
 from .models import BoundingBox
 
-# Colores BGR para bounding boxes según tipo de detección
+# BGR colors for bounding boxes by detection type
 BBOX_COLORS = {
     "person": (0, 255, 0),        # Verde
     "face": (0, 0, 255),          # Rojo

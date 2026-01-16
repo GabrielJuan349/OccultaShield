@@ -1,15 +1,47 @@
+"""SurrealDB Connection Manager.
+
+This module provides an async connection manager for SurrealDB with
+automatic reconnection, connection pooling, and thread-safe operations.
+
+Environment Variables:
+    SURREALDB_URL: Full WebSocket URL (optional, overrides host/port).
+    SURREALDB_HOST: Database host (default: localhost).
+    SURREALDB_PORT: Database port (default: 8000).
+    SURREALDB_USER: Database username (required).
+    SURREALDB_PASS: Database password (required).
+    SURREALDB_NAMESPACE: Database namespace (default: test).
+    SURREALDB_DB: Database name (default: occultashield).
+
+Example:
+    >>> conn = SurrealConn()
+    >>> db = await conn.getting_db()
+    >>> result = await db.query("SELECT * FROM user")
+    >>> await conn.close()
+"""
+
 import surrealdb as sr
 from dotenv import load_dotenv
 import os
 import logging
 import asyncio
 
-# Cargar las variables del archivo .env
+# Load environment variables from .env file
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+
 class SurrealConn:
+    """Async SurrealDB connection manager with automatic reconnection.
+
+    Provides a thread-safe, singleton-friendly connection manager that
+    handles connection lifecycle, automatic reconnection on failure,
+    and namespace/database selection.
+
+    Attributes:
+        db (AsyncSurreal): The SurrealDB client instance.
+        url (str): WebSocket URL for database connection.
+    """
     def __init__(self):
         self.db = None
         self._connected = False
@@ -39,7 +71,7 @@ class SurrealConn:
                 await self.db.query("RETURN 1")
                 return True
             except Exception as e:
-                logger.warning(f"Connection test failed: {e}, reconnecting...")
+                logger.warning(f"🔄 Connection test failed: {e}, reconnecting...")
                 self._connected = False
                 self.db = None
         return False
@@ -51,7 +83,7 @@ class SurrealConn:
             if await self._ensure_connected():
                 return
 
-            logger.info(f"Connecting to SurrealDB at {self.url}")
+            logger.info(f"🔌 Connecting to SurrealDB at {self.url}")
             self.db = sr.AsyncSurreal(self.url)
             try:
                 await self.db.signin({
@@ -59,9 +91,9 @@ class SurrealConn:
                     "password": self.password,
                 })
                 self._connected = True
-                print(f"✅ Successfully connected to SurrealDB at {self.url}")
+                logger.info(f"✅ Successfully connected to SurrealDB at {self.url}")
             except Exception as e:
-                print(f"❌ Error connecting to SurrealDB: {e}")
+                logger.error(f"❌ Error connecting to SurrealDB: {e}")
                 self._connected = False
                 self.db = None
                 raise
@@ -79,9 +111,9 @@ class SurrealConn:
 
         try:
             await self.db.use(namespace, target_db)
-            print(f"✅ [DB] Using namespace: {namespace}, database: {target_db}")
+            logger.info(f"📁 Using namespace: {namespace}, database: {target_db}")
         except Exception as e:
-            logger.error(f"Error selecting namespace/database: {e}")
+            logger.error(f"❌ Error selecting namespace/database: {e}")
             # Connection might be broken, try reconnecting
             self._connected = False
             await self.connect()
@@ -95,9 +127,9 @@ class SurrealConn:
             if self.db:
                 try:
                     await self.db.close()
-                    print("SurrealDB connection closed")
+                    logger.info("🔌 SurrealDB connection closed")
                 except Exception as e:
-                    logger.warning(f"Error closing connection: {e}")
+                    logger.warning(f"⚠️ Error closing connection: {e}")
                 finally:
                     self.db = None
                     self._connected = False

@@ -1,11 +1,34 @@
+"""Progress Manager for Real-Time Video Processing Updates.
+
+This module provides a centralized progress tracking system for video processing,
+implementing a publish/subscribe pattern for Server-Sent Events (SSE).
+
+The ProgressManager singleton coordinates:
+    - Video registration and state tracking
+    - Real-time progress updates to SSE clients
+    - Phase transition notifications
+    - Detection and verification event broadcasting
+    - Completion and error handling
+
+Example:
+    >>> from services.progress_manager import progress_manager
+    >>> await progress_manager.register_video("vid_123")
+    >>> await progress_manager.change_phase("vid_123", ProcessingPhase.DETECTING, "Starting...")
+    >>> await progress_manager.update_progress("vid_123", 50, message="Processing...")
+"""
+
 import asyncio
 from typing import Dict, Optional, AsyncGenerator, Callable, Any
 from datetime import datetime
 from collections import defaultdict
 
+from config.logging_config import get_logger
+
+logger = get_logger("services.progress")
+
 from core.events import (
-    ProcessingPhase, 
-    ProgressEvent, 
+    ProcessingPhase,
+    ProgressEvent,
     PhaseChangeEvent,
     DetectionEvent,
     VerificationEvent,
@@ -75,7 +98,7 @@ class ProgressManager:
             state = VideoProgressState(video_id)
             state.started_at = datetime.now()
             self._states[video_id] = state
-            print(f"📊 [PROGRESS] Registered video: {video_id}")
+            logger.debug("Registered video", extra={"extra_data": {"video_id": video_id}})
             return state
     
     async def get_state(self, video_id: str) -> Optional[VideoProgressState]:
@@ -104,11 +127,9 @@ class ProgressManager:
     async def _broadcast(self, video_id: str, event: Any):
         """Envía evento a todos los subscribers de un video."""
         if video_id not in self._subscribers:
-            print(f"📡 [BROADCAST] No subscribers for {video_id}")
             return
         
         num_subs = len(self._subscribers[video_id])
-        print(f"📡 [BROADCAST] {video_id}: sending {event.event_type.value} to {num_subs} subscriber(s)")
         
         dead_queues = []
         for queue in self._subscribers[video_id]:
@@ -155,8 +176,9 @@ class ProgressManager:
             estimated_time_seconds=estimated_time
         )
         
-        print(f"🔄 [PHASE CHANGE] {video_id}: {previous_phase.value} -> {phase.value}")
-        print(f"   Message: {message}")
+        logger.debug("🔄 Phase change", extra={"extra_data": {
+            "video_id": video_id, "from": previous_phase.value, "to": phase.value
+        }})
         await self._broadcast(video_id, event)
     
     async def update_progress(

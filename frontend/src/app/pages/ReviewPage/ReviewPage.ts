@@ -1,3 +1,20 @@
+/**
+ * Review Page Component for OccultaShield.
+ *
+ * Displays detected GDPR violations for human review and allows users
+ * to select anonymization actions (blur, pixelate, mask, or no modification).
+ *
+ * Features:
+ * - Lists all detected faces, persons, and license plates
+ * - Shows AI severity assessment and recommendations
+ * - Allows per-detection anonymization choice
+ * - Submits user decisions to backend for processing
+ *
+ * @example
+ * Route: /review/:id
+ * Flow: Detection → Verification → **Review** → Anonymization → Download
+ */
+
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { ViolationCard } from '#components/ViolationCard/ViolationCard';
@@ -5,6 +22,12 @@ import type { ModificationType, Violation, UserDecision } from '#interface/viola
 import { VideoService } from '#services/video.service';
 import { environment } from '#environments/environment';
 
+/**
+ * Human review page for GDPR violation decisions.
+ *
+ * Loads detected violations from the API and allows users to confirm
+ * or override AI recommendations before anonymization is applied.
+ */
 @Component({
   imports: [ViolationCard],
   templateUrl: './ReviewPage.html',

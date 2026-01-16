@@ -16,6 +16,7 @@ Thumbs.db
 *.sublime-workspace
 .history/
 .gemini/
+.github/
 .claude/
 .codeviz/
 

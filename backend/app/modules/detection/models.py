@@ -1,9 +1,41 @@
+"""Detection Data Models for Video Processing Pipeline.
+
+This module defines the core data structures used throughout the detection
+and tracking pipeline for GDPR-sensitive content identification.
+
+Classes:
+    BoundingBox: Represents a rectangular region in a video frame.
+    Capture: Stores a captured image of a detected object.
+    TrackedDetection: Tracks an object across multiple frames.
+    DetectionResult: Aggregates all detections from a video.
+
+Example:
+    >>> bbox = BoundingBox(x1=100, y1=100, x2=200, y2=200, confidence=0.95, frame=1)
+    >>> track = TrackedDetection(track_id=1, detection_type="face")
+    >>> track.add_bbox(bbox)
+"""
+
 from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Optional, Tuple
 import numpy as np
 
+
 @dataclass
 class BoundingBox:
+    """Represents a bounding box detection in a video frame.
+
+    Stores coordinates, confidence score, frame number, and optional
+    segmentation mask for precise object boundaries.
+
+    Attributes:
+        x1: Left edge x-coordinate.
+        y1: Top edge y-coordinate.
+        x2: Right edge x-coordinate.
+        y2: Bottom edge y-coordinate.
+        confidence: Detection confidence score (0.0-1.0).
+        frame: Frame number where detection occurred.
+        mask: Optional polygon points for segmentation mask.
+    """
     x1: float
     y1: float
     x2: float
@@ -36,6 +68,19 @@ class BoundingBox:
 
 @dataclass
 class Capture:
+    """Stores metadata for a captured detection image.
+
+    Captures are taken at key moments during tracking to provide
+    visual evidence for AI verification and human review.
+
+    Attributes:
+        frame: Frame number of the capture.
+        image_path: Filesystem path to the saved capture image.
+        bbox: Bounding box of the detection at capture time.
+        reason: Why this capture was taken (e.g., "high_confidence").
+        timestamp: Video timestamp in seconds.
+    """
+
     frame: int
     image_path: str
     bbox: BoundingBox
@@ -43,10 +88,24 @@ class Capture:
     timestamp: float
 
     def to_dict(self) -> dict:
+        """Convert capture to dictionary for serialization."""
         return asdict(self)
 
 @dataclass
 class TrackedDetection:
+    """Represents a tracked object across multiple video frames.
+
+    Maintains the complete history of bounding boxes and captures
+    for a single detected entity (face, person, license plate).
+
+    Attributes:
+        track_id: Unique identifier for this track.
+        detection_type: Type of detection (face, person, license_plate).
+        bbox_history: List of all bounding boxes across frames.
+        captures: List of captured images for this track.
+        is_confirmed: Whether this detection has been AI-verified.
+    """
+
     track_id: int
     detection_type: str
     bbox_history: List[BoundingBox] = field(default_factory=list)
@@ -98,6 +157,23 @@ class TrackedDetection:
 
 @dataclass
 class DetectionResult:
+    """Aggregates all detection results from a video processing run.
+
+    Contains video metadata and a list of all tracked detections
+    found during the detection phase.
+
+    Attributes:
+        video_path: Path to the processed video file.
+        total_frames: Total number of frames in the video.
+        fps: Frames per second of the video.
+        duration_seconds: Video duration in seconds.
+        width: Video width in pixels.
+        height: Video height in pixels.
+        detections: List of all tracked detections.
+        frames_processed: Number of frames actually processed.
+        processing_time_seconds: Total processing time.
+    """
+
     video_path: str
     total_frames: int
     fps: float

@@ -1,14 +1,40 @@
+"""Neo4j Graph Database Client for GDPR Knowledge Retrieval.
+
+This module provides an async client for querying the GDPR knowledge graph
+stored in Neo4j. It implements caching to reduce database load for
+frequently accessed contexts.
+
+Features:
+    - Async Neo4j driver support
+    - Context caching with configurable TTL
+    - Semantic search via vector embeddings
+    - GDPR article and fine information retrieval
+
+Example:
+    >>> client = GraphClient()
+    >>> context = await client.get_context_for_detection("face")
+    >>> await client.close()
+"""
+
 import os
 import time
 from typing import List, Dict, Any, Optional
 from neo4j import GraphDatabase, AsyncGraphDatabase
 from db.neo4j_queries import GDPRQueries
 
-CACHE_TTL_SECONDS = 300  # 5 minutos
+CACHE_TTL_SECONDS = 300  # 5 minutes
+
 
 class GraphClient:
-    """
-    Cliente de grafo mejorado con cache de contexto para evitar queries repetidas.
+    """Async Neo4j client with context caching for GDPR queries.
+
+    Singleton client that manages connections to Neo4j and provides
+    cached access to GDPR-related information based on detection types.
+
+    Attributes:
+        driver: AsyncGraphDatabase driver instance.
+        _context_cache: In-memory cache for context queries.
+        _cache_timestamps: Timestamps for cache invalidation.
     """
     _instance = None
     

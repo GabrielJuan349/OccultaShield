@@ -244,7 +244,7 @@ class GemmaClient:
         # La decisión legal la tomará el ConsensusAgent (el "Juez")
         # =================================================================
         if detection_type == "person":
-            logger.info(f"🔍 [TESTIGO] Generando descripción visual para: {image_path}")
+            logger.info(f"🕵️ [TESTIGO] Generando descripción visual para: {image_path}")
             visual_description = await self._describe_person_visually(image_path)
             visual_description["detection_type"] = "person"
             visual_description["mode"] = "witness"  # Marca que es descripción, no decisión
@@ -285,7 +285,7 @@ class GemmaClient:
             json_end = response.rfind("}") + 1
             if json_start != -1 and json_end > json_start:
                 result = json.loads(response[json_start:json_end])
-                logger.info(f"🔍 [TESTIGO] Descripción: {result.get('visual_summary', 'N/A')[:100]}...")
+                logger.info(f"🕵️ [TESTIGO] Descripción: {result.get('visual_summary', 'N/A')[:100]}...")
                 return result
 
             return self._fallback_visual_description()

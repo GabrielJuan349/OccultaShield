@@ -1,9 +1,33 @@
+"""SSE Event Models for Video Processing Progress.
+
+This module defines Pydantic models for Server-Sent Events (SSE) used to
+communicate real-time processing progress to connected clients.
+
+Event Types:
+    ProgressEvent: General progress update with percentage.
+    PhaseChangeEvent: Processing phase transition notification.
+    DetectionEvent: New detection found during analysis.
+    VerificationEvent: AI verification progress update.
+    CompleteEvent: Processing completed successfully.
+    ErrorEvent: Error occurred during processing.
+
+Example:
+    >>> event = ProgressEvent(phase=ProcessingPhase.DETECTING, progress=50, message="Analyzing...")
+    >>> sse_string = event.to_sse()  # Formats for SSE transmission
+"""
+
 from pydantic import BaseModel
 from typing import Literal, Optional, Any
 from enum import Enum
 from datetime import datetime
 
+
 class ProcessingPhase(str, Enum):
+    """Enumeration of video processing phases.
+
+    Represents the different stages a video goes through during
+    GDPR compliance analysis and anonymization.
+    """
     IDLE = "idle"
     UPLOADING = "uploading"
     DETECTING = "detecting"

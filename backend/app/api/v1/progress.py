@@ -1,3 +1,25 @@
+"""Server-Sent Events (SSE) Progress Streaming Endpoints.
+
+This module provides real-time progress updates for video processing via SSE.
+Clients connect to receive live updates about detection, verification,
+and anonymization phases.
+
+Endpoints:
+    GET /{video_id}/progress: Stream real-time processing events via SSE.
+    GET /{video_id}/status: Get current status (polling fallback).
+    POST /{video_id}/cancel: Cancel ongoing processing.
+
+Events:
+    initial_state: Sent on connection with current processing state.
+    phase_change: Processing phase transition notification.
+    progress: Percentage progress update.
+    detection: New GDPR-sensitive detection found.
+    verification: AI verification progress.
+    complete: Processing finished successfully.
+    error: Processing error occurred.
+    heartbeat: Keep-alive signal (every 15 seconds).
+"""
+
 from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse
@@ -9,8 +31,9 @@ from typing import AsyncGenerator
 from services.progress_manager import progress_manager, ProgressManager
 from core.events import ProcessingPhase
 from core.dependencies import get_current_user, get_db
+from config.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("api.progress")
 
 router = APIRouter(tags=["Processing"])
 
@@ -29,23 +52,22 @@ async def event_generator(
     - id: (opcional) ID del evento
     - retry: (opcional) tiempo de retry en ms
     """
-    print(f"🎬 [SSE] event_generator started for video: {video_id}")
+    logger.debug("📡 SSE event_generator started", extra={"extra_data": {"video_id": video_id}})
     queue = await progress_manager.subscribe(video_id)
-    print(f"📡 [SSE] Subscribed to queue for video: {video_id}")
 
     try:
         # Enviar estado inicial
         state = await progress_manager.get_state(video_id)
-        print(f"📊 [SSE] Got state for {video_id}: {state is not None}")
 
         if state:
             state_dict = state.to_dict()
-            print(f"📤 [SSE] Sending initial_state to client for {video_id}")
-            print(f"   State data: phase={state_dict.get('phase')}, progress={state_dict.get('progress')}")
+            logger.debug("📨 Sending initial_state", extra={"extra_data": {
+                "video_id": video_id, "phase": state_dict.get('phase')
+            }})
             yield {"event": "initial_state", "data": json.dumps(state_dict)}
         else:
             # Si no hay estado, enviar estado idle por defecto
-            print(f"⚠️ [SSE] No state found for {video_id}, sending default idle state")
+            logger.debug("⚠️ No state found, sending idle", extra={"extra_data": {"video_id": video_id}})
             default_state = {
                 "video_id": video_id,
                 "phase": "idle",
@@ -65,7 +87,7 @@ async def event_generator(
         while True:
             # Verificar si cliente desconectó
             if await request.is_disconnected():
-                print(f"🔌 [SSE] Client disconnected for {video_id}")
+                logger.debug("🔌 Client disconnected", extra={"extra_data": {"video_id": video_id}})
                 break
 
             try:
@@ -77,13 +99,12 @@ async def event_generator(
 
                 # Enviar evento usando formato de diccionario
                 event_type = event.event_type.value
-                print(f"📤 [SSE] Sending {event_type} event to client")
 
                 try:
                     event_data = event.model_dump(mode='json')
                     yield {"event": event_type, "data": json.dumps(event_data)}
                 except Exception as serialize_error:
-                    logger.error(f"SSE serialization error: {serialize_error}")
+                    logger.error(f"❌ SSE serialization error: {serialize_error}")
                     yield {
                         "event": "error",
                         "data": json.dumps({
@@ -93,14 +114,13 @@ async def event_generator(
 
                 # Si es evento de completado o error, terminar
                 if event_type in ["complete", "error"]:
-                    print(f"📤 [SSE] Terminal event ({event_type}) - closing connection")
+                    logger.debug(f"✅ Terminal event ({event_type}) - closing", extra={"extra_data": {"video_id": video_id}})
                     break
 
             except asyncio.TimeoutError:
                 # Enviar heartbeat
                 current_time = asyncio.get_event_loop().time()
                 if current_time - last_heartbeat >= heartbeat_interval:
-                    print(f"💓 [SSE] Sending heartbeat for {video_id}")
                     yield {"event": "heartbeat", "data": "{}"}
                     last_heartbeat = current_time
                     
@@ -135,24 +155,22 @@ async def stream_progress(
     from datetime import datetime
 
     # Debug: Ver qué videos están registrados
-    print(f"\n🔌 [SSE CONNECTION REQUEST]")
-    print(f"   video_id requested: {video_id}")
-    print(f"   user: {current_user.get('id', 'unknown')}")
-    print(f"   registered videos in memory: {list(progress_manager._states.keys())}")
+    logger.info("🔌 SSE connection request", extra={"extra_data": {
+        "video_id": video_id, "user_id": current_user.get('id', 'unknown')
+    }})
 
     # 1️⃣ PRIMERO: Verificar que el video existe en DB y pertenece al usuario
     db_video_id = f"video:`{video_id}`"
-    print(f"   🔍 Buscando video en DB: {db_video_id}")
 
     try:
         result = await db.select(db_video_id)
         video = result if not isinstance(result, list) else (result[0] if result else None)
     except Exception as e:
-        print(f"   ❌ Error consultando DB: {e}")
+        logger.error("❌ DB query failed", exc_info=True, extra={"extra_data": {"error": str(e)}})
         raise HTTPException(500, f"Database error: {e}")
 
     if not video:
-        print(f"   ❌ Video no encontrado en DB")
+        logger.warning("⚠️ Video not found", extra={"extra_data": {"video_id": video_id}})
         raise HTTPException(404, f"Video {video_id} not found")
 
     # Verificar ownership
@@ -160,17 +178,19 @@ async def stream_progress(
     current_user_id = str(current_user["id"]).replace("⟨", "").replace("⟩", "")
 
     if video_user_id != current_user_id:
-        print(f"   ❌ Video no pertenece al usuario: {video_user_id} != {current_user_id}")
+        logger.warning("🚫 Access denied - wrong owner", extra={"extra_data": {
+            "video_user": video_user_id, "request_user": current_user_id
+        }})
         raise HTTPException(403, "Not authorized to access this video")
 
-    print(f"   ✅ Video encontrado en DB, status: '{video.get('status')}'")
+    logger.debug("✅ Video verified", extra={"extra_data": {"status": video.get('status')}})
 
     # 2️⃣ SEGUNDO: Verificar/registrar en progress_manager
     state = await progress_manager.get_state(video_id)
     video_status = video.get("status")
 
     if not state:
-        print(f"   📝 Video no está en progress_manager, registrándolo...")
+        logger.debug("📝 Registering video in progress_manager", extra={"extra_data": {"video_id": video_id}})
         state = await progress_manager.register_video(video_id)
         
         # Set initial phase based on DB status
@@ -186,13 +206,10 @@ async def stream_progress(
         if video_status in status_to_phase:
             state.phase = status_to_phase[video_status]
             state.message = f"Video status: {video_status}"
-            print(f"   ✅ Video registrado con fase: {state.phase.value}")
-        else:
-            print(f"   ✅ Video registrado en progress_manager (idle)")
 
     # 3️⃣ TERCERO: AUTO-START si el video está pendiente
     if video_status == "pending":
-        print(f"   🚀 [AUTO-START] Video en estado 'pending', iniciando procesamiento...")
+        logger.info("🚀 Auto-starting processing", extra={"extra_data": {"video_id": video_id}})
 
         file_path = video.get("original_path")
         if file_path:
@@ -206,28 +223,12 @@ async def stream_progress(
             asyncio.create_task(
                 video_processor.process_full_pipeline(video_id, file_path)
             )
-            print(f"   ✅ [AUTO-START] Procesamiento iniciado automáticamente")
         else:
-            print(f"   ⚠️ [AUTO-START] No se encontró file_path para el video")
-    elif video_status == "processing":
-        print(f"   ℹ️ Video ya está procesándose")
-    elif video_status == "verified":
-        print(f"   ℹ️ Video esperando revisión del usuario (verified)")
-        # El estado actual se enviará vía initial_state
-    elif video_status == "editing":
-        print(f"   ℹ️ Video en estado 'editing' (anonymizing)")
-        # Check if anonymization is already running by checking state phase
-        current_state = await progress_manager.get_state(video_id)
-        if current_state and current_state.phase.value == "anonymizing":
-            print(f"   ✅ Anonymization (editing) already in progress, waiting for events...")
-        else:
-            print(f"   ⚠️ Anonymization (editing) not started yet, will receive events when it starts")
-    elif video_status in ["completed", "error"]:
-        print(f"   ℹ️ Video ya terminó con status: {video_status}")
-    else:
-        print(f"   ℹ️ Video en estado: {video_status}")
+            logger.warning("No file_path for auto-start", extra={"extra_data": {"video_id": video_id}})
+    elif video_status in ["processing", "verified", "editing", "completed", "error"]:
+        logger.debug("Video status", extra={"extra_data": {"status": video_status}})
 
-    print(f"   ✅ SSE connection ready for {video_id}")
+    logger.debug("✅ SSE connection ready", extra={"extra_data": {"video_id": video_id}})
 
     return EventSourceResponse(
         content=event_generator(video_id, request),

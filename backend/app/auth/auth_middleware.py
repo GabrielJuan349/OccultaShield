@@ -1,3 +1,21 @@
+"""Authentication Middleware for FastAPI.
+
+This module provides HTTP middleware that validates authentication tokens
+on incoming requests. It supports multiple token sources including:
+- Authorization header (Bearer token)
+- Query parameters (?token=...)
+- Cookies (Better-Auth session cookies)
+
+Features:
+    - Token caching for improved performance
+    - Support for Better-Auth cookie formats
+    - Configurable public routes
+    - Automatic cache cleanup
+
+Example:
+    >>> app.add_middleware(AuthMiddleware, surreal_conn=surreal_conn)
+"""
+
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -6,7 +24,18 @@ import json
 import time
 from db.surreal_conn import SurrealConn
 
+
 class AuthMiddleware(BaseHTTPMiddleware):
+    """FastAPI middleware for token-based authentication.
+
+    Validates authentication tokens against SurrealDB session records.
+    Implements token caching to reduce database queries for frequently
+    used tokens.
+
+    Attributes:
+        conn_manager (SurrealConn): Database connection manager.
+        public_routes (list): Routes that don't require authentication.
+    """
     def __init__(self, app, surreal_conn: SurrealConn):
         super().__init__(app)
         self.conn_manager = surreal_conn

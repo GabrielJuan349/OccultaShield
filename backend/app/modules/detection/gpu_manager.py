@@ -72,7 +72,7 @@ class GPUManager:
         else:  # 32GB+ (DGX Spark level)
             # Use maximum batch sizes for DGX Spark
             batch = min(128, int(vram_gb * 3))  # Up to 128 frames per batch
-            print(f"🚀 [GPU] DGX Spark mode: {vram_gb:.0f}GB VRAM, batch_size={batch}")
+            logger.info(f"🚀 DGX Spark mode: {vram_gb:.0f}GB VRAM, batch_size={batch}")
             return "parallel", "medium", batch
 
 # Instancia global

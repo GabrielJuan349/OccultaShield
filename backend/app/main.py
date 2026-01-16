@@ -1,10 +1,34 @@
+"""OccultaShield Backend API Main Application.
+
+This module initializes and configures the FastAPI application for OccultaShield,
+a GDPR-compliant video anonymization service. It sets up database connections,
+CORS middleware, authentication middleware, and API routes.
+
+Example:
+    Run the server directly::
+
+        $ python main.py
+
+    Or using uvicorn::
+
+        $ uvicorn main:app --host 0.0.0.0 --port 8980
+"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import uvicorn
 from contextlib import asynccontextmanager
+
+# Initialize logging FIRST, before any other imports that might log
+from config.logging_config import setup_logging, get_logger
+setup_logging()
+
+logger = get_logger("app.main")
+
 from db.surreal_conn import SurrealConn
 from auth.auth_middleware import AuthMiddleware
+from core.logging_middleware import LoggingMiddleware
 
 from api.v1.router import api_router
 
@@ -15,14 +39,29 @@ surreal_conn = SurrealConn()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Manage the application lifecycle events.
+
+    Handles startup and shutdown events for the FastAPI application.
+    On startup, establishes a connection to the SurrealDB database.
+    On shutdown, gracefully closes the database connection.
+
+    Args:
+        app (FastAPI): The FastAPI application instance.
+
+    Yields:
+        None: Control is yielded to the application during its lifetime.
+    """
     # Startup
+    logger.info("🚀 OccultaShield Backend starting...")
     await surreal_conn.getting_db()
-    
+    logger.info("✅ Application ready to accept requests")
+
     yield
-    
+
     # Shutdown
+    logger.info("🛑 Shutting down OccultaShield Backend...")
     await surreal_conn.close()
-    print("Database connection closed")
+    logger.info("🔌 Database connection closed")
 
     
 app = FastAPI(
@@ -57,7 +96,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configurar middleware de autenticación (DESPUÉS de CORS)
+# Logging middleware (after CORS, before Auth)
+app.add_middleware(LoggingMiddleware)
+
+# Configurar middleware de autenticación (DESPUÉS de CORS y Logging)
 app.add_middleware(AuthMiddleware, surreal_conn=surreal_conn)
 
 # Inicializar auth service (si se usa globalmente)
@@ -68,6 +110,16 @@ app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():
+    """Health check endpoint for the API root.
+
+    Provides a simple health check to verify that the backend service
+    is running and responsive.
+
+    Returns:
+        dict: A dictionary containing the service status and name.
+            - status (str): "ok" if the service is healthy.
+            - service (str): The name of the service.
+    """
     return {"status": "ok", "service": "OccultaShield Backend"}
 
 

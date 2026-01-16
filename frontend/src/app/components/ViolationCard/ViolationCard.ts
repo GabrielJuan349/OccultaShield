@@ -1,8 +1,37 @@
+/**
+ * Violation Card Component for OccultaShield Review Page.
+ *
+ * Displays a detected GDPR violation with image preview, evidence details,
+ * and action selection buttons. Implements screenshot protection for the
+ * image preview modal.
+ *
+ * Features:
+ * - Secure image loading via blob URLs (no tokens in URLs)
+ * - AI confidence and recommendation display
+ * - GDPR article violation badges
+ * - Screenshot/capture protection in preview modal
+ * - Keyboard navigation support
+ *
+ * @example
+ * ```html
+ * <app-violation-card
+ *   [data]="violation"
+ *   (selectionChange)="updateViolation($event)"
+ * />
+ * ```
+ */
+
 import { ChangeDetectionStrategy, Component, input, output, signal, effect, inject, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { ModificationType, Violation } from '#interface/violation.interface';
 import { SecureMediaService } from '#services/secure-media.service';
 
+/**
+ * Card component for displaying and selecting actions on detected violations.
+ *
+ * Uses signal-based inputs and outputs for reactive state management.
+ * Implements OnPush change detection for optimal performance.
+ */
 @Component({
   selector: 'app-violation-card',
   imports: [],

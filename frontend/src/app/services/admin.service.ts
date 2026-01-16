@@ -1,3 +1,21 @@
+/**
+ * Admin Service for OccultaShield Administration Panel.
+ *
+ * Provides HTTP client methods for admin operations including:
+ * - Dashboard statistics retrieval
+ * - User management (approve, reject, role updates)
+ * - Application settings configuration
+ * - Audit log access
+ *
+ * Uses Angular signals for reactive state management.
+ *
+ * @example
+ * ```typescript
+ * adminService.getStats().subscribe();
+ * adminService.approveUser('user_123').subscribe();
+ * ```
+ */
+
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { catchError, tap } from 'rxjs/operators';
@@ -23,6 +41,12 @@ export type {
 // Alias for backwards compatibility
 export type User = AdminUser;
 
+/**
+ * Service for admin panel operations.
+ *
+ * Manages admin-specific HTTP requests and maintains reactive
+ * state via Angular signals for stats, users, settings, and audit logs.
+ */
 @Injectable({
   providedIn: 'root'
 })

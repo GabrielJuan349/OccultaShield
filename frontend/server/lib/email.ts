@@ -1,10 +1,29 @@
 /**
- * Email Service for OccultaShield
- * Sends notifications via Nodemailer using Gmail SMTP
+ * Email Notification Service for OccultaShield.
+ *
+ * Sends transactional emails via Nodemailer using Gmail SMTP,
+ * including styled HTML templates for user notifications.
+ *
+ * Email Types:
+ * - sendPendingNotification: New user registration (awaiting approval)
+ * - sendApprovalEmail: User account approved
+ * - sendRejectionEmail: User account rejected
+ *
+ * Configuration:
+ * - SMTP_USER: Gmail address
+ * - SMTP_PASS: Gmail app password
+ * - SMTP_FROM: Sender display name
+ *
+ * @example
+ * ```typescript
+ * await sendPendingNotification('user@email.com', 'John');
+ * await sendApprovalEmail('user@email.com', 'John');
+ * ```
  */
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { ENV } from './env';
+import { logger } from './logger';
 
 // =============================================================================
 // TRANSPORTER CONFIGURATION
@@ -125,10 +144,10 @@ export async function sendPendingNotification(
             subject: '🛡️ OccultaShield - Cuenta pendiente de aprobación',
             html: getBaseTemplate(content, 'Registro Pendiente'),
         });
-        console.log(`✅ Pending notification sent to ${userEmail}`);
+        logger.info(`✅ Pending notification sent to ${userEmail}`, { to: userEmail, type: 'pending' });
         return true;
     } catch (error) {
-        console.error('❌ Error sending pending notification:', error);
+        logger.error('❌ Error sending pending notification', { error: (error as Error).message, to: userEmail });
         return false;
     }
 }
@@ -180,10 +199,10 @@ export async function sendApprovalEmail(
             subject: '✅ OccultaShield - ¡Tu cuenta ha sido aprobada!',
             html: getBaseTemplate(content, 'Cuenta Aprobada'),
         });
-        console.log(`✅ Approval email sent to ${userEmail}`);
+        logger.info(`✅ Approval email sent to ${userEmail}`, { to: userEmail, type: 'approval' });
         return true;
     } catch (error) {
-        console.error('❌ Error sending approval email:', error);
+        logger.error('❌ Error sending approval email', { error: (error as Error).message, to: userEmail });
         return false;
     }
 }
@@ -229,10 +248,10 @@ export async function sendRejectionEmail(
             subject: 'OccultaShield - Solicitud de acceso',
             html: getBaseTemplate(content, 'Acceso Denegado'),
         });
-        console.log(`✅ Rejection email sent to ${userEmail}`);
+        logger.info(`✅ Rejection email sent to ${userEmail}`, { to: userEmail, type: 'rejection' });
         return true;
     } catch (error) {
-        console.error('❌ Error sending rejection email:', error);
+        logger.error('❌ Error sending rejection email', { error: (error as Error).message, to: userEmail });
         return false;
     }
 }

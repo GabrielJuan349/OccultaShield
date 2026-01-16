@@ -1,3 +1,28 @@
+"""Object Detection Module for GDPR-Sensitive Content.
+
+This module provides hybrid detection capabilities combining:
+    - Kornia YuNet: GPU-accelerated face detection
+    - YOLO v11/v8: Person and license plate detection with segmentation
+    - OpenCV Haar Cascades: CPU fallback for face detection
+
+Key Components:
+    HybridDetectorManager: Manages multiple detection backends
+    VideoDetector: High-level video processing orchestrator
+
+Detection Flow:
+    1. Load video frames in batches (optimized for GPU memory)
+    2. Run face detection (Kornia or OpenCV fallback)
+    3. Run person/plate detection (YOLO with segmentation)
+    4. Track objects across frames using ObjectTracker
+    5. Capture representative images using CaptureManager
+    6. Return consolidated DetectionResult
+
+Example:
+    >>> detector = VideoDetector()
+    >>> result = await detector.process_video("vid_123", "/path/to/video.mp4", "/output")
+    >>> print(f"Found {len(result.detections)} tracked objects")
+"""
+
 import sys
 import os
 import asyncio
@@ -17,7 +42,7 @@ try:
     KORNIA_FACE_AVAILABLE = True
 except ImportError:
     KORNIA_FACE_AVAILABLE = False
-    
+
 from .models import BoundingBox, Capture, TrackedDetection, DetectionResult
 from .tracker import ObjectTracker
 from .capture_manager import CaptureManager
@@ -28,9 +53,18 @@ logger = logging.getLogger('detection_module')
 
 MIN_DETECTION_AREA = 500
 
+
 class HybridDetectorManager:
-    """
-    Gestor híbrido de detectores: Kornia AI (caras) + YOLO (personas, matrículas).
+    """Hybrid detector manager combining Kornia and YOLO backends.
+
+    Provides a unified interface for detecting faces (Kornia YuNet),
+    persons (YOLO segmentation), and license plates (YOLO).
+
+    Attributes:
+        device (torch.device): CUDA or CPU device for inference.
+        face_detector: Kornia FaceDetector or None if unavailable.
+        person_model: YOLO model for person detection with segmentation.
+        plate_model: YOLO model for license plate detection.
     """
     
     YOLO_CONFIGS = {
@@ -57,7 +91,7 @@ class HybridDetectorManager:
         self._init_face_detector()
         self._init_yolo_detectors(person_model, plate_model)
         
-        logger.info(f"HybridDetectorManager: strategy={self.strategy}, size={self.model_size}, "
+        logger.info(f"🎯 HybridDetectorManager: strategy={self.strategy}, size={self.model_size}, "
                    f"device={self.device}, kornia_face={KORNIA_FACE_AVAILABLE}")
     
     def _init_face_detector(self):
@@ -68,14 +102,14 @@ class HybridDetectorManager:
                 self.face_detector = FaceDetector().to(self.device)
                 logger.info("✓ Kornia FaceDetector (YuNet) loaded")
             except Exception as e:
-                logger.warning(f"Could not load Kornia FaceDetector: {e}")
+                logger.warning(f"⚠️ Could not load Kornia FaceDetector: {e}")
                 self.face_detector = None
         
         if self.face_detector is None:
             self.face_cascade = cv2.CascadeClassifier(
                 cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
             )
-            logger.info("Using OpenCV Haar Cascade fallback for face detection")
+            logger.info("ℹ️ Using OpenCV Haar Cascade fallback for face detection")
     
     def _init_yolo_detectors(self, person_model: str, plate_model: str):
         config = self.YOLO_CONFIGS[self.model_size]
@@ -85,7 +119,7 @@ class HybridDetectorManager:
             self.person_detector = YOLO(person_path)
             logger.info(f"✓ YOLO person detector loaded: {person_path}")
         except Exception as e:
-            logger.error(f"Failed to load person model: {e}")
+            logger.error(f"❌ Failed to load person model: {e}")
             self.person_detector = None
         
         self.plate_detector = None
@@ -96,7 +130,7 @@ class HybridDetectorManager:
                 self.plate_detector = YOLO(plate_model)
                 logger.info(f"✓ YOLO plate detector loaded: {plate_model}")
              except Exception as e:
-                logger.warning(f"Could not load plate model: {e}")
+                logger.warning(f"⚠️ Could not load plate model: {e}")
         else:
             # FALLBACK: Usar YOLO estándar para detectar vehículos (cars, trucks, buses)
             # Esto permite al menos identificar zonas donde probablemente hay placas
@@ -106,7 +140,7 @@ class HybridDetectorManager:
                 logger.info(f"✓ YOLO vehicle detector loaded as plate fallback: {fallback_model}")
                 logger.warning("⚠️  Using vehicle detection as plate proxy. For better plate detection, provide a specialized model.")
             except Exception as e:
-                logger.warning(f"Could not load vehicle detector fallback: {e}")
+                logger.warning(f"⚠️ Could not load vehicle detector fallback: {e}")
                 self.plate_detector = None
     
     def _numpy_to_tensor(self, frame: np.ndarray) -> torch.Tensor:
@@ -150,7 +184,7 @@ class HybridDetectorManager:
                         if bbox.area >= 200:
                             results.append(("face", bbox))
             except Exception as e:
-                logger.error(f"Error processing face detection: {e}", exc_info=True)
+                logger.error(f"❌ Error processing face detection: {e}", exc_info=True)
         return results
     
     def detect_faces_opencv(self, frame: np.ndarray, frame_num: int) -> List[Tuple[str, BoundingBox]]:
@@ -304,7 +338,7 @@ class HybridDetectorManager:
                     logger.info(f"[FACE] First batch result: {total_faces} faces accepted")
 
             except Exception as e:
-                logger.error(f"[FACE] Batch face detection failed: {e}", exc_info=True)
+                logger.error(f"❌ [FACE] Batch face detection failed: {e}", exc_info=True)
         elif self.face_detector is None and KORNIA_FACE_AVAILABLE:
             # Kornia is installed but detector failed to initialize
             if frame_nums[0] <= self.batch_size:
@@ -352,8 +386,11 @@ class HybridDetectorManager:
         
         elapsed = time.time() - start_time
         if total_persons > 0 or total_faces > 0 or total_plates > 0:
-            fps = len(frames) / elapsed if elapsed > 0 else 0
-            print(f"   [DETECTOR] Batch {len(frames)} frames in {elapsed:.2f}s ({fps:.1f} FPS): {total_persons} persons, {total_faces} faces, {total_plates} plates")
+            fps_rate = len(frames) / elapsed if elapsed > 0 else 0
+            logger.debug(
+                f"Batch {len(frames)} frames in {elapsed:.2f}s ({fps_rate:.1f} FPS): "
+                f"{total_persons} persons, {total_faces} faces, {total_plates} plates"
+            )
         
         return all_detections
     
@@ -397,7 +434,7 @@ class VideoDetector:
             )
             
         self.batch_size = self.hybrid_manager.batch_size
-        logger.info(f"VideoDetector initialized: {self.hybrid_manager.get_info()}")
+        logger.info(f"✅ VideoDetector initialized: {self.hybrid_manager.get_info()}")
 
     async def process_video(
         self,
@@ -429,7 +466,7 @@ class VideoDetector:
             frame_buffer = []
             frame_nums = []
 
-            logger.info(f"Processing video {video_id}: {total_frames} frames at {fps} FPS")
+            logger.info(f"🎬 Processing video {video_id}: {total_frames} frames at {fps} FPS")
 
             # Notify start
             await progress_manager.change_phase(
@@ -466,12 +503,15 @@ class VideoDetector:
             )
 
             # Summary log
-            print(f"\n📊 [DETECTION SUMMARY]")
-            print(f"   Total frames processed: {frame_num}")
-            print(f"   Total unique tracks: {len(tracked_objects)}")
+            logger.info(
+                f"✅ Detection complete: {frame_num} frames, {len(tracked_objects)} tracks, "
+                f"{processing_time:.2f}s ({total_frames/processing_time:.1f} FPS)"
+            )
             for tid, track in tracked_objects.items():
-                print(f"      Track {tid}: {track.detection_type}, frames {track.first_frame}-{track.last_frame}, {len(track.captures)} captures")
-            print(f"   Processing time: {processing_time:.2f}s ({total_frames/processing_time:.1f} FPS)")
+                logger.debug(
+                    f"Track {tid}: {track.detection_type}, frames {track.first_frame}-{track.last_frame}, "
+                    f"{len(track.captures)} captures"
+                )
 
             return DetectionResult(
                 video_path=video_path,
@@ -486,15 +526,15 @@ class VideoDetector:
             )
 
         except Exception as e:
-            logger.error(f"Detection failed for video {video_id}: {e}", exc_info=True)
+            logger.error(f"❌ Detection failed for video {video_id}: {e}", exc_info=True)
             # Clean up captured files on error
             try:
                 if output_path.exists():
                     import shutil
                     shutil.rmtree(output_path)
-                    logger.info(f"Cleaned up capture directory: {output_path}")
+                    logger.info(f"🧹 Cleaned up capture directory: {output_path}")
             except Exception as cleanup_error:
-                logger.error(f"Failed to cleanup captures: {cleanup_error}")
+                logger.error(f"❌ Failed to cleanup captures: {cleanup_error}")
             raise
 
         finally:
@@ -508,7 +548,7 @@ class VideoDetector:
                 try:
                     allocated = torch.cuda.memory_allocated() / 1024**3  # GB
                     reserved = torch.cuda.memory_reserved() / 1024**3    # GB
-                    logger.info(f"GPU memory before cleanup: allocated={allocated:.2f}GB, reserved={reserved:.2f}GB")
+                    logger.info(f"🖥️ GPU memory before cleanup: allocated={allocated:.2f}GB, reserved={reserved:.2f}GB")
 
                     # Clear GPU cache
                     torch.cuda.empty_cache()
@@ -518,10 +558,10 @@ class VideoDetector:
 
                     allocated_after = torch.cuda.memory_allocated() / 1024**3
                     reserved_after = torch.cuda.memory_reserved() / 1024**3
-                    logger.info(f"GPU memory after cleanup: allocated={allocated_after:.2f}GB, reserved={reserved_after:.2f}GB")
-                    logger.info(f"GPU memory freed: {(reserved - reserved_after):.2f}GB")
+                    logger.info(f"🖥️ GPU memory after cleanup: allocated={allocated_after:.2f}GB, reserved={reserved_after:.2f}GB")
+                    logger.info(f"✅ GPU memory freed: {(reserved - reserved_after):.2f}GB")
                 except Exception as gpu_cleanup_error:
-                    logger.error(f"Failed to cleanup GPU memory: {gpu_cleanup_error}")
+                    logger.error(f"❌ Failed to cleanup GPU memory: {gpu_cleanup_error}")
 
     async def _process_batch(
         self, 

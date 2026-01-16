@@ -1,11 +1,32 @@
+"""Sub-Agent for Individual Detection Verification.
+
+This module implements a sub-agent in the multi-agent verification system.
+Each sub-agent is responsible for verifying a single detection by:
+1. Retrieving relevant GDPR context from the knowledge graph
+2. Analyzing the captured image using Gemma LLM
+3. Returning a structured verification result
+
+Example:
+    >>> agent = SubAgent(agent_id="agent_1")
+    >>> result = await agent.verify(image_path, detection_dict)
+"""
+
 from typing import Dict, Any, List
 from modules.verification.graph_client import GraphClient
 from modules.verification.gemma_client import GemmaClient
 
+
 class SubAgent:
-    """
-    Agent responsible for verifying a single detection.
-    Orchestrates the retrieval of context and the LLM analysis.
+    """Verification agent for a single GDPR-sensitive detection.
+
+    Orchestrates the retrieval of legal context from Neo4j and
+    performs visual analysis using Gemma LLM to determine if
+    a detection constitutes a GDPR violation.
+
+    Attributes:
+        agent_id: Unique identifier for this agent instance.
+        graph_client: Client for GDPR knowledge graph queries.
+        gemma_client: Client for Gemma LLM visual analysis.
     """
     def __init__(self, agent_id: str):
         self.agent_id = agent_id

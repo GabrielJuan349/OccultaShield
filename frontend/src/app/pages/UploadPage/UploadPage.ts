@@ -1,3 +1,20 @@
+/**
+ * Upload Page Component for OccultaShield.
+ *
+ * Handles video file selection, validation, and upload to the backend.
+ * Supports drag-and-drop and click-to-select file interactions.
+ *
+ * Features:
+ * - File type validation (mp4, avi, mov, mkv)
+ * - File size validation (1KB - 2GB)
+ * - Upload progress tracking via signals
+ * - Automatic navigation to processing page on success
+ *
+ * @example
+ * Route: /upload
+ * Flow: Upload → Processing → Review → Download
+ */
+
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal, viewChild, computed, effect } from '@angular/core';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
@@ -8,7 +25,9 @@ import { VideoService } from '#services/video.service';
 import { AuthService } from '#services/auth.service';
 
 /**
- * Validador de archivos de video
+ * Video file validator with configurable constraints.
+ *
+ * Validates file extension, MIME type, and size before upload.
  */
 class FileValidator {
   private readonly MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
@@ -73,6 +92,13 @@ interface ValidationResult {
   error?: string;
 }
 
+/**
+ * Video upload page component.
+ *
+ * Provides the user interface for selecting and uploading video files
+ * for GDPR compliance analysis. Uses OnPush change detection with
+ * signals for optimal performance.
+ */
 @Component({
   imports: [FileDropDirective, RouterLink],
   templateUrl: './UploadPage.html',

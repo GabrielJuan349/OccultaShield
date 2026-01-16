@@ -1,3 +1,17 @@
+/**
+ * Global HTTP Error Interceptor.
+ *
+ * Provides centralized error handling for all HTTP requests including:
+ * - Structured error logging with timestamps
+ * - Automatic 401 handling (redirect to login if no token)
+ * - 403 forbidden handling
+ * - 500 server error logging
+ * - Network error detection (status 0)
+ *
+ * @example
+ * Automatically applied via app.config.ts provideHttpClient(withInterceptors([errorInterceptor]))
+ */
+
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
@@ -6,8 +20,14 @@ import { Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
 
 /**
- * Interceptor global para manejo de errores HTTP
- * Captura errores y proporciona manejo centralizado con logging estructurado
+ * Functional HTTP interceptor for global error handling.
+ *
+ * Catches all HTTP errors, logs them with structured metadata,
+ * and handles authentication redirects when appropriate.
+ *
+ * @param req - The outgoing HTTP request.
+ * @param next - The next handler in the interceptor chain.
+ * @returns Observable that emits the response or throws the error.
  */
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);

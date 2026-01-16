@@ -1,15 +1,43 @@
+"""FastAPI Dependency Injection Providers.
+
+This module provides dependency injection functions for FastAPI endpoints,
+including database connections and user authentication.
+
+Dependencies:
+    get_db: Provides SurrealDB database connection.
+    get_current_user: Extracts and validates authenticated user from request.
+    get_token_from_request: Extracts auth token from headers/params/cookies.
+
+Example:
+    >>> @router.get("/protected")
+    >>> async def protected_route(
+    >>>     user: dict = Depends(get_current_user),
+    >>>     db = Depends(get_db)
+    >>> ):
+    >>>     return {"user": user["email"]}
+"""
+
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from db.surreal_conn import SurrealConn
 import os
 
 
-# We will use this instance across the app
+# Singleton database connection instance shared across the application
 _db_instance = SurrealConn()
 
+
 async def get_db():
-    """
-    Dependency to get the SurrealDB session.
+    """Get the SurrealDB database connection.
+
+    FastAPI dependency that provides access to the shared SurrealDB
+    connection instance. Automatically connects if not already connected.
+
+    Returns:
+        AsyncSurreal: The SurrealDB client instance.
+
+    Note:
+        Uses SURREALDB_DB environment variable or defaults to 'occultashield'.
     """
     # Use SURREALDB_DB or let getting_db use its default
     db_name = os.getenv("SURREALDB_DB")

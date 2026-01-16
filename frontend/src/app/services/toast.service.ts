@@ -1,6 +1,15 @@
 /**
- * Toast Notification Service
- * Signal-based toast notifications for admin actions
+ * Toast Notification Service.
+ *
+ * Provides a signal-based toast notification system for displaying
+ * temporary feedback messages to users. Supports success, error,
+ * warning, and info notification types.
+ *
+ * @example
+ * ```typescript
+ * toastService.success('File uploaded successfully');
+ * toastService.error('Upload failed', 8000);
+ * ```
  */
 import { Injectable, signal, computed } from '@angular/core';
 import type { Toast, ToastType } from '#interface/toast.interface';
@@ -8,6 +17,12 @@ import type { Toast, ToastType } from '#interface/toast.interface';
 // Re-export for backwards compatibility
 export type { Toast, ToastType };
 
+/**
+ * Signal-based toast notification service.
+ *
+ * Manages a stack of toast notifications with automatic removal
+ * after configurable durations.
+ */
 @Injectable({ providedIn: 'root' })
 export class ToastService {
   private toasts = signal<Toast[]>([]);

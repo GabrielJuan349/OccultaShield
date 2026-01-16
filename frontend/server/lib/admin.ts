@@ -1,11 +1,26 @@
 /**
- * Admin API Routes for Angular SSR Server
- * Handles user approval, settings, and audit log endpoints
+ * Admin API Routes for OccultaShield.
+ *
+ * Provides Express routes for the admin dashboard including:
+ * - User management (list, approve, reject, role updates)
+ * - Dashboard statistics (users, videos, violations)
+ * - Application settings (closed beta mode)
+ * - Audit log access
+ *
+ * All routes require admin role authentication via the requireAdmin middleware.
+ *
+ * @example
+ * Routes:
+ * - GET /admin/stats - Dashboard statistics
+ * - GET /admin/users - List all users
+ * - PATCH /admin/users/:id/approve - Approve a user
+ * - GET /admin/audit-log - View audit entries
  */
 import { Router, Request, Response, NextFunction } from 'express';
 import { getDb, parseRecordId, createRecordId } from './db';
 import { getAuth } from './auth';
 import { sendApprovalEmail, sendRejectionEmail } from './email';
+import { logger } from './logger';
 
 export const adminRouter = Router();
 
@@ -27,9 +42,9 @@ async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction)
         const auth = await getAuth();
 
         // DEBUG: Log raw incoming headers for diagnosis
-        console.log('🔍 [requireAdmin] Incoming request headers:', {
-            authorization: req.headers['authorization'] ? `Bearer ${req.headers['authorization'].substring(0, 20)}...` : 'NOT PRESENT',
-            cookie: req.headers['cookie'] ? `${req.headers['cookie'].substring(0, 100)}...` : 'NOT PRESENT',
+        logger.debug('🔍 [requireAdmin] Incoming request headers', {
+            authorization: req.headers['authorization'] ? 'PRESENT' : 'NOT PRESENT',
+            cookie: req.headers['cookie'] ? 'PRESENT' : 'NOT PRESENT',
             origin: req.headers['origin'],
             host: req.headers['host'],
         });
@@ -44,10 +59,9 @@ async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction)
         }
 
         // DEBUG: Log constructed Headers object
-        console.log('🔍 [requireAdmin] Headers passed to getSession:', {
+        logger.debug('🔍 [requireAdmin] Headers passed to getSession', {
             authorization: headers.get('authorization') ? 'PRESENT' : 'NOT PRESENT',
             cookie: headers.get('cookie') ? 'PRESENT' : 'NOT PRESENT',
-            allHeaderKeys: [...headers.keys()],
         });
 
         // Better-Auth getSession puede recibir el objeto headers directamente
@@ -55,7 +69,7 @@ async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction)
             headers: headers
         });
 
-        console.log('📋 Session check result:', {
+        logger.debug('📋 Session check result', {
             hasSession: !!session,
             hasUser: !!session?.user,
             userEmail: session?.user?.email,
@@ -63,18 +77,18 @@ async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction)
         });
 
         if (!session?.user) {
-            console.warn('⚠️ Admin Access Denied: No session found');
+            logger.warn('⚠️ Admin Access Denied: No session found');
             // Log all cookie names for diagnosis
             const cookieHeader = req.headers.cookie || '';
             const cookieNames = cookieHeader.split(';').map(c => c.trim().split('=')[0]).filter(Boolean);
-            console.log('🍪 Cookie names received:', cookieNames);
-            console.log('💡 Tip: If cookies are empty but Authorization is present, check if Better-Auth is configured to accept Bearer tokens.');
+            logger.debug('🍪 Cookie names received', { cookies: cookieNames });
+            logger.debug('💡 Tip: If cookies are empty but Authorization is present, check if Better-Auth is configured to accept Bearer tokens.');
             res.status(401).json({ error: 'Not authenticated' });
             return;
         }
 
         if (session.user.role !== 'admin') {
-            console.warn(`⚠️ Admin Access Denied: User ${session.user.email} is not an admin`);
+            logger.warn(`⚠️ Admin Access Denied: User ${session.user.email} is not an admin`);
             res.status(403).json({ error: 'Admin access required' });
             return;
         }
@@ -82,7 +96,7 @@ async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction)
         req.user = session.user as AuthRequest['user'];
         next();
     } catch (error) {
-        console.error('Admin auth error:', error);
+        logger.error('❌ Admin auth error', { error: (error as Error).message });
         res.status(401).json({ error: 'Authentication failed' });
     }
 }
@@ -147,7 +161,7 @@ adminRouter.get('/stats', requireAdmin, async (req: AuthRequest, res: Response) 
             recentActivity
         });
     } catch (error) {
-        console.error('Error fetching stats:', error);
+        logger.error('❌ Error fetching stats', { error: (error as Error).message });
         res.status(500).json({ error: 'Failed to fetch stats' });
     }
 });
@@ -176,7 +190,7 @@ adminRouter.get('/users', requireAdmin, async (req: AuthRequest, res: Response) 
 
         res.json(users);
     } catch (error) {
-        console.error('Error fetching users:', error);
+        logger.error('❌ Error fetching users', { error: (error as Error).message });
         res.status(500).json({ error: 'Failed to fetch users' });
     }
 });
@@ -198,7 +212,7 @@ adminRouter.get('/users/pending', requireAdmin, async (req: AuthRequest, res: Re
 
         res.json(users);
     } catch (error) {
-        console.error('Error fetching pending users:', error);
+        logger.error('❌ Error fetching pending users', { error: (error as Error).message });
         res.status(500).json({ error: 'Failed to fetch pending users' });
     }
 });
@@ -234,7 +248,7 @@ adminRouter.patch('/users/:userId/approve', requireAdmin, async (req: AuthReques
 
         res.json({ status: 'approved', user_id: userId });
     } catch (error) {
-        console.error('Error approving user:', error);
+        logger.error('❌ Error approving user', { error: (error as Error).message });
         res.status(500).json({ error: 'Failed to approve user' });
     }
 });
@@ -272,7 +286,7 @@ adminRouter.patch('/users/:userId/reject', requireAdmin, async (req: AuthRequest
 
         res.json({ status: 'rejected', user_id: userId });
     } catch (error) {
-        console.error('Error rejecting user:', error);
+        logger.error('❌ Error rejecting user', { error: (error as Error).message });
         res.status(500).json({ error: 'Failed to reject user' });
     }
 });
@@ -296,7 +310,7 @@ adminRouter.patch('/users/:userId/role', requireAdmin, async (req: AuthRequest, 
 
         res.json({ status: 'updated', user_id: userId, role });
     } catch (error) {
-        console.error('Error updating role:', error);
+        logger.error('❌ Error updating role', { error: (error as Error).message });
         res.status(500).json({ error: 'Failed to update role' });
     }
 });
@@ -319,7 +333,7 @@ adminRouter.get('/settings', requireAdmin, async (req: AuthRequest, res: Respons
 
         res.json(settings);
     } catch (error) {
-        console.error('Error fetching settings:', error);
+        logger.error('❌ Error fetching settings', { error: (error as Error).message });
         res.status(500).json({ error: 'Failed to fetch settings' });
     }
 });
@@ -345,7 +359,7 @@ adminRouter.put('/settings/:key', requireAdmin, async (req: AuthRequest, res: Re
 
         res.json({ status: 'updated', key, value });
     } catch (error) {
-        console.error('Error updating setting:', error);
+        logger.error('❌ Error updating setting', { error: (error as Error).message });
         res.status(500).json({ error: 'Failed to update setting' });
     }
 });
@@ -371,7 +385,7 @@ adminRouter.get('/audit-log', requireAdmin, async (req: AuthRequest, res: Respon
         const result = await db.query<[Record<string, unknown>[]]>(query, params);
         res.json(result[0] || []);
     } catch (error) {
-        console.error('Error fetching audit log:', error);
+        logger.error('❌ Error fetching audit log', { error: (error as Error).message });
         res.status(500).json({ error: 'Failed to fetch audit log' });
     }
 });
@@ -429,7 +443,7 @@ export async function checkUserApproval(req: Request, res: Response, next: NextF
 
         next();
     } catch (error) {
-        console.error('Approval check error:', error);
+        logger.error('❌ Approval check error', { error: (error as Error).message });
         next(); // Continue on error to not block legitimate requests
     }
 }

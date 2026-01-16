@@ -1,11 +1,30 @@
+/**
+ * Environment Configuration for OccultaShield Auth Server.
+ *
+ * Loads and exports environment variables for the Better-Auth server,
+ * including database connections, SMTP settings, and runtime configuration.
+ *
+ * Required environment variables:
+ * - BETTERAUTH_SECRET: Secret for signing tokens
+ * - SURREALDB_USER/PASS: Database credentials
+ * - SMTP_USER/PASS: Email service credentials (optional)
+ *
+ * @example
+ * ```typescript
+ * import { ENV } from './env';
+ * console.log(ENV.PORT); // 4201
+ * console.log(ENV.SURREAL_URL); // http://127.0.0.1:8000
+ * ```
+ */
+
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
-// Cargar .env por defecto (busca en process.cwd())
+// Load .env from current working directory
 dotenv.config();
 
-console.log(`⚙️ Variables de entorno cargadas.`);
+// Note: Logger not imported here to avoid circular dependency (logger imports ENV)
 
 // Detect Bun safely
 const globalAny = globalThis as unknown as Record<string, unknown>;

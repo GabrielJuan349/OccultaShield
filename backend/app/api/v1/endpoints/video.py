@@ -23,6 +23,10 @@ import json
 from pathlib import Path
 from datetime import datetime
 
+from config.logging_config import get_logger
+
+logger = get_logger("api.video")
+
 from core.dependencies import get_current_user, get_db
 
 
@@ -103,19 +107,20 @@ async def upload_video(
         HTTPException: 400 if invalid file type or corrupted video.
         HTTPException: 500 if upload or database operation fails.
     """
-    print(f"\n📤 [UPLOAD] New video upload request")
-    print(f"   Filename: {file.filename}")
-    print(f"   Content-Type: {file.content_type}")
-    print(f"   User: {current_user.get('id', 'unknown')}")
+    logger.info("📤 Upload request received", extra={"extra_data": {
+        "filename": file.filename,
+        "content_type": file.content_type,
+        "user_id": current_user.get('id', 'unknown')
+    }})
     try:
         # 1. Validate file
         if not file.content_type.startswith("video/"):
-            print(f"   ❌ Invalid file type")
+            logger.warning("❌ Invalid file type", extra={"extra_data": {"content_type": file.content_type}})
             raise HTTPException(400, "Invalid file type")
         
         # 2. Generate ID
         video_id = f"vid_{uuid.uuid4().hex[:12]}"
-        print(f"   ✅ Generated video ID: {video_id}")
+        logger.debug("Generated video ID", extra={"extra_data": {"video_id": video_id}})
         
         # 3. Save file
         file_ext = Path(file.filename).suffix
@@ -124,7 +129,7 @@ async def upload_video(
 
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        print(f"   💾 File saved: {file_path}")
+        logger.debug("💾 File saved", extra={"extra_data": {"path": str(file_path)}})
 
         # 4. Extract real metadata using OpenCV with proper resource management
         import cv2
@@ -162,7 +167,10 @@ async def upload_video(
             total_frames=actual_frames,
             has_audio=True  # Assume true; proper check would require ffprobe
         )
-        print(f"   📊 Metadata: {actual_frames} frames, {actual_fps:.1f} FPS, {actual_width}x{actual_height}")
+        logger.debug("📊 Metadata extracted", extra={"extra_data": {
+            "frames": actual_frames, "fps": round(actual_fps, 1),
+            "width": actual_width, "height": actual_height
+        }})
         
         # 5. Create DB record with initial status PENDING
         # Schema permite: ['pending', 'processing', 'detected', 'verified', 'editing', 'completed', 'error']
@@ -176,8 +184,7 @@ async def upload_video(
         else:
             user_uuid = user_id_raw.replace("user:", "")
 
-        print(f"   🔍 [UPLOAD] Creando video en DB: video:{video_id}")
-        print(f"   🔍 [UPLOAD] User UUID extraído: {user_uuid}")
+        logger.debug("Creating video in DB", extra={"extra_data": {"video_id": video_id, "user_uuid": user_uuid}})
 
         # Usar query raw para insertar con el tipo record<user> correcto
         import json
@@ -199,27 +206,26 @@ async def upload_video(
                 processing_completed_at = time::now()
         """
 
-        print(f"   🔍 [UPLOAD] Query: {query[:200]}...")
+        logger.debug("DB query", extra={"extra_data": {"query_preview": query[:200]}})
         try:
             create_result = await db.query(query)
-            print(f"   🔍 [UPLOAD] Create result: {create_result}")
-            print(f"   🗄️  Video record created in DB (status: pending)")
+            logger.debug("🗄️ Video record created", extra={"extra_data": {"result": str(create_result)[:200]}})
         except Exception as e:
-            print(f"   ❌ [UPLOAD] Error en query: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error("❌ DB query failed", exc_info=True, extra={"extra_data": {"error": str(e)}})
             raise
 
         # Verificar inmediatamente que se creó (usar backticks)
         verify_result = await db.select(f"video:`{video_id}`")
-        print(f"   🔍 [UPLOAD] Verification select result: {verify_result}")
+        logger.debug("Verification result", extra={"extra_data": {"verified": bool(verify_result)}})
 
         # Register video in progress manager (but don't start processing yet)
         from services.progress_manager import progress_manager
         await progress_manager.register_video(video_id)
-        print(f"   📡 Registered in progress manager")
-        print(f"   ⏸️  Waiting for frontend SSE connection to auto-start processing")
-        print(f"   ✅ Upload complete! Video ID: {video_id}\n")
+        logger.info("✅ Upload complete", extra={"extra_data": {
+            "video_id": video_id,
+            "filename": file.filename,
+            "status": "pending"
+        }})
 
         return VideoUploadResponse(
             video_id=video_id,
@@ -272,7 +278,7 @@ async def get_video_status(
         required_fields = ["id", "filename", "status", "created_at"]
         missing_fields = [f for f in required_fields if f not in video]
         if missing_fields:
-            print(f"⚠️  Video record missing fields: {missing_fields}")
+            logger.warning("⚠️ Video record missing fields", extra={"extra_data": {"missing": missing_fields}})
             raise HTTPException(500, f"Invalid video record: missing fields {missing_fields}")
             
         # 2. Validate owner (normalize both IDs for consistent comparison)
@@ -366,7 +372,7 @@ async def get_violations(
                 v_rec['detection_id'] = det
                 verification_records.append(v_rec)
 
-        print(f"[VIOLATIONS] Returning {len(verification_records)} violations for video {video_id}")
+        logger.debug("Violations found", extra={"extra_data": {"count": len(verification_records), "video_id": video_id}})
 
         # 4. Map to ViolationCard objects
         items = []
@@ -431,7 +437,7 @@ async def get_violations(
 
         # Return all items (no pagination - frontend handles scroll)
         total = len(items)
-        print(f"[VIOLATIONS] Returning {total} violations to frontend")
+        logger.info("Returning violations", extra={"extra_data": {"total": total, "video_id": video_id}})
 
         return PaginatedResponse(
             items=items,
@@ -446,7 +452,7 @@ async def get_violations(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error fetching violations: {e}")
+        logger.error("Error fetching violations", exc_info=True, extra={"extra_data": {"error": str(e)}})
         raise HTTPException(500, f"Error fetching violations: {str(e)}")
 
 @router.get("/{video_id}/capture/{track_id}/{filename}")
@@ -494,7 +500,7 @@ async def get_capture(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error checking capture ownership: {e}")
+        logger.error("Error checking capture ownership", exc_info=True)
         raise HTTPException(500, "Error verifying capture access")
     
     file_path = CAPTURES_DIR / video_id / f"track_{track_id}" / filename
@@ -514,8 +520,10 @@ async def submit_decisions(
     """
     Submit user decisions for violations and trigger anonymization.
     """
-    print(f"\n📝 [DECISIONS] Received decisions for video: {video_id}")
-    print(f"   Decisions count: {len(batch.decisions)}")
+    logger.info("📝 Decisions received", extra={"extra_data": {
+        "video_id": video_id,
+        "count": len(batch.decisions)
+    }})
     
     # Security: Verify ownership BEFORE updating
     try:
@@ -537,12 +545,12 @@ async def submit_decisions(
     # This prevents the SSE endpoint from restarting the full pipeline
     db_video_id = f"video:`{video_id}`"
     await db.update(db_video_id, {"status": "editing"})
-    print(f"   ✅ Updated video status to 'editing' (anonymizing phase)")
+    logger.debug("Updated video status to editing")
     
     # Trigger Anonymization in background
     user_display_name = current_user.get("name") or current_user.get("id", "unknown")
     background_tasks.add_task(video_processor.apply_anonymization, video_id, batch.decisions, user_display_name)
-    print(f"   🚀 Started anonymization task in background")
+    logger.info("🚀 Anonymization started", extra={"extra_data": {"video_id": video_id}})
     
     return {
         "status": "editing",
@@ -600,7 +608,7 @@ async def download_video(
         final_path = Path(db_path)
     
     if not final_path.exists():
-        print(f"❌ Video file not found at: {final_path}")
+        logger.error("❌ Video file not found", extra={"extra_data": {"path": str(final_path)}})
         raise HTTPException(404, "Processed video file deleted or missing")
         
     return FileResponse(

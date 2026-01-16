@@ -1,10 +1,26 @@
 /**
- * Better-Auth Configuration with SurrealDB Adapter
- * Configuración de autenticación usando Better-Auth con adaptador oficial surreal-better-auth
+ * Better-Auth Configuration for OccultaShield.
+ *
+ * Configures the authentication system using Better-Auth with SurrealDB
+ * as the backend database via the surreal-better-auth adapter.
+ *
+ * Features:
+ * - Email/password authentication
+ * - Session management with cookie caching
+ * - Custom user fields (role, usageType)
+ * - Database hooks for email notifications on registration
+ * - Bearer token support via plugin
+ *
+ * @example
+ * ```typescript
+ * const auth = await getAuth();
+ * const session = await auth.api.getSession({ headers });
+ * ```
  */
 import { betterAuth } from 'better-auth';
 import { surrealdbAdapter } from 'surreal-better-auth';
 import { bearer } from 'better-auth/plugins';
+import { logger } from './logger';
 /* import {
   twoFactor,           // ✅ 2FA con TOTP
   organization,        // ✅ Organizaciones y equipos
@@ -102,7 +118,7 @@ async function createAuth() {
             // Skip email notification for admin user
             const adminEmail = process.env['ADMIN_EMAIL'];
             if (adminEmail && user.email === adminEmail) {
-              console.log(`⏭️  Skipping email notification for admin user: ${user.email}`);
+              logger.debug(`⏭️  Skipping email notification for admin user: ${user.email}`);
               return;
             }
 
@@ -110,9 +126,9 @@ async function createAuth() {
             if (user.email && user.name) {
               try {
                 await sendPendingNotification(user.email, user.name);
-                console.log(`📧 Pending notification sent to ${user.email}`);
+                logger.info(`📧 Pending notification sent to ${user.email}`);
               } catch (error) {
-                console.error('Failed to send pending notification:', error);
+                logger.error('❌ Failed to send pending notification', { error: (error as Error).message, email: user.email });
               }
             }
           },
@@ -163,7 +179,7 @@ let authInstancePromise: ReturnType<typeof createAuth> | null = null;
 export function getAuth() {
   if (!authInstancePromise) {
     authInstancePromise = createAuth().catch(err => {
-      console.error('❌ Failed to create Better-Auth instance:', err);
+      logger.error('❌ Failed to create Better-Auth instance', { error: (err as Error).message });
       throw err;
     }) as ReturnType<typeof createAuth>;
   }

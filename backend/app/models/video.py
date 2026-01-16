@@ -1,22 +1,57 @@
+"""Video Processing Models for OccultaShield API.
+
+This module defines all Pydantic models used in the video processing pipeline,
+including enums for status tracking, request/response models for API endpoints,
+and data structures for detections, verifications, and user decisions.
+
+Sections:
+    - Enums: VideoStatus, ProcessingPhase, DetectionType, Severity, AnonymizationAction
+    - Base Models: BoundingBoxModel, CaptureEntry, VideoMetadata
+    - Request Models: VideoAnalysisConfig, UserDecisionCreate, UserDecisionBatch
+    - Response Models: VideoUploadResponse, VideoResponse, DetectionResponse, etc.
+    - Filter Models: DetectionFilter
+
+Example:
+    >>> from models.video import VideoStatus, UserDecisionCreate, AnonymizationAction
+    >>> decision = UserDecisionCreate(
+    ...     verification_id="ver_123",
+    ...     action=AnonymizationAction.BLUR,
+    ...     confirmed_violation=True
+    ... )
+"""
+
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional, Any, Dict
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
+
 # --- Enums ---
 
 class VideoStatus(str, Enum):
+    """Video processing lifecycle status values.
+
+    Tracks the state of a video through the OccultaShield pipeline:
+    PENDING → UPLOADED → PROCESSING → DETECTED → VERIFIED →
+    WAITING_FOR_REVIEW → ANONYMIZING → COMPLETED
+    """
+
     PENDING = "pending"
-    UPLOADED = "uploaded"  # Added: status after successful upload
+    UPLOADED = "uploaded"
     PROCESSING = "processing"
     DETECTED = "detected"
     VERIFIED = "verified"
-    WAITING_FOR_REVIEW = "waiting_for_review" # New
-    ANONYMIZING = "anonymizing" # New
+    WAITING_FOR_REVIEW = "waiting_for_review"
+    ANONYMIZING = "anonymizing"
     COMPLETED = "completed"
     ERROR = "error"
 
+
 class ProcessingPhase(str, Enum):
+    """Real-time processing phase for SSE progress updates.
+
+    More granular than VideoStatus, used for live progress feedback.
+    """
     IDLE = "idle"
     UPLOADING = "uploading"
     DETECTING = "detecting"
@@ -29,6 +64,8 @@ class ProcessingPhase(str, Enum):
     ERROR = "error"
 
 class DetectionType(str, Enum):
+    """Types of GDPR-sensitive content that can be detected."""
+
     FACE = "face"
     LICENSE_PLATE = "license_plate"
     PERSON = "person"
@@ -37,22 +74,39 @@ class DetectionType(str, Enum):
     NUDE_BODY = "nude_body"
     OTHER = "other"
 
+
 class Severity(str, Enum):
+    """GDPR violation severity levels for risk assessment."""
+
     NONE = "none"
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
 
+
 class AnonymizationAction(str, Enum):
+    """Available anonymization effects for detected regions."""
+
     NO_MODIFY = "no_modify"
     BLUR = "blur"
     PIXELATE = "pixelate"
     MASK = "mask"
 
+
 # --- Base Models ---
 
 class BoundingBoxModel(BaseModel):
+    """Bounding box coordinates with validation.
+
+    Attributes:
+        x1: Left edge x-coordinate.
+        y1: Top edge y-coordinate.
+        x2: Right edge x-coordinate (must be > x1).
+        y2: Bottom edge y-coordinate (must be > y1).
+        confidence: Detection confidence (0.0-1.0).
+        frame: Frame number where detection occurred.
+    """
     x1: float
     y1: float
     x2: float
@@ -73,13 +127,36 @@ class BoundingBoxModel(BaseModel):
         return v
 
 class CaptureEntry(BaseModel):
+    """Metadata for a captured detection image.
+
+    Attributes:
+        frame: Frame number of the capture.
+        image_path: Filesystem path to saved image.
+        bbox: Bounding box at capture time.
+        reason: Why this capture was taken.
+        timestamp: Video timestamp in seconds.
+    """
+
     frame: int
     image_path: str
     bbox: BoundingBoxModel
     reason: str
     timestamp: float
 
+
 class VideoMetadata(BaseModel):
+    """Technical metadata extracted from a video file.
+
+    Attributes:
+        duration_seconds: Video length.
+        fps: Frames per second.
+        width: Video width in pixels.
+        height: Video height in pixels.
+        total_frames: Total frame count.
+        codec: Video codec (e.g., "h264").
+        has_audio: Whether video has audio track.
+    """
+
     duration_seconds: float
     fps: float
     width: int
@@ -88,9 +165,15 @@ class VideoMetadata(BaseModel):
     codec: Optional[str] = None
     has_audio: bool = False
 
+
 # --- Request Models ---
 
 class VideoAnalysisConfig(BaseModel):
+    """Configuration options for video analysis.
+
+    Controls detection parameters, capture frequency,
+    and verification settings.
+    """
     detection_types: List[DetectionType] = [DetectionType.FACE, DetectionType.LICENSE_PLATE, DetectionType.PERSON]
     confidence_threshold: float = 0.5
     detection_interval: int = 3

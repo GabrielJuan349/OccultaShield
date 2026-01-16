@@ -3,6 +3,9 @@ import numpy as np
 import cv2
 from scipy.optimize import linear_sum_assignment
 from .models import BoundingBox
+from config.logging_config import get_logger
+
+logger = get_logger("modules.tracker")
 
 class Track:
     def __init__(self, track_id, detection_type, bbox, frame):
@@ -78,14 +81,14 @@ class ObjectTracker:
         self.min_hits = min_hits
         self.tracks = {}
         self.next_id = 1
-        print(f"   [TRACKER] Initialized: iou_threshold={iou_threshold}, max_age={max_age}, min_hits={min_hits}")
+        logger.debug("👣 Tracker initialized", extra={"extra_data": {
+            "iou_threshold": iou_threshold, "max_age": max_age, "min_hits": min_hits
+        }})
         
     def update(self, detections: List[Tuple[str, BoundingBox]], frame_num: int) -> List[Tuple[int, str, BoundingBox]]:
-        # DEBUG: Log incoming detections
+        # DEBUG: Log incoming detections (only visible with LOG_LEVEL=DEBUG)
         if detections:
-            print(f"   [TRACKER] Frame {frame_num}: {len(detections)} detections incoming")
-            for cls, bbox in detections:
-                print(f"      - {cls}: conf={bbox.confidence:.2f}, area={bbox.area:.0f}")
+            logger.debug(f"👣 Frame {frame_num}: {len(detections)} detections")
         
         # Envejecer tracks existentes y guardar predicciones
         predictions = {}  # track_id -> predicted_bbox
@@ -105,7 +108,6 @@ class ObjectTracker:
             if not active_tracks:
                 for bbox in bboxes:
                     self._create_track(cls, bbox, frame_num)
-                    print(f"   [TRACKER] Created new track for {cls} (no active tracks)")
                 continue
                 
             if not bboxes:
@@ -145,7 +147,6 @@ class ObjectTracker:
             for j, det in enumerate(bboxes):
                 if j not in matched_dets:
                     self._create_track(cls, det, frame_num)
-                    print(f"   [TRACKER] Created new track for unmatched {cls}")
                     
         # Limpieza de tracks y reporte
         dead = []
@@ -154,7 +155,6 @@ class ObjectTracker:
         for tid, t in self.tracks.items():
             if t.age > self.max_age:
                 dead.append(tid)
-                print(f"   [TRACKER] Track {tid} died (age > {self.max_age})")
             else:
                 # Retornamos TODOS los tracks activos, independientemente de hits
                 # El usuario quiere ver todo, aunque sea pequeño.
@@ -164,7 +164,7 @@ class ObjectTracker:
             del self.tracks[tid]
         
         if confirmed_out:
-            print(f"   [TRACKER] Reporting {len(confirmed_out)} active tracks")
+            logger.debug(f"Reporting {len(confirmed_out)} active tracks")
         
         return confirmed_out
 

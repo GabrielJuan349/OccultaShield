@@ -20,6 +20,8 @@ import { getAuth } from '#server/auth';
 import { getDb, prepareDataForSurreal } from '#server/db';
 import { ENV } from '#server/env';
 import { initializeAdminUser } from '#server/init-admin';
+import { logger, logStartup, logReady } from '#server/logger';
+import { requestLogger } from '#server/req-logger';
 
 // Rutas de archivos
 const browserDistFolder = join(import.meta.dirname, '../browser');
@@ -29,7 +31,7 @@ let angularApp: AngularNodeAppEngine | null = null;
 try {
   angularApp = new AngularNodeAppEngine();
 } catch (e) {
-  console.warn('⚠️ Angular SSR Engine not initialized (Normal in dev mode):', (e as Error).message);
+  logger.warn('⚠️ Angular SSR Engine not initialized (Normal in dev mode)', { error: (e as Error).message });
 }
 
 // Aplicación Express (usada también por Angular CLI)
@@ -46,6 +48,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Request logging middleware
+app.use(requestLogger);
 
 // =========================================================================
 // RUTAS DE AUTENTICACIÓN (/api/auth/*)
@@ -92,7 +97,7 @@ app.all('/api/auth/*splat', async (req, res) => {
     const body = await response.text();
     res.send(body);
   } catch (error) {
-    console.error('Auth Error:', error);
+    logger.error('Auth handler error', { error: (error as Error).message });
     res.status(500).json({ error: 'Authentication error' });
   }
 });
@@ -142,7 +147,7 @@ app.post('/api/upload/log', async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Log Error:', error);
+    logger.error('Upload log error', { error: (error as Error).message });
     res.status(500).json({ error: 'Failed to log activity' });
   }
 });
@@ -179,32 +184,30 @@ app.use((req, res, next) => {
 // ============================================================================
 if (isMainModule(import.meta.url) || ENV.RUN_UNDER_PROCESS_MANAGER) {
   const PORT = Number(ENV.PORT ?? 4201);
-  console.log(`🚀 OccultaShield Server starting on port ${PORT}`);
+  logStartup(PORT);
 
   // Inicializar conexión a SurrealDB y Better-Auth
   Promise.all([getDb(), getAuth()])
     .then(async () => {
-      console.log('✅ DB and Auth initialized successfully');
-      console.log('🔧 Starting admin user initialization...');
+      logger.info('✅ DB and Auth initialized successfully');
+      logger.info('🔧 Starting admin user initialization...');
       // Initialize admin user after DB and Auth are ready
       try {
         await initializeAdminUser();
       } catch (error) {
-        console.error('⚠️  Admin initialization failed (non-fatal):', error);
+        logger.warn('⚠️ Admin initialization failed (non-fatal)', { error: (error as Error).message });
       }
 
       app.listen(PORT, () => {
-        console.log(`✅ OccultaShield Server running at http://localhost:${PORT}`);
-        console.log(`   Auth endpoints: http://localhost:${PORT}/api/auth/*`);
-        console.log(`   Angular SSR: Enabled`);
+        logReady(PORT);
       });
     })
     .catch((error) => {
-      console.error('❌ Failed to initialize server:', error);
+      logger.error('❌ Failed to initialize server', { error: (error as Error).message });
       // Iniciar servidor sin DB para desarrollo
       app.listen(PORT, () => {
-        console.log(`⚠️  Server running with errors at http://localhost:${PORT}`);
-        console.log(`   Start SurrealDB and restart the server for full functionality`);
+        logger.warn(`⚠️ Server running with errors at http://localhost:${PORT}`);
+        logger.warn('   Start SurrealDB and restart the server for full functionality');
       });
     });
 }

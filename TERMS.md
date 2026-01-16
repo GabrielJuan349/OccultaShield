@@ -5,6 +5,7 @@
 
 ## 1. Acceptance and Contractual Nature
 These Terms of Service ("Terms") constitute a binding legal agreement between you ("the User" or "Deployer") and **GabrielJuan349** ("the Author"). By downloading, cloning, installing, or running **OccultaShield** ("the Software"), you unconditionally agree to these Terms and the associated **LICENSE.md**.
+
 **IF YOU DO NOT AGREE TO THESE TERMS OR THE JURISDICTION OF SPANISH COURTS, DO NOT USE THE SOFTWARE.**
 
 ## 2. Intellectual Property & License Scope

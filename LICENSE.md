@@ -8,6 +8,7 @@ This Software is provided as a **Privacy Enhancing Technology (PET)** intended t
 
 ### 3. Permitted Use (Non-Commercial Only)
 The user is granted a non-exclusive, non-transferable, non-sublicensable, and revocable license to use the Software exclusively for **personal, educational, non-profit, or internal research purposes**, subject to:
+
 - **Strict Non-Commercial Restriction**: The Software must NOT be used for any commercial purpose, profit-generating activity, or business advantage without a separate written commercial agreement. This includes prohibition on SaaS deployment, paid consultancy using the tool, or bundling with proprietary products.
 - **Ethical Usage**: The Software must not be used for unlawful surveillance, "deepfake" creation intended to deceive, or recovering anonymized identities.
 
@@ -40,3 +41,5 @@ This License is governed by the laws of **Spain**. Any dispute shall be subject 
 ### 11. Export Control and International Sanctions
 The User represents that they are not located in a country subject to EU, UN, or US government embargo, and that they will not export, re-export, or transfer the Software to any prohibited jurisdiction or entity (including for military end-use) in violation of applicable export control laws.
 
+### 11. Export Control and International Sanctions
+The User represents that they are not located in a country subject to EU, UN, or US government embargo, and that they will not export, re-export, or transfer the Software to any prohibited jurisdiction or entity (including for military end-use) in violation of applicable export control laws.

@@ -27,6 +27,28 @@ function generateUUID(): string {
   });
 }
 
+/**
+ * Authentication service using Better-Auth with reactive Angular signals.
+ *
+ * Provides reactive state management for user authentication including:
+ * - Email/password login and registration
+ * - Session persistence and validation
+ * - Role-based access control (admin/user)
+ * - Automatic session refresh
+ *
+ * @example
+ * ```typescript
+ * const authService = inject(AuthService);
+ *
+ * // Check authentication
+ * if (authService.isAuthenticated()) {
+ *   console.log('User:', authService.userName());
+ * }
+ *
+ * // Login
+ * await authService.login('user@example.com', 'password');
+ * ```
+ */
 @Injectable({
   providedIn: 'root',
 })
@@ -36,22 +58,31 @@ export class AuthService {
   private readonly isBrowser = isPlatformBrowser(this.platformId);
   private _sessionCheckPromise: Promise<boolean> | null = null;
 
-  // Estado reactivo
+  /** Private signal for current user state */
   private readonly _user = signal<User | null>(null);
+  /** Private signal for current session state */
   private readonly _session = signal<Session | null>(null);
+  /** Private signal for loading state */
   private readonly _isLoading = signal(false);
+  /** Private signal for error messages */
   private readonly _error = signal<string | null>(null);
 
-  // Señales públicas de solo lectura
+  /** Readonly signal exposing current user */
   readonly user = this._user.asReadonly();
+  /** Readonly signal exposing current session */
   readonly session = this._session.asReadonly();
+  /** Readonly signal indicating async operations in progress */
   readonly isLoading = this._isLoading.asReadonly();
+  /** Readonly signal with last error message */
   readonly error = this._error.asReadonly();
 
-  // Señales computadas
+  /** Computed signal - true if user is authenticated */
   readonly isAuthenticated = computed(() => this._user() !== null);
+  /** Computed signal - user's email address */
   readonly userEmail = computed(() => this._user()?.email ?? null);
+  /** Computed signal - user's display name */
   readonly userName = computed(() => this._user()?.name ?? null);
+  /** Computed signal - user's role (admin/user) */
   readonly userRole = computed(() => this._user()?.role ?? 'user');
 
   constructor() {

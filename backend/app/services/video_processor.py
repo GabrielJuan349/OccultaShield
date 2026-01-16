@@ -1,3 +1,24 @@
+"""Video Processing Pipeline Orchestrator.
+
+This module orchestrates the complete GDPR compliance video processing pipeline,
+coordinating detection, AI verification, and anonymization phases.
+
+The pipeline operates in two main phases:
+    Phase 1 (Automatic): Detection → Verification → DB Persistence
+        - Detects faces, persons, and license plates using YOLO/Kornia
+        - Verifies GDPR compliance using Gemma 3 LLM
+        - Saves results and waits for human review
+
+    Phase 2 (User-Triggered): Anonymization → Final Video
+        - Applies user-selected anonymization effects (blur, pixelate)
+        - Strips metadata and adds compliance watermarks
+        - Produces the final anonymized video
+
+Example:
+    >>> from services.video_processor import video_processor
+    >>> await video_processor.process_full_pipeline("vid_abc123", "/path/to/video.mp4")
+"""
+
 import asyncio
 import os
 import logging
@@ -14,27 +35,56 @@ from core.dependencies import _db_instance
 
 logger = logging.getLogger('video_processor')
 
+
 class VideoProcessor:
-    """
-    Orchestrates the video processing pipeline.
-    Phase 1: Detection -> Verification -> DB Persistence (Waits for User)
-    Phase 2: Edition (triggered by user) -> Final Video
+    """Orchestrates the complete video processing pipeline.
+
+    Coordinates detection, verification, and anonymization modules to process
+    videos for GDPR compliance. Manages database persistence and progress
+    reporting via SSE.
+
+    Attributes:
+        detector (VideoDetector): YOLO/Kornia-based object detector.
+        verifier (ParallelProcessor): LLM-based GDPR compliance verifier.
+        anonymizer (VideoAnonymizer): GPU-accelerated video anonymizer.
     """
     def __init__(self):
-        # Initialize modules
-        self.detector = VideoDetector() 
+        """Initialize the video processor with detection, verification, and anonymization modules.
+
+        Creates singleton instances of:
+            - VideoDetector: For face/person/plate detection using YOLO and Kornia
+            - ParallelProcessor: For parallel LLM-based GDPR verification
+            - VideoAnonymizer: For GPU-accelerated video anonymization
+        """
+        self.detector = VideoDetector()
         self.verifier = ParallelProcessor(max_workers=4)
         self.anonymizer = VideoAnonymizer(use_gpu=True)
         
     async def process_full_pipeline(self, video_id: str, input_path: str, timeout_seconds: int = 3600):
-        """
-        Runs Phase 1: Detection and Verification.
-        Saves results to DB sets status to 'WAITING_FOR_REVIEW'.
+        """Execute Phase 1 of the processing pipeline: Detection and Verification.
+
+        Performs the following steps:
+            1. Registers video in progress manager for SSE updates
+            2. Runs object detection (faces, persons, plates) on all frames
+            3. Saves detection results to database
+            4. Verifies GDPR compliance using LLM for each detection
+            5. Saves verification results and sets status to WAITING_FOR_REVIEW
+
+        If no detections are found, automatically proceeds to metadata stripping.
 
         Args:
-            video_id: Unique video identifier
-            input_path: Path to the video file
-            timeout_seconds: Maximum processing time (default: 1 hour)
+            video_id (str): Unique identifier for the video (e.g., "vid_abc123").
+            input_path (str): Absolute path to the input video file.
+            timeout_seconds (int): Maximum processing time before timeout.
+                Defaults to 3600 (1 hour).
+
+        Raises:
+            asyncio.TimeoutError: If processing exceeds timeout_seconds.
+            Exception: For any processing errors (logged and saved to DB).
+
+        Note:
+            This method updates video status in the database and sends
+            real-time progress updates via the progress_manager.
         """
         db_conn = None
         try:
@@ -285,11 +335,35 @@ class VideoProcessor:
             pass
 
     async def apply_anonymization(self, video_id: str, decisions: List[Any], user_id: str = "unknown"):
-        """
-        Runs Phase 2: Anonymization.
-        Triggered after user reviews violations.
-        decisions: List of decision objects (from UserDecisionBatch).
-                   Each has 'verification_id' and 'action'.
+        """Execute Phase 2 of the processing pipeline: Anonymization.
+
+        Applies user-selected anonymization effects to detected objects.
+        Triggered after the user reviews violations and submits decisions.
+
+        Performs the following steps:
+            1. Fetches video information from database
+            2. Maps user decisions to detection records
+            3. Reconstructs bounding box history for each detection
+            4. Applies blur/pixelate effects using GPU-accelerated processing
+            5. Strips metadata and adds compliance watermarks
+            6. Updates database with completed status and output path
+
+        Args:
+            video_id (str): Unique identifier for the video.
+            decisions (List[Any]): List of UserDecision objects or dicts,
+                each containing:
+                - verification_id (str): ID of the verification record
+                - action (str): "blur", "pixelate", or "no_modify"
+            user_id (str): Identifier of the user who submitted decisions.
+                Used for audit logging. Defaults to "unknown".
+
+        Raises:
+            ValueError: If video not found or original file missing.
+            Exception: For any processing errors (logged and saved to DB).
+
+        Note:
+            Even with empty decisions, the method runs to strip metadata
+            and add watermarks to the output video.
         """
         db_conn = None
         try:

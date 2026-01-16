@@ -1,3 +1,18 @@
+"""Video API Endpoints for OccultaShield.
+
+This module provides REST API endpoints for video upload, processing status,
+GDPR violation retrieval, user decision submission, and video download.
+
+Endpoints:
+    POST /upload: Upload a video for GDPR analysis.
+    GET /{video_id}/status: Get current processing status.
+    GET /{video_id}/violations: Get detected GDPR violations.
+    GET /{video_id}/capture/{track_id}/{filename}: Get detection capture image.
+    POST /{video_id}/decisions: Submit anonymization decisions.
+    GET /{video_id}/download: Download processed video.
+    DELETE /{video_id}: Delete video and associated data.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 from typing import List, Optional
@@ -68,6 +83,26 @@ async def upload_video(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
+    """Upload a video file for GDPR compliance analysis.
+
+    Accepts a video file, validates its format, extracts metadata using OpenCV,
+    creates a database record, and registers the video for processing.
+    Processing starts automatically when the frontend connects via SSE.
+
+    Args:
+        background_tasks (BackgroundTasks): FastAPI background task manager.
+        file (UploadFile): The video file to upload.
+        config_json (Optional[str]): JSON string with analysis configuration.
+        current_user (dict): Authenticated user from dependency injection.
+        db: Database connection from dependency injection.
+
+    Returns:
+        VideoUploadResponse: Contains video_id, status, and message.
+
+    Raises:
+        HTTPException: 400 if invalid file type or corrupted video.
+        HTTPException: 500 if upload or database operation fails.
+    """
     print(f"\n📤 [UPLOAD] New video upload request")
     print(f"   Filename: {file.filename}")
     print(f"   Content-Type: {file.content_type}")
@@ -205,6 +240,24 @@ async def get_video_status(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
+    """Get the current processing status of a video.
+
+    Retrieves the video record from the database and returns its current
+    status including metadata and processing state.
+
+    Args:
+        video_id (str): Unique identifier of the video.
+        current_user (dict): Authenticated user from dependency injection.
+        db: Database connection from dependency injection.
+
+    Returns:
+        VideoResponse: Complete video record with status information.
+
+    Raises:
+        HTTPException: 404 if video not found.
+        HTTPException: 403 if user is not the video owner.
+        HTTPException: 500 if database query fails.
+    """
     # 1. Get video
     try:
         # Select returns a list or single object depending on if ID is specific
@@ -404,6 +457,26 @@ async def get_capture(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
+    """Retrieve a detection capture image.
+
+    Returns a capture image for a specific detection track. Used to display
+    thumbnail images of detected faces/persons in the review interface.
+
+    Args:
+        video_id (str): Unique identifier of the video.
+        track_id (int): Tracking ID of the detection.
+        filename (str): Name of the capture image file.
+        current_user (dict): Authenticated user from dependency injection.
+        db: Database connection from dependency injection.
+
+    Returns:
+        FileResponse: The capture image file.
+
+    Raises:
+        HTTPException: 404 if video or capture not found.
+        HTTPException: 403 if user is not authorized.
+        HTTPException: 500 if verification fails.
+    """
     # Security check: Verify ownership
     try:
         # Check video ownership first
@@ -483,6 +556,23 @@ async def download_video(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
+    """Download the processed (anonymized) video.
+
+    Returns the anonymized video file after processing is complete.
+    Only the video owner can download their processed videos.
+
+    Args:
+        video_id (str): Unique identifier of the video.
+        current_user (dict): Authenticated user from dependency injection.
+        db: Database connection from dependency injection.
+
+    Returns:
+        FileResponse: The anonymized video file as MP4.
+
+    Raises:
+        HTTPException: 404 if video not found or file missing.
+        HTTPException: 403 if user is not authorized.
+    """
     # Get video info from DB to find the correct path
     simple_video_id = f"video:`{video_id}`" # Use backticks
     result = await db.select(simple_video_id)
@@ -525,6 +615,24 @@ async def delete_video(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
+    """Delete a video and all associated data.
+
+    Removes the video record from the database and cleans up
+    associated storage files (uploads, captures, processed).
+
+    Args:
+        video_id (str): Unique identifier of the video to delete.
+        current_user (dict): Authenticated user from dependency injection.
+        db: Database connection from dependency injection.
+
+    Returns:
+        dict: Confirmation with status and video_id.
+
+    Raises:
+        HTTPException: 404 if video not found.
+        HTTPException: 403 if user is not authorized.
+        HTTPException: 500 if deletion fails.
+    """
     # Delete from DB and Storage (usar backticks)
     try:
         # Security: Check ownership first

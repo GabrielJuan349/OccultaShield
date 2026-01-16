@@ -1,3 +1,29 @@
+"""Video Anonymization Engine with GPU Acceleration.
+
+This module provides the core video editing functionality for applying
+anonymization effects (blur, pixelate, mask) to detected regions.
+
+Features:
+    - GPU-accelerated processing via Kornia/PyTorch
+    - CPU fallback using OpenCV
+    - Batch frame processing for efficiency
+    - Bounding box interpolation for smooth effects
+    - Metadata stripping and professional tagging via FFmpeg
+
+Classes:
+    KorniaEffects: GPU-accelerated visual effects using Kornia.
+    VideoAnonymizer: Main anonymization orchestrator.
+
+Example:
+    >>> anonymizer = VideoAnonymizer(use_gpu=True, batch_frames=8)
+    >>> await anonymizer.apply_anonymization(
+    ...     video_id="vid_123",
+    ...     input_path="input.mp4",
+    ...     output_path="output.mp4",
+    ...     actions=[{"type": "blur", "bboxes": {1: [100, 100, 200, 200]}}]
+    ... )
+"""
+
 import cv2
 import numpy as np
 import logging
@@ -20,11 +46,17 @@ from services.progress_manager import progress_manager, ProcessingPhase
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# KORNIA EFFECTS - Efectos acelerados por GPU
+# KORNIA EFFECTS - GPU-Accelerated Visual Effects
 # =============================================================================
 class KorniaEffects:
-    """
-    Efectos de anonimización acelerados por GPU usando Kornia + PyTorch.
+    """GPU-accelerated anonymization effects using Kornia and PyTorch.
+
+    Provides high-performance blur, pixelation, and masking operations
+    that leverage CUDA for real-time video processing.
+
+    Attributes:
+        device: PyTorch device (cuda or cpu).
+        noise_cache: Cached noise tensors for consistent pixelation.
     """
     
     def __init__(self, device: str = None):
@@ -133,10 +165,28 @@ kornia_effects = KorniaEffects() if KORNIA_AVAILABLE or torch.cuda.is_available(
 
 
 class VideoAnonymizer:
+    """Video anonymization engine with GPU acceleration and CPU fallback.
+
+    Orchestrates the application of blur, pixelation, and masking effects
+    to detected regions across video frames. Supports batch processing
+    for improved GPU utilization.
+
+    Attributes:
+        use_gpu: Whether to use GPU acceleration.
+        batch_frames: Number of frames to process per GPU batch.
+        kornia: KorniaEffects instance for GPU operations.
+        noise_cache: Cached noise patterns for consistent pixelation.
+
+    Example:
+        >>> anonymizer = VideoAnonymizer(use_gpu=True)
+        >>> await anonymizer.apply_anonymization(
+        ...     video_id="vid_123",
+        ...     input_path="input.mp4",
+        ...     output_path="output.mp4",
+        ...     actions=actions_list
+        ... )
     """
-    Anonimizador de video con aceleración GPU (Kornia) y fallback CPU (OpenCV).
-    """
-    
+
     def __init__(self, use_gpu: bool = True, batch_frames: int = 8):
         self.use_gpu = use_gpu and (KORNIA_AVAILABLE or torch.cuda.is_available())
         self.batch_frames = batch_frames
@@ -179,6 +229,25 @@ class VideoAnonymizer:
         actions: List[Dict[str, Any]],
         user_id: str = "default_user"
     ):
+        """Apply anonymization effects to a video based on user decisions.
+
+        Processes the input video frame by frame, applying blur, pixelation,
+        or masking to regions specified in the actions list. Updates progress
+        via SSE and finalizes output with metadata stripping.
+
+        Args:
+            video_id: Unique identifier for progress tracking.
+            input_path: Path to the source video file.
+            output_path: Path for the anonymized output video.
+            actions: List of action dictionaries containing:
+                - type: Effect type (blur, pixelate, mask)
+                - bboxes: Dict mapping frame numbers to [x1,y1,x2,y2]
+                - config: Effect-specific parameters
+            user_id: User ID for metadata attribution.
+
+        Raises:
+            ValueError: If input video cannot be opened.
+        """
         start_time = time.time()
         logger.info(f"Anonymizing video {video_id}: {input_path} -> {output_path} (User: {user_id})")
         

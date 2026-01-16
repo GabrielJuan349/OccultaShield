@@ -1,3 +1,28 @@
+"""Object Detection Module for GDPR-Sensitive Content.
+
+This module provides hybrid detection capabilities combining:
+    - Kornia YuNet: GPU-accelerated face detection
+    - YOLO v11/v8: Person and license plate detection with segmentation
+    - OpenCV Haar Cascades: CPU fallback for face detection
+
+Key Components:
+    HybridDetectorManager: Manages multiple detection backends
+    VideoDetector: High-level video processing orchestrator
+
+Detection Flow:
+    1. Load video frames in batches (optimized for GPU memory)
+    2. Run face detection (Kornia or OpenCV fallback)
+    3. Run person/plate detection (YOLO with segmentation)
+    4. Track objects across frames using ObjectTracker
+    5. Capture representative images using CaptureManager
+    6. Return consolidated DetectionResult
+
+Example:
+    >>> detector = VideoDetector()
+    >>> result = await detector.process_video("vid_123", "/path/to/video.mp4", "/output")
+    >>> print(f"Found {len(result.detections)} tracked objects")
+"""
+
 import sys
 import os
 import asyncio
@@ -17,7 +42,7 @@ try:
     KORNIA_FACE_AVAILABLE = True
 except ImportError:
     KORNIA_FACE_AVAILABLE = False
-    
+
 from .models import BoundingBox, Capture, TrackedDetection, DetectionResult
 from .tracker import ObjectTracker
 from .capture_manager import CaptureManager
@@ -28,9 +53,18 @@ logger = logging.getLogger('detection_module')
 
 MIN_DETECTION_AREA = 500
 
+
 class HybridDetectorManager:
-    """
-    Gestor híbrido de detectores: Kornia AI (caras) + YOLO (personas, matrículas).
+    """Hybrid detector manager combining Kornia and YOLO backends.
+
+    Provides a unified interface for detecting faces (Kornia YuNet),
+    persons (YOLO segmentation), and license plates (YOLO).
+
+    Attributes:
+        device (torch.device): CUDA or CPU device for inference.
+        face_detector: Kornia FaceDetector or None if unavailable.
+        person_model: YOLO model for person detection with segmentation.
+        plate_model: YOLO model for license plate detection.
     """
     
     YOLO_CONFIGS = {

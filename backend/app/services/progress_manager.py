@@ -1,11 +1,30 @@
+"""Progress Manager for Real-Time Video Processing Updates.
+
+This module provides a centralized progress tracking system for video processing,
+implementing a publish/subscribe pattern for Server-Sent Events (SSE).
+
+The ProgressManager singleton coordinates:
+    - Video registration and state tracking
+    - Real-time progress updates to SSE clients
+    - Phase transition notifications
+    - Detection and verification event broadcasting
+    - Completion and error handling
+
+Example:
+    >>> from services.progress_manager import progress_manager
+    >>> await progress_manager.register_video("vid_123")
+    >>> await progress_manager.change_phase("vid_123", ProcessingPhase.DETECTING, "Starting...")
+    >>> await progress_manager.update_progress("vid_123", 50, message="Processing...")
+"""
+
 import asyncio
 from typing import Dict, Optional, AsyncGenerator, Callable, Any
 from datetime import datetime
 from collections import defaultdict
 
 from core.events import (
-    ProcessingPhase, 
-    ProgressEvent, 
+    ProcessingPhase,
+    ProgressEvent,
     PhaseChangeEvent,
     DetectionEvent,
     VerificationEvent,

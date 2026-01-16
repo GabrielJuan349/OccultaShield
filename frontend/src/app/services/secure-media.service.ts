@@ -1,11 +1,40 @@
 /**
- * SecureMediaService - Carga segura de imágenes y videos
- * Usa HttpClient con Authorization header en vez de tokens en URL
+ * Secure Media Loading Service.
+ *
+ * Provides secure loading of images and videos using HttpClient
+ * with Authorization headers instead of exposing tokens in URLs.
+ * This prevents token leakage via browser history, logs, and referrer headers.
+ *
+ * Features:
+ * - Blob URL generation for secure media display
+ * - Request caching to avoid duplicate fetches
+ * - Download progress tracking for videos
+ * - Memory leak prevention via URL revocation
+ *
+ * @example
+ * ```typescript
+ * // Load image securely
+ * secureMedia.loadImage(captureUrl).subscribe(blobUrl => {
+ *   this.imageUrl = blobUrl;
+ * });
+ *
+ * // Download video with progress
+ * secureMedia.downloadVideo(videoUrl).subscribe(({progress, blobUrl}) => {
+ *   this.progress = progress;
+ *   if (blobUrl) this.videoUrl = blobUrl;
+ * });
+ * ```
  */
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpEventType } from '@angular/common/http';
 import { Observable, map, shareReplay, filter, catchError, of } from 'rxjs';
 
+/**
+ * Service for secure media loading via Authorization headers.
+ *
+ * Converts API URLs to blob URLs for safe browser rendering
+ * while keeping authentication tokens out of URLs.
+ */
 @Injectable({ providedIn: 'root' })
 export class SecureMediaService {
   private readonly http = inject(HttpClient);

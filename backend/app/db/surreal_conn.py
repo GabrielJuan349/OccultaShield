@@ -1,15 +1,47 @@
+"""SurrealDB Connection Manager.
+
+This module provides an async connection manager for SurrealDB with
+automatic reconnection, connection pooling, and thread-safe operations.
+
+Environment Variables:
+    SURREALDB_URL: Full WebSocket URL (optional, overrides host/port).
+    SURREALDB_HOST: Database host (default: localhost).
+    SURREALDB_PORT: Database port (default: 8000).
+    SURREALDB_USER: Database username (required).
+    SURREALDB_PASS: Database password (required).
+    SURREALDB_NAMESPACE: Database namespace (default: test).
+    SURREALDB_DB: Database name (default: occultashield).
+
+Example:
+    >>> conn = SurrealConn()
+    >>> db = await conn.getting_db()
+    >>> result = await db.query("SELECT * FROM user")
+    >>> await conn.close()
+"""
+
 import surrealdb as sr
 from dotenv import load_dotenv
 import os
 import logging
 import asyncio
 
-# Cargar las variables del archivo .env
+# Load environment variables from .env file
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+
 class SurrealConn:
+    """Async SurrealDB connection manager with automatic reconnection.
+
+    Provides a thread-safe, singleton-friendly connection manager that
+    handles connection lifecycle, automatic reconnection on failure,
+    and namespace/database selection.
+
+    Attributes:
+        db (AsyncSurreal): The SurrealDB client instance.
+        url (str): WebSocket URL for database connection.
+    """
     def __init__(self):
         self.db = None
         self._connected = False

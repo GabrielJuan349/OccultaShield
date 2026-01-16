@@ -26,6 +26,37 @@ import { VideoService } from './video.service';
 import { AuthService } from './auth.service';
 import { environment } from '#environments/environment';
 
+/**
+ * Server-Sent Events service for real-time video processing progress.
+ *
+ * Manages SSE connections to the backend for live progress updates during
+ * video detection, verification, and anonymization phases.
+ *
+ * Features:
+ * - Reactive state management with Angular signals
+ * - Automatic reconnection on connection loss
+ * - Phase-aware progress tracking
+ * - Elapsed time and countdown timers
+ * - Violation loading on review phase
+ *
+ * @example
+ * ```typescript
+ * const sseService = inject(ProcessingSSEService);
+ *
+ * // Connect to video processing
+ * sseService.connect('vid_abc123');
+ *
+ * // React to phase changes
+ * effect(() => {
+ *   if (sseService.phase() === 'waiting_for_review') {
+ *     console.log('Ready for review!');
+ *   }
+ * });
+ *
+ * // Cleanup
+ * sseService.disconnect();
+ * ```
+ */
 @Injectable({
   providedIn: 'root'
 })

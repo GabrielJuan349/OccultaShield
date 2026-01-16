@@ -1,3 +1,24 @@
+/**
+ * Processing Page Component for OccultaShield.
+ *
+ * Displays real-time video processing progress via Server-Sent Events (SSE).
+ * Shows detection, verification, and anonymization phases with live updates.
+ *
+ * Flow:
+ * - From Upload: Processing → Detection → Verification → Review
+ * - From Review: Processing → Anonymization → Download
+ *
+ * Features:
+ * - Real-time progress updates via SSE
+ * - Phase-specific UI feedback
+ * - Automatic navigation on phase completion
+ * - Retry functionality on errors
+ *
+ * @example
+ * Route: /processing/:id
+ * Query: ?from=upload|review (determines next navigation target)
+ */
+
 import { DecimalPipe, NgOptimizedImage } from '@angular/common';
 import { ChangeDetectionStrategy, Component, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -5,6 +26,12 @@ import { HttpClient } from '@angular/common/http';
 import { ProcessingSSEService } from '#services/processing-sse.service';
 import { environment } from '#environments/environment';
 
+/**
+ * Real-time video processing status page.
+ *
+ * Connects to SSE endpoint for live progress updates and handles
+ * automatic navigation based on processing phase transitions.
+ */
 @Component({
   imports: [DecimalPipe, NgOptimizedImage, RouterLink],
   templateUrl: './ProcessingPage.html',

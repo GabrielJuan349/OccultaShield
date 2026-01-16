@@ -1,9 +1,22 @@
+"""Configuration Loader with Environment Variable Substitution.
+
+This module provides a singleton configuration loader that reads settings
+from YAML files and supports environment variable substitution using
+the ${VAR:default} syntax.
+
+Example:
+    >>> config = get_config()
+    >>> threshold = config.get('detector.confidence_threshold', 0.5)
+    >>> detector_settings = config.detector
+"""
+
 import os
 import yaml
 import re
 from pathlib import Path
 from functools import lru_cache
 from typing import Any, Dict
+
 
 class ConfigLoader:
     """

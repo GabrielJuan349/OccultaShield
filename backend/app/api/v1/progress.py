@@ -1,3 +1,25 @@
+"""Server-Sent Events (SSE) Progress Streaming Endpoints.
+
+This module provides real-time progress updates for video processing via SSE.
+Clients connect to receive live updates about detection, verification,
+and anonymization phases.
+
+Endpoints:
+    GET /{video_id}/progress: Stream real-time processing events via SSE.
+    GET /{video_id}/status: Get current status (polling fallback).
+    POST /{video_id}/cancel: Cancel ongoing processing.
+
+Events:
+    initial_state: Sent on connection with current processing state.
+    phase_change: Processing phase transition notification.
+    progress: Percentage progress update.
+    detection: New GDPR-sensitive detection found.
+    verification: AI verification progress.
+    complete: Processing finished successfully.
+    error: Processing error occurred.
+    heartbeat: Keep-alive signal (every 15 seconds).
+"""
+
 from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse

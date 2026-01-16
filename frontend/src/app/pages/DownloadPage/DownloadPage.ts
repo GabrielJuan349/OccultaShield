@@ -1,3 +1,22 @@
+/**
+ * Download Page Component for OccultaShield.
+ *
+ * Final step in the video processing pipeline. Allows users to:
+ * - Preview the anonymized video
+ * - Download the processed video file
+ * - Copy a shareable link
+ *
+ * Features:
+ * - Secure video streaming with authentication
+ * - Download progress tracking
+ * - Share URL generation
+ * - Platform-aware rendering (SSR compatible)
+ *
+ * @example
+ * Route: /download/:id
+ * Flow: Upload → Processing → Review → **Download**
+ */
+
 import { Component, signal, ChangeDetectionStrategy, PLATFORM_ID, inject, OnInit } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { RouterLink, ActivatedRoute } from '@angular/router';
@@ -6,6 +25,12 @@ import { VideoService } from '#services/video.service';
 import { environment } from '#environments/environment';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 
+/**
+ * Processed video download page.
+ *
+ * Provides video preview, download functionality, and link sharing
+ * for completed anonymization jobs.
+ */
 @Component({
   imports: [RouterLink],
   templateUrl: './DownloadPage.html',

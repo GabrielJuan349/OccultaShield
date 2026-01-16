@@ -1,3 +1,22 @@
+/**
+ * Authentication Guards for Route Protection.
+ *
+ * Provides unified guard functions for protecting routes based on
+ * authentication status and user roles.
+ *
+ * @example
+ * ```typescript
+ * // Require authentication only
+ * { path: 'upload', canActivate: [authGuard] }
+ *
+ * // Require admin role
+ * { path: 'admin', canActivate: [authGuard], data: { role: 'admin' } }
+ *
+ * // Guest only (redirect if authenticated)
+ * { path: 'login', canActivate: [authGuard], data: { guestOnly: true } }
+ * ```
+ */
+
 import { inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import type { CanActivateFn } from '@angular/router';
@@ -5,7 +24,7 @@ import { Router } from '@angular/router';
 import { AuthService } from '#services/auth.service';
 
 /**
- * Guard unificado para manejo de autenticación y roles
+ * Unified authentication guard for route protection.
  *
  * Uso:
  * - Sin data: Solo verifica autenticación

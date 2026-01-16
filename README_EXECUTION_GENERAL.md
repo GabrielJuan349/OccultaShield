@@ -1,101 +1,287 @@
-# 🛡️ OccultaShield General Execution Guide
+# 🛡️ OccultaShield - General Execution Guide
 
-This guide provides a comprehensive overview of how to set up and run the entire OccultaShield ecosystem, including the **Angular v21 (Zoneless)** frontend, the **FastAPI (YOLOv11 Precision)** backend, and the necessary databases.
+Complete guide to set up and run the OccultaShield GDPR video anonymization platform.
 
 ---
 
 ## 🏗️ Architecture Overview
 
-OccultaShield is a high-precision video anonymization platform designed for GDPR compliance. It uses a **"Human-in-the-Loop"** workflow:
-1.  **AI Analysis (YOLOv11-seg)**: Detects subjects and silhouettes with polygonal precision.
-2.  **Legal Reasoning (Neo4j RAG)**: Validates detections against GDPR articles.
-3.  **Human Review**: Users confirm or modify anonymization actions.
-4.  **GPU-Accelerated Editing (Kornia)**: Applies precise masks to the final video.
+OccultaShield is a high-precision video anonymization platform with a **Human-in-the-Loop** workflow:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           OCCULTASHIELD PIPELINE                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐                │
+│  │   DETECTION  │────▶│ VERIFICATION │────▶│   EDITION    │                │
+│  │  YOLOv11-seg │     │ Gemma + Neo4j│     │    Kornia    │                │
+│  │    + YuNet   │     │   GraphRAG   │     │  GPU Effects │                │
+│  └──────────────┘     └──────────────┘     └──────────────┘                │
+│         │                    │                    │                         │
+│         ▼                    ▼                    ▼                         │
+│  • Faces (YuNet)       • GDPR Compliance    • Blur / Pixelate             │
+│  • Persons (YOLO)      • Witness/Judge AI   • Irreversible masks          │
+│  • License Plates      • Vulnerability      • Metadata stripping          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## 📋 Prerequisites
 
-### System Requirements
-*   **OS**: Windows/Linux (Windows used for development).
-*   **Python**: 3.10+
-*   **Node.js**: 20+ (with Bun recommended).
-*   **GPU**: NVIDIA GPU (Optional, but highly recommended for YOLOv11 and Kornia).
-
-### Global Dependencies
-*   **SurrealDB**: Application state and tracking history.
-*   **Neo4j**: GDPR knowledge base and Article RAG.
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| **OS** | Windows/Linux | WSL2 recommended on Windows |
+| **Python** | 3.10+ | Managed via `uv` |
+| **Node.js** | 20+ | Managed via `nvm` |
+| **Bun** | 1.3+ | For frontend |
+| **Docker** | Latest | For databases |
+| **GPU** | NVIDIA (optional) | Recommended for YOLO/Kornia |
 
 ---
 
-## 🚀 Quick Start (Step-by-Step)
+## ⚡ Quick Start (Automated)
 
-### 1. Database Setup
-Ensure both databases are running:
-*   **SurrealDB**: `surreal start --user root --pass root memory`
-*   **Neo4j**: Start your instance and ensure APOC/GDS are enabled.
+Use the automated installation script:
 
-### 2. Backend Initialization
 ```bash
-cd backend
-# Install dependencies
-pip install kornia scipy pypdf ultralytics opencv-python
-# Ingest GDPR data (Neo4j)
-python app/modules/verification/ingest_gdpr.py path/to/gdpr.pdf
-# Start Server
-cd app
-uvicorn main:app --host 0.0.0.0 --port 8900 --reload
+# Make executable and run
+chmod +x instalation.sh
+./instalation.sh
 ```
 
-### 3. Frontend & Admin Setup
+The script will:
+1. ✅ Install system dependencies (ffmpeg, docker)
+2. ✅ Set up Bun, Node.js, and Angular CLI
+3. ✅ Configure `.env` files interactively (or use defaults)
+4. ✅ Install backend (uv) and frontend (bun) dependencies
+5. ✅ Start Docker services (Neo4j + SurrealDB)
+6. ✅ Optionally set up Hugging Face login for Gemma LLM
+7. ✅ Optionally ingest GDPR knowledge graph
+
+---
+
+## 📦 Manual Setup
+
+### 1. Start Databases
+
 ```bash
+cd docker
+docker compose up -d
+```
+
+This starts:
+- **Neo4j**: `http://localhost:7474` (bolt: 7687)
+- **SurrealDB**: `http://localhost:8000`
+
+> SurrealDB schema is automatically imported via `--import-file`.
+
+### 2. Configure Environment
+
+Create `.env` files from examples:
+
+```bash
+# Backend
+cp backend/app/.env.example backend/app/.env
+
+# Frontend
+cp frontend/.env.example frontend/.env
+
+# Docker
+cp docker/.env.example docker/.env
+```
+
+**Shared variables** (must match across all `.env` files):
+- `SURREALDB_*` credentials
+- `BETTERAUTH_SECRET`
+- `NEO4J_PASSWORD`
+
+### 3. Install Dependencies
+
+```bash
+# Backend
+cd backend/app
+uv sync
+uv add kornia pandas
+
+# Frontend
 cd frontend
-# Install dependencies (including nodemailer for admin)
 bun install
-# Setup .env for Admin & Email
-# SMTP_USER, SMTP_PASS, SMTP_FROM are required for user approval emails
+```
+
+### 4. GDPR Knowledge Graph (Optional)
+
+For full legal verification capabilities:
+
+```bash
+cd backend/app
+uv run python scripts/gdpr_ingestion/enhanced_ingest_gdpr.py
+```
+
+### 5. Hugging Face Login (Optional)
+
+Required for Gemma LLM (visual verification):
+
+```bash
+pip install huggingface_hub
+huggingface-cli login
+```
+
+> Visit https://huggingface.co/google/gemma-3n-E4B-it to accept the license first.
+
+### 6. Start Services
+
+```bash
+# Terminal 1: Backend
+cd backend/app
+uv run main.py
+
+# Terminal 2: Frontend
+cd frontend
 bun run dev
 ```
 
----
-
-## 🛡️ Admin & Closed Beta Management
-
-OccultaShield includes an Administrative Panel at `/admin` to control access:
-
-1.  **Closed Beta Mode**: When enabled, new registrations are set as `pending` and cannot access processing features.
-2.  **User Approval**: Admins review requests and approve/reject users from the dashboard.
-3.  **Automated Emails**: The system sends professional HTML emails for registration receipt, approval, and rejection.
-4.  **Audit Logging**: Every administrative action is recorded in the `audit_log` table for accountability.
+Access the application at:
+- **Frontend**: http://localhost:4200
+- **Backend API**: http://localhost:8980
+- **Neo4j Browser**: http://localhost:7474
 
 ---
 
-## 🧪 Testing the "Precision Mode" Pipeline
+## 🛡️ Admin Panel
 
-1.  **Register**: Create a new account. If **Closed Beta Mode** is on, you will see a "Pending Approval" notice.
-2.  **Admin Approval**: Use an admin account to go to `/admin/users` and approve the new user.
-3.  **Upload**: Once approved, go to `http://localhost:4200` and upload a video.
-4.  **Monitor**: Watch the "Processing" page. The backend will use **YOLOv11** for instance segmentation.
-5.  **Review**: In the "Review" page, you will see precise silhouettes. Choose your anonymization effect (Blur, Pixelate, or Mask).
-6.  **Download**: Once processing is complete, download the anonymized video. The system automatically handles **Dynamic Fading** for subjects that are too small to be identifiable (Ground Truth check).
+Access the admin panel at `/admin`:
+
+| Feature | Description |
+|---------|-------------|
+| **User Management** | Approve/reject registrations, manage roles |
+| **Closed Beta Mode** | Require admin approval for new users |
+| **Audit Log** | Track all administrative actions |
+| **Dashboard Stats** | Users, videos, violations overview |
+
+Admin credentials are configured in `frontend/.env`:
+```env
+ADMIN_EMAIL=admin@occultashield.local
+ADMIN_PASSWORD=your_password
+```
 
 ---
 
-## 🛠️ Components Summary
+## 🧪 Testing the Pipeline
 
-| Component | Technology | Role |
-| :--- | :--- | :--- |
-| **Frontend** | Angular v21 (Signals) | Modern UI with real-time SSE updates. |
-| **Admin API** | Node.js (SSR Express) | Secure management of users, settings, and emails. |
-| **Backend** | FastAPI / Python | Orchestration and AI pipeline. |
-| **Detection** | YOLOv11-seg | Silhouette-level instance segmentation. |
-| **Verification** | Neo4j / LLM | Legal compliance analysis (GDPR). |
-| **Database** | SurrealDB | Application state, users, and audit history. |
-| **Mailing** | Nodemailer | Transactional emails for the approval system. |
+1. **Register** a new account (requires approval if Closed Beta is on)
+2. **Admin Approval**: Go to `/admin/users` and approve the user
+3. **Upload**: Upload a video at `/upload`
+4. **Monitor**: Watch real-time progress via SSE
+5. **Review**: Inspect detections in the review page
+6. **Download**: Get the anonymized video
+
+---
+
+## 🧩 Module Overview
+
+| Module | Location | Description |
+|--------|----------|-------------|
+| **Detection** | `backend/app/modules/detection/` | YOLOv11-seg + Kornia YuNet face detection |
+| **Verification** | `backend/app/modules/verification/` | GDPR compliance via Neo4j + Gemma LLM |
+| **Edition** | `backend/app/modules/edition/` | GPU-accelerated anonymization effects |
+
+### Detection Module
+- Hybrid architecture: Kornia FaceDetector (YuNet) + YOLO
+- Segmentation masks for precise person boundaries
+- Multi-object tracking with ID persistence
+
+### Verification Module
+- **Witness (GemmaClient)**: Visual description without legal judgment
+- **Judge (ConsensusAgent)**: Legal decision based on GDPR rules
+- **Neo4j GraphRAG**: GDPR article retrieval and context
+
+### Edition Module
+- GPU effects via Kornia (blur, pixelate)
+- Noise injection for irreversibility
+- FFmpeg metadata stripping for GDPR compliance
+
+---
+
+## 🔧 Environment Variables
+
+### Backend (`backend/app/.env`)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SERVER_PORT` | API server port | `8980` |
+| `CLIENT_URL` | CORS allowed origin | `http://localhost:4200` |
+| `BETTERAUTH_SECRET` | Auth secret key | (generate) |
+| `SURREALDB_*` | Database connection | `localhost:8000` |
+| `NEO4J_*` | Neo4j connection | `localhost:7687` |
+| `DETECTION_MODEL_PATH` | YOLO model | `yolo11n-seg.pt` |
+
+### Frontend (`frontend/.env`)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BETTERAUTH_SECRET` | Must match backend | (generate) |
+| `ADMIN_EMAIL` | Initial admin email | `admin@...` |
+| `ADMIN_PASSWORD` | Initial admin password | (set) |
+| `SMTP_*` | Email service config | (optional) |
 
 ---
 
 ## 🔍 Troubleshooting
-*   **First Run Delay**: The backend will download `yolo11n-seg.pt` (approx 10MB) on the first upload.
-*   **Memory Issues**: If not using a GPU, processing will fallback to CPU (OpenCV), which is significantly slower.
-*   **SSE Sync**: If the UI hangs, check if the Backend terminal shows active logs for `video_processor`.
+
+### First Run Takes Long
+YOLO models download automatically on first use (~50MB for yolo11n-seg.pt).
+
+### "Model not loaded" Error
+```bash
+huggingface-cli login
+```
+Then accept the Gemma license at HuggingFace.
+
+### SSE Connection Issues
+Check backend logs for `video_processor` activity. Ensure correct `CLIENT_URL` in backend `.env`.
+
+### GPU Not Detected
+```bash
+python -c "import torch; print(torch.cuda.is_available())"
+```
+If `False`, install CUDA-compatible PyTorch.
+
+### Database Connection Failed
+```bash
+# Check Docker services
+docker compose -f docker/docker-compose.yml ps
+```
+
+---
+
+## 📚 Related Documentation
+
+| Document | Location | Content |
+|----------|----------|---------|
+| Backend Setup | `backend/README.md` | Detailed backend configuration |
+| Frontend Setup | `frontend/README.md` | Angular/Bun configuration |
+| Auth Setup | `frontend/BETTER_AUTH_SETUP.md` | Better-Auth + admin API |
+| GDPR Setup | `backend/app/README_GDPR_SETUP.md` | Neo4j knowledge graph |
+| Detection Models | `backend/app/modules/detection/README_MODELS.md` | YOLO model details |
+| Verification Module | `backend/app/modules/verification/README.md` | Full verification docs |
+| Edition Module | `backend/app/modules/edition/README.md` | Anonymization effects |
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | Angular v21 (Zoneless, Signals, SSR) |
+| **Admin API** | Node.js Express (SSR server) |
+| **Backend** | FastAPI / Python |
+| **Detection** | YOLOv11-seg, Kornia YuNet |
+| **Verification** | Neo4j, LangGraph, Gemma 3n LLM |
+| **Edition** | Kornia (GPU), OpenCV (CPU fallback) |
+| **Auth** | Better-Auth |
+| **Databases** | SurrealDB, Neo4j |
+| **Email** | Nodemailer |
+| **Package Managers** | uv (Python), Bun (JS) |

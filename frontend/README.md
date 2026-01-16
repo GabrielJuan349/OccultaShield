@@ -2,107 +2,107 @@
 
 # 🌐 OccultaShield Frontend
 
-### Interfaz SSR de Alta Fidelidad y Panel de Administración (Angular v21)
+### High-Fidelity SSR Interface and Administration Panel (Angular v21)
 
 [![Angular](https://img.shields.io/badge/Angular-v21.0-DD0031?style=for-the-badge&logo=angular&logoColor=white)](https://angular.io/)
 [![Bun](https://img.shields.io/badge/Bun-1.3.1-000000?style=for-the-badge&logo=bun&logoColor=white)](https://bun.sh/)
 [![Better-Auth](https://img.shields.io/badge/Auth-Better--Auth-blueviolet?style=for-the-badge)](https://better-auth.com)
 [![Zoneless](https://img.shields.io/badge/Architecture-Zoneless-blue?style=for-the-badge)](https://angular.dev)
 
-**Experiencia de usuario instantánea y segura con Server-Side Rendering (SSR), Signals y gestión administrativa avanzada.**
+**Instant and secure user experience with Server-Side Rendering (SSR), Signals, and advanced administrative management.**
 
 </div>
 
 ---
 
-## 🚀 Visión General
+## 🚀 Overview
 
-El frontend de OccultaShield trasciende el reproductor de video convencional. Es una **Suite de Cumplimiento Normativo (Compliance Suite)** completa. Construido con la última tecnología disponible en 2025 (Angular v21), ofrece una experiencia fluida, reactiva y segura para la toma de decisiones críticas sobre privacidad.
+The OccultaShield frontend transcends the conventional video player. It is a complete **Compliance Suite**. Built with the latest technology available in 2025 (Angular v21), it offers a smooth, reactive, and secure experience for making critical privacy decisions.
 
-Su arquitectura **Zoneless** garantiza que incluso con cientos de detecciones en pantalla (Bounding Boxes), la interfaz se mantenga a 60 FPS sin bloqueos.
-
----
-
-## ✨ Características Técnicas Avanzadas
-
-### 1. Arquitectura "Bleeding Edge" (Zoneless + SSR)
-*   **Adiós Zone.js**: Hemos eliminado la dependencia de `zone.js` para la detección de cambios. Ahora, la UI reacciona a cambios de estado atómicos mediante **Signals**, reduciendo drásticamente el uso de CPU y memoria.
-*   **Server-Side Rendering (SSR)**: Gracias a **Bun** y el adaptador de Express, la aplicación se renderiza en el servidor antes de llegar al cliente, asegurando tiempos de carga (`LCP`) casi instantáneos.
-*   **Hydration no destructiva**: Angular rehidrata el estado del cliente sin parpadeos, permitiendo interacción inmediata.
-
-### 2. Panel de Administración y Seguridad (`/admin`)
-*   **Role-Based Access Control (RBAC)**: Sistema de permisos granular.
-    *   *Admins*: Aprueban cuentas, ven métricas globales, acceden a registros de auditoría.
-    *   *Users*: Solo ven sus propios videos.
-*   **Sistema "Closed Beta"**: Flujo de registro con aprobación manual. Los nuevos usuarios quedan en estado `Pending` hasta validación.
-*   **Audit Log Inmutable**: Cada acción administrativa (aprobar usuario, cambiar configuración) queda registrada y firmada en el sistema.
-
-### 3. Experiencia de Revisión (Review Room)
-*   **SSE Streaming Real-time**: Conexión continua con el backend para mostrar el progreso de detección frame a frame.
-*   **Reproductor Seguro**:
-    *   **Anti-Screenshot**: La UI detecta atajos de teclado de captura y ofusca el contenido sensible.
-    *   **Marcas de Agua**: Superposición dinámica con el ID del usuario visualizador para trazar filtraciones.
-    *   **Navegación por Infracciones**: Timeline interactivo que marca los momentos exactos de violación del RGPD.
+Its **Zoneless** architecture ensures that even with hundreds of detections on screen (Bounding Boxes), the interface maintains 60 FPS without freezing.
 
 ---
 
-## 🏃 Guía de Desarrollo
+## ✨ Advanced Technical Features
 
-### 1. Requisitos
-*   [Bun](https://bun.sh) v1.1+ instalado globalmente.
-*   Node.js v20+ (opcional, Bun lo reemplaza en la mayoría de tareas).
-*   Backend de OccultaShield corriendo en el puerto `8980`.
+### 1. "Bleeding Edge" Architecture (Zoneless + SSR)
+*   **Goodbye Zone.js**: We have eliminated the dependency on `zone.js` for change detection. Now, the UI reacts to atomic state changes through **Signals**, drastically reducing CPU and memory usage.
+*   **Server-Side Rendering (SSR)**: Thanks to **Bun** and the Express adapter, the application renders on the server before reaching the client, ensuring near-instant load times (`LCP`).
+*   **Non-destructive Hydration**: Angular rehydrates the client state without flickering, allowing immediate interaction.
 
-### 2. Instalación de Dependencias
-Utilizamos Bun para una instalación ultrarrápida (10x más rápido que npm).
+### 2. Administration Panel and Security (`/admin`)
+*   **Role-Based Access Control (RBAC)**: Granular permission system.
+    *   *Admins*: Approve accounts, view global metrics, access audit logs.
+    *   *Users*: Only see their own videos.
+*   **"Closed Beta" System**: Registration flow with manual approval. New users remain in `Pending` status until validated.
+*   **Immutable Audit Log**: Every administrative action (approve user, change settings) is recorded and signed in the system.
+
+### 3. Review Experience (Review Room)
+*   **Real-time SSE Streaming**: Continuous connection with the backend to show detection progress frame by frame.
+*   **Secure Player**:
+    *   **Anti-Screenshot**: The UI detects screenshot keyboard shortcuts and obfuscates sensitive content.
+    *   **Watermarks**: Dynamic overlay with the viewer's user ID to trace leaks.
+    *   **Violation Navigation**: Interactive timeline marking the exact moments of GDPR violation.
+
+---
+
+## 🏃 Development Guide
+
+### 1. Requirements
+*   [Bun](https://bun.sh) v1.1+ installed globally.
+*   Node.js v20+ (optional, Bun replaces it in most tasks).
+*   OccultaShield Backend running on port `8980`.
+
+### 2. Installing Dependencies
+We use Bun for ultra-fast installation (10x faster than npm).
 ```bash
 cd frontend
 bun install
 ```
 
-### 3. Configuración del Entorno (`.env`)
+### 3. Environment Configuration (`.env`)
 ```bash
 cp .env.example .env
 nano .env
 ```
-**Variables Críticas:**
-*   `API_URL`: URL del backend (ej: `http://localhost:8980/api/v1`).
-*   `BETTERAUTH_SECRET`: Clave secreta para firmar sesiones.
-*   `SMTP_*`: Configuración para el envío de correos transaccionales (invitaciones, aprobaciones).
+**Critical Variables:**
+*   `API_URL`: Backend URL (e.g., `http://localhost:8980/api/v1`).
+*   `BETTERAUTH_SECRET`: Secret key for signing sessions.
+*   `SMTP_*`: Configuration for sending transactional emails (invitations, approvals).
 
-### 4. Ejecución (Modo Desarrollo)
-Arranca el servidor de desarrollo con Hot Module Replacement (HMR).
+### 4. Running (Development Mode)
+Start the development server with Hot Module Replacement (HMR).
 ```bash
 bun run dev
 ```
-Accede a `http://localhost:4200`. La aplicación proxyficará automáticamente las peticiones `/api` al backend si usas la configuración por defecto.
+Access `http://localhost:4200`. The application will automatically proxy `/api` requests to the backend if using the default configuration.
 
-### 5. Build y Producción (SSR)
-Para desplegar en entorno real:
+### 5. Build and Production (SSR)
+For deployment in a real environment:
 ```bash
-# Compilar la aplicación (genera dist/occultashield/browser y server)
+# Build the application (generates dist/occultashield/browser and server)
 bun run build
 
-# Servir con el motor SSR Node.js/Bun
+# Serve with the Node.js/Bun SSR engine
 bun run serve:ssr
 ```
-La aplicación estará disponible en `http://localhost:4000` (o `PORT` definido en env).
+The application will be available at `http://localhost:4000` (or `PORT` defined in env).
 
 ---
 
-## 📂 Arquitectura de Directorios (Subpath Imports)
+## 📂 Directory Architecture (Subpath Imports)
 
-El proyecto utiliza un sistema de alias moderno (`#`) definido en `tsconfig.json` para mantener modularidad estricta:
+The project uses a modern alias system (`#`) defined in `tsconfig.json` to maintain strict modularity:
 
-*   `#components/*`: **UI Kit**. Componentes puros de presentación (ViolationCard, ProgressBar, Header). Standalone y sin lógica de negocio compleja.
-*   `#pages/*`: **Vistas**. Componentes enrutados que orquestan lógica (UploadPage, ReviewPage, AdminPage).
-*   `#services/*`: **Capa de Datos**. Servicios inyectables, clientes HTTP y stores de estado (Signals).
-*   `#server/*`: **Backend SSR**. Código que **solo** se ejecuta en el servidor (Rutas API de Admin, configuración de Express, Handlers de Auth).
-*   `#interface/*`: **Tipos**. Contratos TypeScript compartidos.
+*   `#components/*`: **UI Kit**. Pure presentation components (ViolationCard, ProgressBar, Header). Standalone and without complex business logic.
+*   `#pages/*`: **Views**. Routed components that orchestrate logic (UploadPage, ReviewPage, AdminPage).
+*   `#services/*`: **Data Layer**. Injectable services, HTTP clients, and state stores (Signals).
+*   `#server/*`: **SSR Backend**. Code that **only** runs on the server (Admin API Routes, Express configuration, Auth Handlers).
+*   `#interface/*`: **Types**. Shared TypeScript contracts.
 
 ---
 
-## 🔒 Detalles de Seguridad (Frontend)
-*   **Auth Interceptor**: Inyecta automáticamente tokens de sesión en cabeceras para peticiones API.
-*   **Error Interceptor**: Gestiona globalmente respuestas 401/403, redirigiendo al login o refrescando sesiones.
-*   **Sanitization**: Todo el contenido HTML renderizado pasa por `DomSanitizer` para prevenir XSS.
+## 🔒 Security Details (Frontend)
+*   **Auth Interceptor**: Automatically injects session tokens in headers for API requests.
+*   **Error Interceptor**: Globally handles 401/403 responses, redirecting to login or refreshing sessions.
+*   **Sanitization**: All rendered HTML content goes through `DomSanitizer` to prevent XSS.

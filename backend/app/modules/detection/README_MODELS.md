@@ -1,69 +1,120 @@
-# Modelos de Detección - OccultaShield
+# Detection Models - OccultaShield
 
-## Estado Actual
+## Architecture Overview
 
-El sistema detecta **simultáneamente** tres tipos de objetos sensibles:
+OccultaShield uses a **Hybrid Detection System** managed by `HybridDetectorManager`, which automatically selects the optimal strategy based on available GPU resources.
 
-| Tipo | Modelo | Estado | Precisión |
-|------|--------|--------|-----------|
-| **Personas** | YOLO11n-seg | ✅ Activo | Alta (segmentación incluida) |
-| **Caras** | Kornia FaceDetector (YuNet) | ✅ Activo | Alta |
-| **Vehículos/Placas** | YOLOv8n (fallback) | ⚠️ Proxy | Media (detecta vehículos, no placas específicas) |
+## Current Detection Stack
 
-## Mejora de Detección de Placas
+| Type | Model | Technology | Status | Accuracy |
+|------|--------|------------|--------|-----------|
+| **People** | YOLO11n-seg | Ultralytics + Segmentation | ✅ Active | High (precise silhouettes) |
+| **Faces** | Kornia FaceDetector | YuNet DNN + GPU Acceleration | ✅ Active | High |
+| **Faces (Fallback)** | OpenCV Haar Cascade | CPU-based | ⚠️ Backup | Medium |
+| **Vehicles/Plates** | YOLOv8n | COCO classes proxy | ⚠️ Proxy | Medium |
 
-### Opción 1: Modelo Pre-entrenado de Roboflow
+## GPU Management System
 
-```bash
-# Descargar modelo especializado de Roboflow
-cd backend/app/modules/detection/models/
-wget https://app.roboflow.com/ds/xxxxx -O license_plate_detector.pt
+### GPUManager Singleton
 
-# Actualizar configuración
-# En detector.py, línea 94, cambiar:
-plate_model = "modules/detection/models/license_plate_detector.pt"
-```
+The `GPUManager` class automatically detects available VRAM and selects the optimal strategy:
 
-### Opción 2: Modelo de Hugging Face
-
-```bash
-# Instalar transformers
-uv add transformers
-
-# Usar modelo pre-entrenado
-from transformers import AutoImageProcessor, AutoModelForObjectDetection
-model = AutoModelForObjectDetection.from_pretrained("nickmuchi/yolos-small-finetuned-license-plate-detection")
-```
-
-### Opción 3: Fine-tune YOLOv8
+| VRAM | Strategy | Model Size | Batch Size |
+|------|----------|------------|------------|
+| < 8GB | Sequential | Nano | 8 |
+| 8-16GB | Parallel | Small | 32 |
+| 16-32GB | Parallel | Medium | 64 |
+| 32GB+ (DGX Spark) | Parallel | Medium | up to 128 |
 
 ```python
-# Entrenar con dataset de placas
-from ultralytics import YOLO
+# Automatic strategy selection
+from modules.detection.gpu_manager import gpu_manager
 
-model = YOLO('yolov8n.pt')
-model.train(
-    data='license_plates.yaml',  # Dataset YAML
-    epochs=50,
-    imgsz=640,
-    device='0'  # GPU
+strategy, model_size, batch_size = gpu_manager.get_strategy()
+# Example: ("parallel", "medium", 128) on DGX Spark
+```
+
+## Model Configurations
+
+### YOLO Configurations (in `detector.py`)
+
+```python
+YOLO_CONFIGS = {
+    "nano": {
+        "model_file": "yolo11n-seg.pt",
+        "vram_mb": 500,
+        "description": "Fast, lower accuracy"
+    },
+    "small": {
+        "model_file": "yolo11s-seg.pt", 
+        "vram_mb": 800,
+        "description": "Balanced speed/accuracy"
+    },
+    "medium": {
+        "model_file": "yolo11m-seg.pt",
+        "vram_mb": 1500,
+        "description": "High accuracy, slower"
+    }
+}
+```
+
+### Kornia Face Detection
+
+The system prioritizes **Kornia FaceDetector (YuNet)** for GPU-accelerated face detection:
+
+```python
+# Kornia YuNet - GPU optimized
+self.kornia_face_detector = FaceDetector(
+    model_path=None  # Uses bundled YuNet model
+)
+
+# Fallback: OpenCV Haar Cascade (CPU)
+self.haar_cascade = cv2.CascadeClassifier(
+    cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
 )
 ```
 
-## Datasets Recomendados para Placas
+## Detection Thresholds
 
-1. **CCPD (Chinese City Parking Dataset)**: 250k imágenes
-   - https://github.com/detectRecog/CCPD
+### Area Thresholds
 
-2. **OpenALPR Benchmark**: Dataset europeo
-   - https://github.com/openalpr/benchmarks
+```python
+MIN_DETECTION_AREA = 500     # Minimum pixels² for any detection
+FACE_AREA_THRESHOLD = 200    # Minimum pixels² for face detection
+```
 
-3. **Roboflow Universe - License Plates**
-   - https://universe.roboflow.com/search?q=license+plate
+### Confidence Thresholds (from `detection.yaml`)
 
-## Configuración Actual
+```yaml
+confidence_threshold: 0.5    # 50% minimum confidence
+iou_threshold: 0.45          # NMS overlap threshold
+```
 
-### Clases COCO Detectadas (vehículos como proxy)
+## Tracking System
+
+### Kalman Filter Tracker
+
+The `ObjectTracker` class uses **Hungarian Algorithm** with **Kalman Filter** for smooth tracking:
+
+```python
+# State vector: [x1, y1, x2, y2, vx1, vy1, vx2, vy2]
+# Predicts position + velocity for stable tracking
+
+tracker = ObjectTracker(
+    iou_threshold=0.3,   # Association threshold
+    max_age=1000,        # Track survives practically forever
+    min_hits=0           # Immediate confirmation
+)
+```
+
+**Key Features:**
+- **Immediate Track Confirmation**: `min_hits=0` means detections are tracked from first frame
+- **Persistent Tracks**: `max_age=1000` keeps tracks alive even with temporary occlusions
+- **Velocity Damping**: Reduces velocity influence when age increases (uncertainty)
+
+## License Plate Detection Enhancement
+
+### Current Behavior (Vehicle Proxy)
 
 ```python
 vehicle_classes = [
@@ -74,86 +125,99 @@ vehicle_classes = [
 ]
 ```
 
-### Umbrales de Confianza
+### Option 1: Pre-trained Roboflow Model
 
-```python
-face_confidence = 0.5      # 50% confianza mínima para caras
-person_confidence = 0.5    # 50% confianza mínima para personas
-MIN_DETECTION_AREA = 500   # Área mínima (píxeles²)
+```bash
+# Download specialized model from Roboflow
+cd backend/app/modules/detection/models/
+wget https://app.roboflow.com/ds/xxxxx -O license_plate_detector.pt
 ```
 
-## Cómo Cambiar los Modelos
-
-### En `video_processor.py`
+### Option 2: Hugging Face Model
 
 ```python
-self.detector = VideoDetector(
-    person_model="yolo11n-seg.pt",  # Cambiar modelo de personas
-    plate_model="license_plate_detector.pt",  # Modelo especializado de placas
-    confidence_threshold=0.5
+from transformers import AutoModelForObjectDetection
+model = AutoModelForObjectDetection.from_pretrained(
+    "nickmuchi/yolos-small-finetuned-license-plate-detection"
 )
 ```
 
-### Modelos Disponibles
+### Option 3: Fine-tune YOLOv8
 
-**YOLO Personas** (con segmentación):
-- `yolo11n-seg.pt` - Nano (rápido, menos preciso)
-- `yolo11s-seg.pt` - Small (balanceado)
-- `yolo11m-seg.pt` - Medium (preciso, más lento)
-
-**YOLO Genérico**:
-- `yolov8n.pt` - Nano (80 clases COCO)
-- `yolov8s.pt` - Small
-- `yolov8m.pt` - Medium
-
-## Problemas Conocidos
-
-### 1. Detección de Personas Falla Ocasionalmente
-
-**Causa**: Oclusiones, ángulos difíciles, iluminación baja
-
-**Solución**:
 ```python
-# Reducir threshold
-person_confidence = 0.3  # Más detecciones, más falsos positivos
+from ultralytics import YOLO
 
-# Usar modelo más grande
-person_model = "yolo11m-seg.pt"  # Más preciso
+model = YOLO('yolov8n.pt')
+model.train(
+    data='license_plates.yaml',
+    epochs=50,
+    imgsz=640,
+    device='0'
+)
 ```
 
-### 2. Placas No Se Detectan
+## Batch Processing
 
-**Causa**: YOLOv8 estándar no está entrenado para placas
+### Frame Batch Processing
 
-**Solución**: Usar modelo especializado (ver Opción 1, 2 o 3 arriba)
-
-### 3. Múltiples Detecciones del Mismo Objeto
-
-**Causa**: Tracker puede perder objetos entre frames
-
-**Solución**:
 ```python
-# En tracker.py, ajustar IOU threshold
-self.iou_threshold = 0.3  # Más estricto (menos duplicados)
+def _detect_batch(self, frames: List[np.ndarray], frame_indices: List[int]):
+    """Process multiple frames in parallel for GPU efficiency."""
+    
+    # Batch YOLO inference
+    yolo_results = self.person_model(
+        frames,
+        conf=self.confidence,
+        iou=self.iou_threshold,
+        device=self.device,
+        verbose=False
+    )
+    
+    # Parallel face detection with Kornia
+    for i, frame in enumerate(frames):
+        faces = self._detect_faces_kornia(frame)
+        # ...
 ```
 
-## Rendimiento
+### GPU Memory Optimization
 
-### GPU NVIDIA DGX Spark
+- **Explicit VRAM Release**: After each video processing
+- **Batch Size Calculation**: Based on available VRAM
+- **Safety Margin**: 20% buffer when checking model fit
 
-- **Batch Size**: Ajustado automáticamente según VRAM
-- **FPS**: ~25-30 FPS en detección (con batch processing)
-- **Memoria GPU**: ~2-4 GB por video (liberada automáticamente)
+## Sensitive Content Classification
 
-### Optimizaciones
+The system can also detect **non-person** sensitive content using the LLM:
 
-1. **Batch Processing**: Procesa múltiples frames simultáneamente
-2. **GPU Memory Management**: Libera explícitamente después de cada video
-3. **Parallel Detection**: Personas, caras y placas en paralelo
+```python
+SENSITIVE_CONTENT_TYPES = [
+    "fingerprint",      # Visible ridge patterns
+    "id_document",      # Passports, IDs, licenses
+    "credit_card",      # Bank cards with visible numbers
+    "signature",        # Handwritten signatures
+    "hand_biometric"    # Palm print recognition
+]
+```
 
-## Logs de Ejemplo
+## Performance Metrics
+
+### NVIDIA DGX Spark GPU (128GB VRAM)
+
+- **Batch Size**: Up to 128 frames per batch
+- **FPS**: ~25-30 FPS in detection
+- **GPU Memory**: 2-4 GB per video (auto-released)
+
+### Standard GPU (8-16GB)
+
+- **Batch Size**: 16-32 frames
+- **FPS**: ~15-20 FPS
+- **Fallback**: CPU mode if CUDA unavailable
+
+## Example Logs
 
 ```
+🚀 [GPU] DGX Spark mode: 128GB VRAM, batch_size=128
+
 ✓ YOLO person detector loaded: yolo11n-seg.pt
 ✓ Kornia FaceDetector (YuNet) loaded
 ✓ YOLO vehicle detector loaded as plate fallback: yolov8n.pt
@@ -161,11 +225,41 @@ self.iou_threshold = 0.3  # Más estricto (menos duplicados)
 
 HybridDetectorManager: strategy=batch, size=nano, device=cuda:0, kornia_face=True
 
+[TRACKER] Initialized: iou_threshold=0.3, max_age=1000, min_hits=0
 [DETECTOR] Batch 94 frames in 3.73s (25.2 FPS): 12 persons, 5 faces, 3 plates
 ```
 
-## Referencias
+## Known Issues & Solutions
+
+### 1. Person Detection Fails in Low Light
+
+```python
+# Reduce confidence threshold
+person_confidence = 0.3  # More detections, more false positives
+
+# Or use larger model
+person_model = "yolo11m-seg.pt"
+```
+
+### 2. Face Detection Fails
+
+The system automatically falls back to OpenCV Haar Cascade if Kornia fails:
+
+```python
+if not faces_detected and self.haar_cascade:
+    faces = self._detect_faces_haar(frame)  # CPU fallback
+```
+
+### 3. Duplicate Detections
+
+```python
+# Adjust tracker IOU threshold
+tracker.iou_threshold = 0.4  # Stricter matching
+```
+
+## References
 
 - **YOLO11**: https://docs.ultralytics.com/models/yolo11/
 - **Kornia**: https://kornia.readthedocs.io/
-- **License Plate Detection**: https://github.com/topics/license-plate-detection
+- **OpenCV DNN**: https://docs.opencv.org/master/d2/d58/tutorial_table_of_content_dnn.html
+- **Hungarian Algorithm**: https://en.wikipedia.org/wiki/Hungarian_algorithm

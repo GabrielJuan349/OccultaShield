@@ -1,43 +1,43 @@
-# Notebooks de Testing - OccultaShield Backend
+# Testing Notebooks - OccultaShield Backend
 
-Esta carpeta contiene notebooks para probar los módulos del backend de forma aislada.
+This folder contains notebooks for testing backend modules in isolation.
 
-## Requisitos
+## Requirements
 
-Asegúrate de tener instaladas las dependencias del proyecto y `jupyter`/`notebook`.
+Make sure you have the project dependencies and `jupyter`/`notebook` installed.
 
 ```bash
 pip install jupyter matplotlib ipykernel nest_asyncio
 ```
 
-## Configuración Previa
+## Prior Configuration
 
-1.  **Modelo YOLO**: Asegúrate de tener `yolov10m.pt` (o el que uses) en `backend/app/`.
-2.  **Video de Prueba**: Coloca un video mp4 en `backend/storage/uploads/` (ej. `coche.mp4`) o actualiza la variable `VIDEO_PATH` en el notebook.
+1.  **YOLO Model**: Make sure you have `yolov10m.pt` (or whichever you use) in `backend/app/`.
+2.  **Test Video**: Place an mp4 video in `backend/storage/uploads/` (e.g., `car.mp4`) or update the `VIDEO_PATH` variable in the notebook.
 
 ## Notebooks
 
 ### 1. [01_detection_module.ipynb](./01_detection_module.ipynb)
-Prueba el detector YOLO y el tracking.
-- **Input**: Video local.
-- **Output**: Información de tracks y recortes de detecciones en `storage/captures/notebook_test`.
+Test the YOLO detector and tracking.
+- **Input**: Local video.
+- **Output**: Track information and detection crops in `storage/captures/notebook_test`.
 
 ### 2. [02_edition_module.ipynb](./02_edition_module.ipynb)
-Prueba la anonimización de video.
-- **Input**: Video local.
-- **Output**: Video modificado con blur/pixelado.
+Test video anonymization.
+- **Input**: Local video.
+- **Output**: Modified video with blur/pixelation.
 
 ### 3. [03_verification_module.ipynb](./03_verification_module.ipynb)
-Prueba el análisis GDPR (RAG + LLM).
-- **Input**: Imágenes recortadas (capturas).
-- **Output**: Reporte de violaciones.
+Test GDPR analysis (RAG + LLM).
+- **Input**: Cropped images (captures).
+- **Output**: Violations report.
 
 ### 4. [04_full_pipeline.ipynb](./04_full_pipeline.ipynb)
-Corre todo el flujo en secuencia sin levantar el servidor API.
+Run the entire flow in sequence without starting the API server.
 
-## Ejecución
+## Execution
 
-Desde la carpeta `backend/app`:
+From the `backend/app` folder:
 
 ```bash
 jupyter notebook notebooks/

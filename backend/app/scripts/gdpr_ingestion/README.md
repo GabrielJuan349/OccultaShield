@@ -1,25 +1,25 @@
 # Enhanced GDPR Knowledge Graph Ingestion
 
-Este script mejorado integra datos GDPR de múltiples fuentes para crear un knowledge graph completo en Neo4j.
+This enhanced script integrates GDPR data from multiple sources to create a complete knowledge graph in Neo4j.
 
-## Fuentes de Datos
+## Data Sources
 
-1. **Local JSON files** (incluidos en el proyecto)
-   - `gdpr_articles.json` - Artículos del RGPD
-   - `gdpr_concepts.json` - Conceptos, tipos de datos, derechos y multas
-   - `detection_gdpr_mapping.json` - Mapeo de detecciones a artículos GDPR
+1. **Local JSON files** (included in the project)
+   - `gdpr_articles.json` - GDPR Articles
+   - `gdpr_concepts.json` - Concepts, data types, rights and fines
+   - `detection_gdpr_mapping.json` - Detection to GDPR articles mapping
 
 2. **GitHub: coolharsh55/GDPRtEXT**
-   - Repositorio oficial con textos completos del RGPD en formato JSON
+   - Official repository with complete GDPR texts in JSON format
    - URL: https://github.com/coolharsh55/GDPRtEXT
-   - Se descarga automáticamente durante la ingesta
+   - Downloaded automatically during ingestion
 
-3. **Kaggle Datasets** (opcionales)
+3. **Kaggle Datasets** (optional)
    - GDPR Articles dataset
    - GDPR-JSON dataset
-   - Requiere configuración de Kaggle API (ver abajo)
+   - Requires Kaggle API configuration (see below)
 
-## Requisitos
+## Requirements
 
 ### Python Dependencies
 
@@ -29,23 +29,23 @@ pip install neo4j sentence-transformers requests kaggle python-dotenv
 
 ### Neo4j Database
 
-Asegúrate de tener Neo4j corriendo:
+Make sure Neo4j is running:
 
 ```bash
-# Con Docker
+# With Docker
 docker run -d \
   --name neo4j \
   -p 7474:7474 -p 7687:7687 \
   -e NEO4J_AUTH=neo4j/Occultashield_neo4j \
   neo4j:latest
 
-# O iniciarlo localmente
+# Or start it locally
 neo4j start
 ```
 
-### Variables de Entorno
+### Environment Variables
 
-Crea un archivo `.env` en el directorio `backend/app` con:
+Create a `.env` file in the `backend/app` directory with:
 
 ```env
 NEO4J_URI=bolt://localhost:7687
@@ -53,81 +53,81 @@ NEO4J_USER=neo4j
 NEO4J_PASSWORD=Occultashield_neo4j
 ```
 
-## Configuración de Kaggle (Opcional)
+## Kaggle Configuration (Optional)
 
-Si quieres incluir los datasets de Kaggle:
+If you want to include Kaggle datasets:
 
-1. **Crear cuenta en Kaggle**: https://www.kaggle.com
-2. **Obtener API credentials**:
-   - Ve a: https://www.kaggle.com/settings
-   - Scroll hasta "API" section
+1. **Create a Kaggle account**: https://www.kaggle.com
+2. **Get API credentials**:
+   - Go to: https://www.kaggle.com/settings
+   - Scroll to "API" section
    - Click "Create New API Token"
-   - Se descargará `kaggle.json`
+   - `kaggle.json` will be downloaded
 
-3. **Instalar las credenciales**:
+3. **Install credentials**:
    ```bash
    mkdir -p ~/.kaggle
    cp kaggle.json ~/.kaggle/
    chmod 600 ~/.kaggle/kaggle.json
    ```
 
-4. **Instalar Kaggle API**:
+4. **Install Kaggle API**:
    ```bash
    pip install kaggle
    ```
 
-## Ejecución
+## Execution
 
-### Método 1: Script Mejorado (Recomendado)
+### Method 1: Enhanced Script (Recommended)
 
 ```bash
 cd /home/gjuan/OccultaShield/backend/app
 python scripts/gdpr_ingestion/enhanced_ingest_gdpr.py
 ```
 
-Este script:
-- ✅ Carga datos locales JSON
-- ✅ Descarga y procesa GDPRtEXT de GitHub
-- ✅ (Opcional) Descarga datasets de Kaggle
-- ✅ Crea embeddings para búsqueda semántica
-- ✅ Establece relaciones entre nodos
-- ✅ Crea índices fulltext
+This script:
+- ✅ Loads local JSON data
+- ✅ Downloads and processes GDPRtEXT from GitHub
+- ✅ (Optional) Downloads Kaggle datasets
+- ✅ Creates embeddings for semantic search
+- ✅ Establishes relationships between nodes
+- ✅ Creates fulltext indices
 
-### Método 2: Script Original (Solo datos locales)
+### Method 2: Original Script (Local data only)
 
 ```bash
 cd /home/gjuan/OccultaShield/backend/app
 python scripts/gdpr_ingestion/ingest_gdpr.py
 ```
 
-## Verificación
+## Verification
 
-Después de la ingesta, verifica el knowledge graph:
+After ingestion, verify the knowledge graph:
 
 ```bash
-# Conectar a Neo4j Browser: http://localhost:7474
+# Connect to Neo4j Browser: http://localhost:7474
 
-# Verificar artículos
+# Verify articles
 MATCH (a:Article) RETURN count(a) as total_articles
 
-# Ver estructura del grafo
+# See graph structure
 CALL db.schema.visualization()
 
-# Buscar artículo específico
+# Search for specific article
 MATCH (a:Article {number: 6})
 RETURN a.title, a.content
 
-# Encontrar artículos relacionados con un tipo de detección
+# Find articles related to a detection type
 MATCH (d:DetectionType {type: "face"})-[:VIOLATES]->(a:Article)
 RETURN a.number, a.title
 
-# Buscar artículos con embeddings
+# Search for articles with embeddings
 MATCH (a:Article)
 WHERE a.embedding IS NOT NULL
 RETURN count(a) as articles_with_embeddings
 ```
 
-## Estructura del Knowledge Graph
+## Knowledge Graph Structure
 
 ```
 (Chapter)-[:CONTAINS]->(Article)
@@ -144,25 +144,25 @@ RETURN count(a) as articles_with_embeddings
 ## Troubleshooting
 
 ### Error: "Failed to init Neo4j driver"
-- Verifica que Neo4j esté corriendo: `neo4j status`
-- Comprueba las credenciales en `.env`
-- Verifica el puerto: `netstat -an | grep 7687`
+- Verify Neo4j is running: `neo4j status`
+- Check credentials in `.env`
+- Verify port: `netstat -an | grep 7687`
 
 ### Error: "Kaggle API not available"
-- Es opcional. El script continuará sin datasets de Kaggle
-- Para usar Kaggle, sigue los pasos de configuración arriba
+- It's optional. The script will continue without Kaggle datasets
+- To use Kaggle, follow the configuration steps above
 
 ### Error: "Could not download GDPRtEXT"
-- Verifica conexión a Internet
-- Comprueba que GitHub no esté bloqueado
-- El script continuará con datos locales
+- Check Internet connection
+- Verify GitHub is not blocked
+- The script will continue with local data
 
-### Embeddings muy lentos
-- Primera ejecución descarga el modelo `all-MiniLM-L6-v2` (~80MB)
-- Siguientes ejecuciones serán más rápidas
-- Considera usar GPU si está disponible
+### Very slow embeddings
+- First execution downloads the `all-MiniLM-L6-v2` model (~80MB)
+- Subsequent executions will be faster
+- Consider using GPU if available
 
-## Logs de Ejemplo
+## Example Logs
 
 ```
 🚀 Starting Enhanced GDPR Knowledge Graph Ingestion...
@@ -211,15 +211,15 @@ RETURN count(a) as articles_with_embeddings
 💡 Knowledge graph ready for GDPR compliance verification!
 ```
 
-## Próximos Pasos
+## Next Steps
 
-Después de la ingesta:
+After ingestion:
 
-1. **Verificar los datos en Neo4j Browser**: http://localhost:7474
-2. **Ejecutar el backend**: El módulo de verificación usará automáticamente el knowledge graph
-3. **Probar con un video**: Sube un video y verifica que las violaciones GDPR se detecten correctamente
+1. **Verify data in Neo4j Browser**: http://localhost:7474
+2. **Run the backend**: The verification module will automatically use the knowledge graph
+3. **Test with a video**: Upload a video and verify that GDPR violations are detected correctly
 
-## Referencias
+## References
 
 - **GDPRtEXT**: https://github.com/coolharsh55/GDPRtEXT
 - **GDPR Official**: https://gdpr-info.eu/

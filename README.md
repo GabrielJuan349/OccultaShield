@@ -39,6 +39,7 @@
 The system consists of two main orchestrated monoliths:
 1.  **AI Core (Backend)**: An asynchronous processing engine that combines classical computer vision (OpenCV), modern Deep Learning (YOLOv11, YuNet), and Knowledge Graphs (Neo4j) to make legal decisions in real-time.
 2.  **Management Platform (Frontend)**: A cutting-edge reactive web interface (Angular Zoneless) that allows Data Protection Officers (DPOs) to review, audit, and manage video access requests.
+To see OccultaShield in action, watch our project demonstration video: [OccultaShield: Motor de Anonimización de Video GDPR con IA (On-Premise & GraphRAG) | Demo Técnica](https://youtu.be/l_T2g_cFirU)
 
 ---
 
